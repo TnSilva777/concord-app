@@ -52,3 +52,7 @@ create policy "presence read friends" on public.concord_presence for select to a
  )
 );
 -- Nota: executar apenas uma vez; a interface consulta por polling, sem publicacao Realtime.
+
+-- Evita que o destinatario altere requester_id/recipient_id durante a aceitacao.
+revoke update on public.concord_friend_requests from authenticated;
+grant update (status) on public.concord_friend_requests to authenticated;
