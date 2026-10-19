@@ -44,7 +44,7 @@
   <button class="voice-room" data-room="Resenha"><span class="room-icon">◖</span><span class="room-name">Resenha</span><span class="room-count" id="roomCountResenha">0</span></button>
   <div class="room-members" id="membersResenha"></div>
 </div>
-<div class="user"><div class="avatar">T</div><div><b>Thauwan</b><small>● Online</small></div><button class="gear" id="profileBtn">⚙</button></div></aside>
+<div class="user"><div class="avatar">T</div><div><b>Thauwan</b><small>● Online</small></div><button class="gear" id="profileBtn" title="Editar perfil" aria-label="Editar perfil">⚙</button><button class="gear" id="logoutBtn" title="Sair da conta" aria-label="Sair da conta">↪</button></div></aside>
 <main class="main"><header class="topbar"><span class="hash">#</span><div><strong id="channelTitle">geral</strong><span class="sub"> — Converse com sua comunidade</span></div><div class="top-actions"><button class="pill hide-mobile" id="inviteBtn">＋ Convidar</button><button class="primary" id="shareBtn">▣ <span class="hide-mobile">Compartilhar tela</span><span class="mobile-share">Tela</span></button></div></header>
 <div class="messages" id="messages"><section class="welcome"><h1>Bem-vindo ao <span style="color:#a779ff">CONCORD</span> ✨</h1><p>Seu espaço para jogar, conversar e encontrar sua comunidade. Comece mandando uma mensagem ou entre em uma sala de voz.</p></section><div class="date">HOJE</div><div id="messageList"><article class="message"><div class="avatar">C</div><div><div class="msghead"><b>Concord Bot</b><time>agora</time></div><div class="msgbody">Fala, pessoal! 👋 Bem-vindos ao servidor oficial do Concord. Este é o começo de uma nova comunidade!</div></div></article><article class="message"><div class="avatar" style="background:linear-gradient(135deg,#e68a56,#7d365e)">L</div><div><div class="msghead"><b>Membro da comunidade</b><time>agora</time></div><div class="msgbody">Quem vai jogar hoje? 🎮</div></div></article></div></div>
 <div class="mobilebar"><button class="pill" id="mobileVoice">🎙 Sala de voz</button><button class="pill" id="mobileInvite">＋ Convidar</button></div><footer class="composer"><form class="composebox" id="chatForm"><button type="button" class="iconbtn" id="attachBtn" title="Anexar">＋</button><input id="chatInput" placeholder="Mensagem em #geral" autocomplete="off" maxlength="1500"><button class="iconbtn" type="button" id="emojiBtn" title="Emoji">☺</button><button class="primary" type="submit">➤</button></form><div class="hint">CONCORD • Respeite a comunidade e divirta-se.</div></footer></main></div>
@@ -248,6 +248,25 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
       message.textContent = error.message || 'Não foi possível entrar.';
     } finally {
       submit.disabled = false;
+    }
+  };
+
+  // Encerrar a sessao sem apagar automaticamente o historico salvo no dispositivo.
+  document.getElementById('logoutBtn').onclick = async () => {
+    if (!confirm('Deseja sair da sua conta do CONCORD? As mensagens de teste deste navegador permanecerao neste dispositivo.')) return;
+    const button = document.getElementById('logoutBtn');
+    button.disabled = true;
+    try {
+      const { error } = await concordSupabase.auth.signOut();
+      if (error) throw error;
+      overlay.style.display = 'flex';
+      document.getElementById('authPassword').value = '';
+      message.textContent = 'Voce saiu da sua conta.';
+    } catch (error) {
+      message.textContent = error.message || 'Nao foi possivel sair.';
+      alert('Nao foi possivel sair da conta. Tente novamente.');
+    } finally {
+      button.disabled = false;
     }
   };
 
