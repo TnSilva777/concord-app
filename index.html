@@ -23,6 +23,7 @@
 .voice-room-remove{position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:20px;line-height:1;opacity:.65;padding:2px 5px;border-radius:6px;color:#f5b5b5}
 .voice-room-remove:hover,.voice-room-remove:focus-visible{opacity:1;background:#703333;color:white;outline:2px solid #ffb4b4}
 .concord-social{border-top:1px solid var(--line);padding-bottom:7px}.concord-social .section{display:flex;justify-content:space-between;align-items:center}.concord-social .section button{background:#1d4d36;border-radius:7px;padding:1px 7px}.concord-friends{padding:5px 12px;font-size:11px;color:var(--muted);max-height:155px;overflow:auto}.concord-friend{display:flex;align-items:center;gap:5px;margin:6px 0}.concord-friend span{flex:1;overflow:hidden;text-overflow:ellipsis}.concord-friend button,.concord-copy-id{background:#1b4935;border-radius:6px;padding:3px 6px;font-size:11px}.concord-copy-id{margin:2px 12px;color:#c9f3d9}.voice-room[data-custom="true"] .voice-room-remove{cursor:pointer}
+.concord-connection-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #355a46;border-radius:20px;background:#172e23;color:#b4d6c2;font-size:12px;margin:8px 0}.concord-connection-badge[data-state="connected"]{border-color:#38bb7b;color:#7ff0b2;background:#103f2a}.concord-connection-badge[data-state="waiting"]{border-color:#9e8b44;color:#f0d98c}
 /* CONCORD HUD refinement — consistent interactive surfaces and accessible focus */
 :root{--hud-glow:rgba(53,212,154,.14);--hud-ring:#68e4ac}
 button,.channel,.voice-room{transition:background-color .18s ease,border-color .18s ease,transform .18s ease,box-shadow .18s ease}
@@ -292,7 +293,19 @@ let voiceSignal=null,voicePeers=new Map(),voiceAudio=new Map(),voiceStarting=fal
 const voicePendingIce=new Map();
 let remoteAudioMuted=false;
 async function voiceFlushIce(id){const peer=voicePeers.get(id);if(!peer?.remoteDescription)return;const pending=voicePendingIce.get(id)||[];voicePendingIce.delete(id);for(const candidate of pending){try{await peer.addIceCandidate(new RTCIceCandidate(candidate))}catch(error){console.warn('Candidato ICE rejeitado',error)}}}
-function voiceStatus(text){const el=$('#voiceStatus');if(el)el.textContent=text}
+const voiceConnectionBadge=document.createElement('div');
+voiceConnectionBadge.className='concord-connection-badge';
+voiceConnectionBadge.setAttribute('role','status');
+voiceConnectionBadge.textContent='○ Aguardando chamada';
+const voiceStatusElement=$('#voiceStatus');
+if(voiceStatusElement)voiceStatusElement.parentNode.insertBefore(voiceConnectionBadge,voiceStatusElement);
+function voiceStatus(text){
+  const el=$('#voiceStatus');if(el)el.textContent=text;
+  const connected=/conectada!|áudio remoto recebido/i.test(text);
+  const waiting=/conectando|aguardando|sala conectada/i.test(text);
+  voiceConnectionBadge.textContent=connected?'● Áudio conectado':waiting?'◌ Conectando':'○ '+(callJoined?'Verificar conexão':'Fora da chamada');
+  voiceConnectionBadge.dataset.state=connected?'connected':waiting?'waiting':'offline';
+}
 function voicePeerName(){return (typeof concordData!=='undefined'&&concordData.profile?.name)||'Participante'}
 function voiceParticipants(){
   if(!voiceSignal||!joinedRoom)return;
