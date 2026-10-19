@@ -168,6 +168,15 @@ body:not(.concord-server-view) #concordDmPane:not([hidden]){flex:1;min-height:0;
 .concord-brand-mark{cursor:default;user-select:none}
 .concord-brand-mark:hover{transform:none;border-radius:18px}
 #concordFriendsNav.active{background:linear-gradient(135deg,#32c98b,#096b4a);box-shadow:0 0 0 2px #67dca35c,0 0 20px #16865e40;border-color:#6bebb0}
+
+/* Confirmacoes nao bloqueantes: desaparecem automaticamente. */
+#concordToast{position:fixed;right:22px;bottom:22px;z-index:100000;width:min(390px,calc(100vw - 32px));padding:15px 44px 15px 17px;border:1px solid #56b887;border-radius:13px;background:#173b2a;color:#e9fff1;box-shadow:0 15px 50px #0008;display:grid;gap:5px;font-size:13px;line-height:1.45}
+#concordToast[hidden]{display:none!important}
+#concordToast strong{font-size:14px;color:#a4f3c6}
+#concordToast span{color:#d0e6d7;overflow-wrap:anywhere}
+#concordToast button{position:absolute;right:10px;top:8px;width:28px;height:28px;border:0;border-radius:8px;background:#ffffff16;color:#e9fff1;font-size:21px;cursor:pointer}
+#concordToast button:hover{background:#ffffff30}
+@media(max-width:760px){#concordToast{right:12px;bottom:12px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -199,7 +208,26 @@ body:not(.concord-server-view) #concordDmPane:not([hidden]){flex:1;min-height:0;
 <div class="modal" id="simpleModal"><section class="dialog"><h2 id="simpleTitle">CONCORD</h2><p id="simpleText"></p><div class="footbuttons"><button class="primary" id="simpleClose">Entendi</button></div></section></div>
 <script>
 const $=s=>document.querySelector(s);let stream=null;const names={geral:'Converse com sua comunidade',regras:'Leia as regras da comunidade',anuncios:'Novidades do Concord',jogos:'Monte seu squad',tecnologia:'Tudo sobre tecnologia',memes:'Compartilhe os melhores memes'};
-function simple(title,text){$('#simpleTitle').textContent=title;$('#simpleText').textContent=text;$('#simpleModal').classList.add('show')}$('#simpleClose').onclick=()=>$('#simpleModal').classList.remove('show');
+const concordSuccessTitles=new Set(['Perfil atualizado','Comunidade criada','Convite copiado','Pedido enviado','ID copiado','Mensagens encontradas']);
+let concordToastTimer=null;
+const concordToast=document.createElement('div');
+concordToast.id='concordToast';concordToast.setAttribute('role','status');concordToast.setAttribute('aria-live','polite');
+concordToast.hidden=true;document.body.append(concordToast);
+function hideConcordToast(){clearTimeout(concordToastTimer);concordToast.hidden=true;concordToast.replaceChildren()}
+function showConcordToast(title,message){
+  hideConcordToast();
+  const heading=document.createElement('strong');heading.textContent='✓ '+title;
+  const detail=document.createElement('span');detail.textContent=message||'';
+  const close=document.createElement('button');close.type='button';close.textContent='×';close.title='Fechar aviso';close.setAttribute('aria-label','Fechar aviso');close.onclick=hideConcordToast;
+  concordToast.append(heading,detail,close);concordToast.hidden=false;
+  concordToastTimer=setTimeout(hideConcordToast,3800);
+}
+function simple(title,text){
+  if(concordSuccessTitles.has(title)){showConcordToast(title,text);return}
+  hideConcordToast();
+  $('#simpleTitle').textContent=title;$('#simpleText').textContent=text;$('#simpleModal').classList.add('show')
+}
+$('#simpleClose').onclick=()=>$('#simpleModal').classList.remove('show');
 // Chat de teste: historico separado por canal, guardado apenas neste navegador.
 const CONCORD_CHAT_STORE='concord-preview-chat-v2';
 const CONCORD_OLD_CHAT_STORE='concord-preview-chat-v1';
