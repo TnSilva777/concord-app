@@ -121,6 +121,15 @@ button:disabled{cursor:not-allowed;opacity:.58}
 @media(max-width:760px){.app{grid-template-columns:58px minmax(0,1fr)}.sidebar{display:none}.topbar{height:60px}.call-layout{grid-template-columns:1fr}.call-stage{min-height:190px}.voice-dialog{max-height:94dvh;overflow:auto}}
 @media(prefers-reduced-motion:reduce){.logo,.voice-control{transition:none!important}}
 
+
+/* Comunidades locais gerenciaveis e campos adicionais do perfil */
+.concord-community-item{position:relative;width:48px;display:grid;place-items:center;flex-shrink:0}
+.concord-community-item .server{display:grid;place-items:center}
+.concord-community-edit{position:absolute;right:-5px;bottom:-5px;width:23px;height:23px;border:1px solid #4d8e66;border-radius:50%;background:#183d2a;color:#b8f7d1;font-size:12px;display:grid;place-items:center;box-shadow:0 2px 7px #0008}
+.concord-community-edit:hover,.concord-community-edit:focus-visible{background:#26734d}
+.profile-fields textarea{width:100%;min-height:72px;resize:vertical;background:#172e22;color:#eefaf3;border:1px solid #41684f;border-radius:9px;padding:10px;font:inherit}
+.profile-fields textarea:focus-visible{outline:2px solid #68e4ac;outline-offset:2px}
+@media(max-width:760px){.concord-community-item{width:44px}.concord-community-edit{right:-3px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -498,8 +507,60 @@ function setConcordAvatar(el,profile){
   }
 }
 function updateProfileUI(){const name=concordData.profile.name||'Thauwan';const user=$('.user');if(user){setConcordAvatar(user.querySelector('.avatar'),concordData.profile);const b=user.querySelector('b');if(b)b.textContent=name}document.querySelectorAll('.message .msghead b').forEach(b=>{if(b.dataset.self==='true'||b.textContent==='Thauwan'||b.textContent==='Você')b.textContent=name});}
-function renderCommunities(){const rail=$('.servers');if(!rail)return;rail.querySelectorAll('[data-community-id]').forEach(el=>el.remove());const add=$('#addServer');concordData.communities.forEach(c=>{const b=document.createElement('button');b.className='server';b.dataset.communityId=c.id;b.title=c.name;b.textContent=c.icon||c.name.slice(0,1).toUpperCase();b.onclick=()=>{document.querySelectorAll('.server').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('#channelTitle').textContent=c.name;$('.topbar .sub').textContent=' — Comunidade criada neste navegador';const welcome=$('#messages .welcome');if(welcome){welcome.querySelector('h1').textContent='Bem-vindo à '+c.name;welcome.querySelector('p').textContent='Esta comunidade foi criada neste navegador. Os canais compartilhados ainda estão em desenvolvimento.'}if(dmOpen)dmShow(false);};rail.insertBefore(b,add)});}
-function openCommunityCreator(){const title=prompt('Nome da comunidade:','Minha comunidade');if(!title||!title.trim())return;const name=title.trim().slice(0,40);if(concordData.communities.some(c=>c.name.toLowerCase()===name.toLowerCase())){simple('Comunidade já existe','Escolha outro nome para esta comunidade.');return}const icon=(prompt('Escolha um emoji para o ícone da comunidade:','🎮')||'🎮').trim().slice(0,4)||'🎮';concordData.communities.push({id:'c'+Date.now(),name,icon,createdAt:new Date().toISOString()});saveConcordData();renderCommunities();simple('Comunidade criada!','“'+name+'” foi adicionada à barra lateral neste navegador. Para ela aparecer para seus amigos e funcionar em outros dispositivos, falta conectar contas e banco de dados compartilhado.');}
+function editLocalCommunity(id){
+  const community=concordData.communities.find(item=>item.id===id);if(!community)return;
+  const action=prompt('Gerenciar "'+community.name+'" neste navegador. Digite 1 para renomear, 2 para trocar o ícone ou 3 para excluir:','1');
+  if(action===null)return;
+  if(action.trim()==='1'){
+    const value=prompt('Novo nome da comunidade:',community.name);if(value===null)return;
+    const name=value.trim().slice(0,40);
+    if(!name){simple('Nome inválido','Informe um nome para a comunidade.');return}
+    if(concordData.communities.some(item=>item.id!==id&&item.name.toLowerCase()===name.toLowerCase())){simple('Nome em uso','Já existe uma comunidade com esse nome.');return}
+    community.name=name;
+  }else if(action.trim()==='2'){
+    const value=prompt('Novo emoji ou símbolo da comunidade:',community.icon||'🎮');if(value===null)return;
+    community.icon=value.trim().slice(0,4)||'🎮';
+  }else if(action.trim()==='3'){
+    if(!confirm('Excluir a comunidade "'+community.name+'" deste navegador? Esta ação não pode ser desfeita.'))return;
+    concordData.communities=concordData.communities.filter(item=>item.id!==id);
+    $('#channelTitle').textContent='geral';
+    $('.topbar .sub').textContent=' — Converse com sua comunidade';
+  }else{simple('Gerenciar comunidade','Escolha 1, 2 ou 3.');return}
+  saveConcordData();renderCommunities();
+}
+function renderCommunities(){
+  const rail=$('.servers');if(!rail)return;
+  rail.querySelectorAll('[data-community-id]').forEach(el=>el.remove());
+  const add=$('#addServer');
+  concordData.communities.forEach(community=>{
+    const group=document.createElement('div');group.className='concord-community-item';group.dataset.communityId=community.id;
+    const b=document.createElement('button');b.type='button';b.className='server';
+    b.title=community.name;b.setAttribute('aria-label','Abrir comunidade '+community.name);
+    b.textContent=community.icon||community.name.slice(0,1).toUpperCase();
+    b.onclick=()=>{
+      document.querySelectorAll('.server').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+      $('#channelTitle').textContent=community.name;$('.topbar .sub').textContent=' — Comunidade local';
+      const welcome=$('#messages .welcome');
+      if(welcome){welcome.querySelector('h1').textContent='Bem-vindo à '+community.name;welcome.querySelector('p').textContent='Comunidade salva neste navegador. Salas e mensagens próprias compartilhadas ainda não estão disponíveis.'}
+      if(dmOpen)dmShow(false);
+    };
+    b.oncontextmenu=e=>{e.preventDefault();editLocalCommunity(community.id)};
+    const edit=document.createElement('button');edit.type='button';edit.className='concord-community-edit';
+    edit.textContent='⚙';edit.title='Renomear, personalizar ou excluir '+community.name;
+    edit.setAttribute('aria-label','Gerenciar comunidade '+community.name);
+    edit.onclick=()=>editLocalCommunity(community.id);
+    group.append(b,edit);rail.insertBefore(group,add);
+  });
+}
+function openCommunityCreator(){
+  const title=prompt('Nome da comunidade (até 40 caracteres):','Minha comunidade');if(!title||!title.trim())return;
+  const name=title.trim().slice(0,40);
+  if(concordData.communities.some(item=>item.name.toLowerCase()===name.toLowerCase())){simple('Comunidade já existe','Escolha outro nome.');return}
+  const icon=(prompt('Emoji ou símbolo da comunidade:','🎮')||'🎮').trim().slice(0,4)||'🎮';
+  concordData.communities.push({id:'c'+Date.now(),name,icon,createdAt:new Date().toISOString()});
+  saveConcordData();renderCommunities();
+  simple('Comunidade criada','Use a engrenagem do ícone para personalizar ou excluir. Comunidades criadas aqui ficam somente neste navegador.');
+}
 function openProfileEditor(){
   const modal=$('#simpleModal');$('#simpleTitle').textContent='Personalizar perfil';$('#simpleText').replaceChildren();
   const wrap=document.createElement('div');wrap.className='profile-fields';
@@ -511,6 +572,10 @@ function openProfileEditor(){
   const previewSub=document.createElement('small');previewSub.textContent='Prévia do seu perfil';previewText.append(previewName,previewSub);preview.append(avatar,previewText);
   const nameLabel=document.createElement('label');nameLabel.textContent='Nome de exibição';
   const nameInput=document.createElement('input');nameInput.maxLength=28;nameInput.value=concordData.profile.name||'Thauwan';nameInput.placeholder='Seu nome';nameLabel.append(nameInput);
+  const bioLabel=document.createElement('label');bioLabel.textContent='Sobre mim (até 160 caracteres)';
+  const bioInput=document.createElement('textarea');bioInput.maxLength=160;bioInput.rows=3;bioInput.placeholder='Conte um pouco sobre você…';bioInput.value=concordData.profile.bio||'';bioLabel.append(bioInput);
+  const statusLabel=document.createElement('label');statusLabel.textContent='Status personalizado (até 50 caracteres)';
+  const statusInput=document.createElement('input');statusInput.maxLength=50;statusInput.placeholder='Ex.: Jogando com amigos 🎮';statusInput.value=concordData.profile.status||'';statusLabel.append(statusInput);
   const avatarLabel=document.createElement('label');avatarLabel.textContent='Letra ou emoji (sem foto)';
   const avatarInput=document.createElement('input');avatarInput.maxLength=4;avatarInput.value=concordData.profile.avatar||'T';avatarLabel.append(avatarInput);
   const colorLabel=document.createElement('label');colorLabel.textContent='Cor principal';
@@ -538,7 +603,7 @@ function openProfileEditor(){
   };
   removePhoto.onclick=()=>{selectedPhotoRemoved=true;selectedPhoto='';photoInput.value='';photoError.textContent='Foto removida da prévia. Salve para confirmar.';previewAvatar()};
   photoLabel.append(photoInput,photoHint);
-  [preview,nameLabel,avatarLabel,colorLabel,photoLabel,removePhoto,photoError].forEach(x=>wrap.append(x));
+  [preview,nameLabel,statusLabel,bioLabel,avatarLabel,colorLabel,photoLabel,removePhoto,photoError].forEach(x=>wrap.append(x));
   $('#simpleText').append(wrap);
   const foot=modal.querySelector('.footbuttons');foot.replaceChildren();
   const cancel=document.createElement('button');cancel.className='pill';cancel.textContent='Cancelar';cancel.onclick=()=>modal.classList.remove('show');
@@ -556,7 +621,7 @@ function openProfileEditor(){
         else {cloudPhoto='';notice='Foto salva somente neste navegador. O Supabase recusou a sincronização: '+result.message+'. Confira as políticas de Storage antes de testar em outro dispositivo.'}
       }
       if(id!==concordProfileUser){photoError.textContent='A conta mudou durante o salvamento. Abra o perfil novamente.';return}
-      concordData.profile={name:n,avatar:avatarInput.value.trim()||n.slice(0,1).toUpperCase(),color:colorInput.value,photo:selectedPhoto,cloudPhoto};
+      concordData.profile={name:n,status:statusInput.value.trim().slice(0,50),bio:bioInput.value.trim().slice(0,160),avatar:avatarInput.value.trim()||n.slice(0,1).toUpperCase(),color:colorInput.value,photo:selectedPhoto,cloudPhoto};
       if(!saveConcordProfileForUser()){concordData.profile=previous;photoError.textContent='Não foi possível salvar o perfil neste navegador.';return}
       updateProfileUI();if(typeof renderRooms==='function')renderRooms();modal.classList.remove('show');simple('Perfil atualizado',notice);
     }finally{save.disabled=false;save.textContent='Salvar perfil'}
