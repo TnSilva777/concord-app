@@ -25,6 +25,7 @@
 .concord-social{border-top:1px solid var(--line);padding-bottom:7px}.concord-social .section{display:flex;justify-content:space-between;align-items:center}.concord-social .section button{background:#1d4d36;border-radius:7px;padding:1px 7px}.concord-friends{padding:5px 12px;font-size:11px;color:var(--muted);max-height:155px;overflow:auto}.concord-friend{display:flex;align-items:center;gap:5px;margin:6px 0}.concord-friend span{flex:1;overflow:hidden;text-overflow:ellipsis}.concord-friend button,.concord-copy-id{background:#1b4935;border-radius:6px;padding:3px 6px;font-size:11px}.concord-copy-id{margin:2px 12px;color:#c9f3d9}.voice-room[data-custom="true"] .voice-room-remove{cursor:pointer}
 .concord-connection-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #355a46;border-radius:20px;background:#172e23;color:#b4d6c2;font-size:12px;margin:8px 0}.concord-connection-badge[data-state="connected"]{border-color:#38bb7b;color:#7ff0b2;background:#103f2a}.concord-connection-badge[data-state="waiting"]{border-color:#9e8b44;color:#f0d98c}
 .concord-social-error{font-size:11px;line-height:1.4;color:#eab5a7;overflow-wrap:anywhere;margin:5px 0}
+#concordDmPane[hidden]{display:none!important}#concordDmPane{flex:1;min-height:0;display:flex;flex-direction:column;background:#071b14;margin:0;padding:18px 24px;overflow:hidden}#messages[hidden],#chatForm[hidden]{display:none!important}.concord-dm-header{display:flex;align-items:center;gap:16px;border-bottom:1px solid #315542;padding:10px 0 16px;flex-wrap:wrap}.concord-dm-header button,.concord-dm-form button,.concord-dm-nav,.concord-dm-friend{border:1px solid #35634a;background:#15583e;color:#d9fbe8;border-radius:9px;padding:9px 12px;cursor:pointer}.concord-dm-header span{color:#9fcdb3;font-size:12px}.concord-dm-history{flex:1;min-height:0;overflow:auto;padding:16px 0}.concord-dm-message{max-width:75%;padding:10px 13px;margin:10px 0;background:#17392b;border-radius:12px;overflow-wrap:anywhere}.concord-dm-message.mine{margin-left:auto;background:#176345}.concord-dm-message time{font-size:10px;opacity:.65;margin-left:10px}.concord-dm-message p{margin:5px 0 0;white-space:pre-wrap}.concord-dm-form{display:flex;gap:10px;padding:12px 0}.concord-dm-form input{flex:1;min-width:0;border:1px solid #386b50;background:#142e22;border-radius:9px;padding:12px;color:white}.concord-dm-nav{width:calc(100% - 24px);margin:10px 12px;text-align:left}.concord-dm-nav.active{background:#19835a}.concord-dm-friends{padding:4px 12px;max-height:170px;overflow:auto;color:#a7c9b4;font-size:11px}.concord-dm-label{font-size:10px;font-weight:bold;letter-spacing:1px;margin-bottom:8px}.concord-dm-friend{display:block;width:100%;margin:5px 0;text-align:left;font-size:11px;padding:7px}.concord-dm-form button:disabled{opacity:.5}@media(max-width:720px){#concordDmPane{padding:10px 12px}.concord-dm-message{max-width:94%}}
 /* CONCORD HUD refinement — consistent interactive surfaces and accessible focus */
 :root{--hud-glow:rgba(53,212,154,.14);--hud-ring:#68e4ac}
 button,.channel,.voice-room{transition:background-color .18s ease,border-color .18s ease,transform .18s ease,box-shadow .18s ease}
@@ -440,6 +441,74 @@ socialPanel.innerHTML='<div class="section">AMIGOS <button id="concordAddFriend"
 const voiceSection=document.querySelector('.voice-section-title');
 if(voiceSection)voiceSection.parentNode.insertBefore(socialPanel,voiceSection);
 let socialUser=null,socialTimer=null,socialBusy=false;
+// Mensagens privadas: area separada dos canais publicos, com armazenamento no Supabase.
+const dmPane=document.createElement('section');dmPane.id='concordDmPane';dmPane.hidden=true;
+dmPane.innerHTML='<div class="concord-dm-header"><button type="button" id="dmBack">← Voltar</button><strong>Conversas privadas</strong><span id="dmPeerLabel">Selecione um amigo</span></div><div id="dmHistory" class="concord-dm-history" role="log" aria-live="polite">Selecione um amigo na lista à esquerda.</div><form id="dmForm" class="concord-dm-form"><input id="dmInput" type="text" maxlength="2000" placeholder="Mensagem privada..." autocomplete="off" required disabled><button type="submit" disabled id="dmSend">Enviar</button></form>';
+const chatContainer=$('#messages');
+if(chatContainer)chatContainer.parentNode.append(dmPane);
+const dmNav=document.createElement('button');dmNav.type='button';dmNav.id='concordDmNav';dmNav.className='concord-dm-nav';dmNav.textContent='✉ Conversas privadas';
+socialPanel.append(dmNav);
+const dmFriends=document.createElement('div');dmFriends.id='dmFriends';dmFriends.className='concord-dm-friends';
+socialPanel.append(dmFriends);
+let dmOpen=false,dmPeer=null,dmRequest=0,dmBusy=false,dmFriendIds=new Set(),dmTimer=null;
+function dmShow(open){
+  dmOpen=open;dmPane.hidden=!open;
+  if(chatContainer)chatContainer.hidden=open;
+  const composer=$('#chatForm');if(composer)composer.hidden=open;
+  dmNav.classList.toggle('active',open);
+  if(!open){dmPeer=null;$('#dmPeerLabel').textContent='Selecione um amigo';$('#dmInput').disabled=true;$('#dmSend').disabled=true}
+}
+dmNav.onclick=()=>{dmShow(!dmOpen);if(dmOpen)dmLoad()};
+$('#dmBack').onclick=()=>dmShow(false);
+function dmSelect(id){
+  if(!dmFriendIds.has(id))return;
+  dmPeer=id;dmShow(true);
+  $('#dmPeerLabel').textContent='Amigo '+id.slice(0,8);
+  $('#dmInput').disabled=false;$('#dmSend').disabled=false;
+  $('#dmInput').focus();dmLoad();
+}
+function dmRender(rows){
+  const list=$('#dmHistory');list.replaceChildren();
+  if(!rows.length){list.textContent='Nenhuma mensagem ainda. Envie a primeira!';return}
+  rows.forEach(msg=>{
+    const item=document.createElement('article');item.className='concord-dm-message';
+    if(msg.sender_id===socialUser)item.classList.add('mine');
+    const name=document.createElement('strong');name.textContent=msg.sender_id===socialUser?'Você':'Amigo';
+    const time=document.createElement('time');time.textContent=new Date(msg.created_at).toLocaleString('pt-BR');
+    const body=document.createElement('p');body.textContent=msg.body;
+    item.append(name,time,body);list.append(item);
+  });
+  list.scrollTop=list.scrollHeight;
+}
+async function dmLoad(){
+  if(!dmOpen||!dmPeer||!socialUser||dmBusy)return;
+  if(!dmFriendIds.has(dmPeer)){dmPeer=null;$('#dmHistory').textContent='Esta amizade não está mais ativa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true;return}
+  dmBusy=true;const peer=dmPeer,seq=++dmRequest;
+  try{
+    const {data,error}=await concordSupabase.from('concord_direct_messages')
+      .select('id,sender_id,recipient_id,body,created_at')
+      .or('and(sender_id.eq.'+socialUser+',recipient_id.eq.'+peer+'),and(sender_id.eq.'+peer+',recipient_id.eq.'+socialUser+')')
+      .order('created_at',{ascending:false}).limit(100);
+    if(error)throw error;
+    if(dmPeer===peer&&seq===dmRequest)dmRender((data||[]).reverse());
+  }catch(error){if(dmPeer===peer)$('#dmHistory').textContent='Mensagens privadas indisponíveis: '+(error.message||'verifique o SQL no Supabase');console.error('CONCORD DM:',error)}
+  finally{dmBusy=false}
+}
+$('#dmForm').onsubmit=async event=>{
+  event.preventDefault();
+  const input=$('#dmInput'),body=input.value.trim(),peer=dmPeer;
+  if(!body||!peer||!socialUser||!dmFriendIds.has(peer))return;
+  $('#dmSend').disabled=true;
+  try{
+    const {error}=await concordSupabase.from('concord_direct_messages').insert({sender_id:socialUser,recipient_id:peer,body});
+    if(error)throw error;
+    input.value='';await dmLoad();
+  }catch(error){simple('Mensagem não enviada',error.message||'Confira a conexão e as permissões.')}
+  finally{$('#dmSend').disabled=!dmFriendIds.has(dmPeer)}
+};
+document.querySelectorAll('[data-channel]').forEach(btn=>btn.addEventListener('click',()=>dmShow(false)));
+dmTimer=setInterval(()=>{if(dmOpen&&document.visibilityState==='visible')dmLoad()},4000);
+
 async function refreshSocial(){
   if(!socialUser||socialBusy)return;socialBusy=true;
   try{
@@ -449,6 +518,12 @@ async function refreshSocial(){
     const ids=accepted.map(f=>f.requester_id===socialUser?f.recipient_id:f.requester_id);
     const {data:presence}=ids.length?await concordSupabase.from('concord_presence').select('user_id,last_seen').in('user_id',ids):{data:[]};
     const online=new Set((presence||[]).filter(p=>Date.now()-new Date(p.last_seen).getTime()<90000).map(p=>p.user_id));
+    dmFriendIds=new Set(ids);
+    const dmList=$('#dmFriends');dmList.replaceChildren();
+    const dmLabel=document.createElement('div');dmLabel.className='concord-dm-label';dmLabel.textContent='CONVERSAS COM AMIGOS';dmList.append(dmLabel);
+    if(!ids.length){const empty=document.createElement('div');empty.textContent='Aceite uma amizade para conversar.';dmList.append(empty)}
+    ids.forEach(id=>{const button=document.createElement('button');button.type='button';button.className='concord-dm-friend';button.textContent='✉ Amigo '+id.slice(0,8);button.onclick=()=>dmSelect(id);dmList.append(button)});
+    if(dmOpen&&dmPeer&&!dmFriendIds.has(dmPeer))dmLoad();
     const list=$('#concordFriends');list.replaceChildren();
     if(!friends.length){list.textContent='Nenhum amigo adicionado.'}
     for(const f of friends){
@@ -491,7 +566,7 @@ async function initConcordSocial(session){
   const id=session?.user?.id||null;
   if(id===socialUser)return;
   socialUser=id;voiceRoomsUser=id;clearInterval(socialTimer);socialTimer=null;
-  if(!id){$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
+  if(!id){dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
   await Promise.all([refreshSocial(),refreshSharedVoiceRooms()]);
   socialTimer=setInterval(()=>{if(document.visibilityState==='visible'){refreshSocial();refreshSharedVoiceRooms()}},30000);
 }
