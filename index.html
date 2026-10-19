@@ -523,6 +523,19 @@ voiceConnectionBadge.setAttribute('role','status');
 voiceConnectionBadge.textContent='○ Aguardando chamada';
 const voiceStatusElement=$('#voiceStatus');
 if(voiceStatusElement)voiceStatusElement.parentNode.insertBefore(voiceConnectionBadge,voiceStatusElement);
+const voiceInviteButton=document.createElement('button');
+voiceInviteButton.type='button';
+voiceInviteButton.className='concord-copy-id';
+voiceInviteButton.textContent='🔗 Copiar convite da sala';
+voiceInviteButton.title='Copiar link para convidar um amigo para esta sala de voz';
+voiceInviteButton.onclick=async()=>{
+  const room=joinedRoom||activeRoom;
+  if(!room){simple('Selecione uma sala','Escolha uma sala de voz antes de copiar o convite.');return}
+  const url=new URL(location.href);url.hash=new URLSearchParams({voz:room}).toString();
+  try{await navigator.clipboard.writeText(url.toString());simple('Convite copiado','Envie o link ao seu amigo. Ele precisará entrar na conta e clicar em Entrar na sala.')}
+  catch(error){prompt('Copie o convite da sala:',url.toString())}
+};
+if(voiceStatusElement)voiceStatusElement.parentNode.insertBefore(voiceInviteButton,voiceStatusElement);
 function voiceStatus(text){
   const el=$('#voiceStatus');if(el)el.textContent=text;
   const connected=/conectada!|áudio remoto recebido/i.test(text);
