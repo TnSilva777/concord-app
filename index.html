@@ -27,6 +27,7 @@
 .concord-social-error{font-size:11px;line-height:1.4;color:#eab5a7;overflow-wrap:anywhere;margin:5px 0}
 #concordDmPane[hidden]{display:none!important}#concordDmPane{flex:1;min-height:0;display:flex;flex-direction:column;background:#071b14;margin:0;padding:18px 24px;overflow:hidden}#messages[hidden],#chatForm[hidden]{display:none!important}.concord-dm-header{display:flex;align-items:center;gap:16px;border-bottom:1px solid #315542;padding:10px 0 16px;flex-wrap:wrap}.concord-dm-header button,.concord-dm-form button,.concord-dm-nav,.concord-dm-friend{border:1px solid #35634a;background:#15583e;color:#d9fbe8;border-radius:9px;padding:9px 12px;cursor:pointer}.concord-dm-header span{color:#9fcdb3;font-size:12px}.concord-dm-history{flex:1;min-height:0;overflow:auto;padding:16px 0}.concord-dm-message{max-width:75%;padding:10px 13px;margin:10px 0;background:#17392b;border-radius:12px;overflow-wrap:anywhere}.concord-dm-message.mine{margin-left:auto;background:#176345}.concord-dm-message time{font-size:10px;opacity:.65;margin-left:10px}.concord-dm-message p{margin:5px 0 0;white-space:pre-wrap}.concord-dm-form{display:flex;gap:10px;padding:12px 0}.concord-dm-form input{flex:1;min-width:0;border:1px solid #386b50;background:#142e22;border-radius:9px;padding:12px;color:white}.concord-dm-nav{width:calc(100% - 24px);margin:10px 12px;text-align:left}.concord-dm-nav.active{background:#19835a}.concord-dm-friends{padding:4px 12px;max-height:170px;overflow:auto;color:#a7c9b4;font-size:11px}.concord-dm-label{font-size:10px;font-weight:bold;letter-spacing:1px;margin-bottom:8px}.concord-dm-friend{display:block;width:100%;margin:5px 0;text-align:left;font-size:11px;padding:7px}.concord-dm-form button:disabled{opacity:.5}@media(max-width:720px){#concordDmPane{padding:10px 12px}.concord-dm-message{max-width:94%}}
 .concord-dm-navigation{padding:8px 10px 4px;border-bottom:1px solid var(--line)}.concord-dm-navigation .concord-dm-nav{display:flex;align-items:center;justify-content:flex-start;width:100%;margin:0;padding:11px 12px;font-weight:700;font-size:12px}.concord-dm-navigation .concord-dm-nav:focus-visible{outline:2px solid #7cf2b2;outline-offset:2px}.composer[hidden],.mobilebar[hidden]{display:none!important}#concordDmPane{order:0}#concordDmPane .concord-dm-history{overscroll-behavior:contain}@media(max-width:720px){.concord-dm-navigation{padding:7px}.concord-dm-navigation .concord-dm-nav{padding:10px 8px;font-size:11px}}
+.concord-local-notice{font-size:11px;line-height:1.5;color:#b8d5c2;background:#163527;border:1px solid #355f47;border-radius:10px;padding:9px 12px;margin:12px 0 18px}
 /* CONCORD HUD refinement — consistent interactive surfaces and accessible focus */
 :root{--hud-glow:rgba(53,212,154,.14);--hud-ring:#68e4ac}
 button,.channel,.voice-room{transition:background-color .18s ease,border-color .18s ease,transform .18s ease,box-shadow .18s ease}
@@ -104,6 +105,13 @@ $('#chatInput').maxLength=2000;
 $('#chatInput').addEventListener('input',()=>saveConcordDraft(concordActiveChannel,$('#chatInput').value));
 
 const concordDefaultMessages=$('#messageList').innerHTML;
+const localChatNotice=document.createElement('div');
+localChatNotice.className='concord-local-notice';
+localChatNotice.setAttribute('role','note');
+localChatNotice.textContent='⚠ Chat público em teste: mensagens salvas apenas neste navegador. Seus amigos ainda não recebem essas mensagens.';
+const messageList=$('#messageList');
+if(messageList)messageList.parentNode.insertBefore(localChatNotice,messageList);
+
 function readChatHistory(){
   try{
     const value=JSON.parse(localStorage.getItem(CONCORD_CHAT_STORE)||'{}');
