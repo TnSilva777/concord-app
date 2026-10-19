@@ -605,7 +605,7 @@ async function voiceSignalReceived(packet){
     }
   }catch(error){console.warn('Sinalizacao de voz',error);voiceStatus('Erro na conexão de voz: '+error.message)}
 }
-async function startVoiceNetwork(){
+async async function startVoiceNetwork(){
   if(voiceStarting||voiceSignal||!callJoined||!joinedRoom)return;
   voiceStarting=true;
   try{
