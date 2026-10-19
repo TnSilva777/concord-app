@@ -147,6 +147,22 @@ body.concord-home-view #concordDmPane{display:flex;flex-direction:column;min-hei
 body.concord-home-view #concordDmPane[hidden]{display:none!important}
 body.concord-home-view #concordDmNav{box-shadow:0 0 0 2px #67dca35c}
 body.concord-home-view #concordFriendsNav{background:#225c40}
+
+/* Sem servidor selecionado, nao exibir canais nem o chat demonstrativo. */
+body:not(.concord-server-view) .sidebar>.section,
+body:not(.concord-server-view) .sidebar>.channel,
+body:not(.concord-server-view) .sidebar>.voice-room-list,
+body:not(.concord-server-view) .sidebar>.search,
+body:not(.concord-server-view) #messages,
+body:not(.concord-server-view) .composer,
+body:not(.concord-server-view) .mobilebar,
+body:not(.concord-server-view) .top-actions{display:none!important}
+body:not(.concord-server-view) .topbar .sub{display:none}
+body:not(.concord-server-view) .sidebar .brand{border-bottom:1px solid var(--line)}
+body:not(.concord-server-view) #concordDmPane:not([hidden]){flex:1;min-height:0;display:flex;flex-direction:column}
+.concord-home-intro{margin:18px;padding:22px;border:1px solid #34684b;border-radius:15px;background:linear-gradient(115deg,#1c3c2a,#12261d);color:#e6f8eb}
+.concord-home-intro h2{margin:0 0 9px;font-size:21px}
+.concord-home-intro p{margin:0;color:#a9cbb5;line-height:1.5}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -844,6 +860,16 @@ let dmOpen=false,dmPeer=null,dmRequest=0,dmBusy=false,dmFriendIds=new Set(),dmTi
 function dmShow(open){
   ++dmRequest;
   dmOpen=open;dmPane.hidden=!open;
+  if(open&&!dmPeer){
+    const history=$('#dmHistory');
+    if(history&&!history.querySelector('.concord-home-intro')){
+      history.replaceChildren();
+      const intro=document.createElement('div');intro.className='concord-home-intro';
+      const heading=document.createElement('h2');heading.textContent='Bem-vindo ao CONCORD ✨';
+      const detail=document.createElement('p');detail.textContent='Converse com amigos ou escolha um servidor na barra lateral. Os canais e salas de voz aparecem quando você entra em uma comunidade.';
+      intro.append(heading,detail);history.append(intro);
+    }
+  }
   document.body.classList.toggle('concord-home-view',open);
   if(open)document.body.classList.remove('concord-server-view');
   if(chatContainer)chatContainer.hidden=open;
