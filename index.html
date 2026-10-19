@@ -163,6 +163,11 @@ body:not(.concord-server-view) #concordDmPane:not([hidden]){flex:1;min-height:0;
 .concord-home-intro{margin:18px;padding:22px;border:1px solid #34684b;border-radius:15px;background:linear-gradient(115deg,#1c3c2a,#12261d);color:#e6f8eb}
 .concord-home-intro h2{margin:0 0 9px;font-size:21px}
 .concord-home-intro p{margin:0;color:#a9cbb5;line-height:1.5}
+
+/* C e somente a marca; estrela e o unico atalho da area inicial. */
+.concord-brand-mark{cursor:default;user-select:none}
+.concord-brand-mark:hover{transform:none;border-radius:18px}
+#concordFriendsNav.active{background:linear-gradient(135deg,#32c98b,#096b4a);box-shadow:0 0 0 2px #67dca35c,0 0 20px #16865e40;border-color:#6bebb0}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -175,7 +180,7 @@ body:not(.concord-server-view) #concordDmPane:not([hidden]){flex:1;min-height:0;
   );
 </script>
   </head><body>
-<div class="app"><aside class="servers"><button type="button" class="logo" id="concordDmNav" title="Conversas privadas" aria-label="Abrir conversas privadas" aria-pressed="false">C</button><button type="button" class="server" id="concordFriendsNav" title="Amigos e conversas privadas" aria-label="Abrir amigos e conversas privadas">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
+<div class="app"><aside class="servers"><div class="logo concord-brand-mark" aria-label="Logo CONCORD" title="CONCORD">C</div><button type="button" class="server" id="concordFriendsNav" title="Amigos e conversas privadas" aria-label="Abrir amigos e conversas privadas">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
 <aside class="sidebar"><div class="brand"><strong>CONCORD</strong><small>SUA COMUNIDADE. SEU ESPAÇO.</small></div><button class="search" id="searchBtn">⌕ &nbsp; Buscar canais</button><div class="section">CONCORD OFICIAL</div><button class="channel active" data-channel="geral"><span>#</span> geral</button><button class="channel" data-channel="regras"><span>#</span> regras</button><button class="channel" data-channel="anuncios"><span>#</span> anúncios</button><div class="section">COMUNIDADES</div><button class="channel" data-channel="jogos"><span>#</span> jogos</button><button class="channel" data-channel="tecnologia"><span>#</span> tecnologia</button><button class="channel" data-channel="memes"><span>#</span> memes</button><div class="section">CANAIS DE VOZ</div><button class="channel" id="voiceBtn"><span>◖</span> Sala de voz <span class="online"></span></button><div class="section voice-section-title">SALAS DE VOZ <button id="addVoiceRoom" title="Criar sala de voz">＋</button></div>
 <div class="voice-room-list" id="voiceRoomList">
   <button class="voice-room active" data-room="Geral"><span class="room-icon">◖</span><span class="room-name">Geral</span><span class="room-count" id="roomCountGeral">0</span></button>
@@ -853,7 +858,7 @@ const dmPane=document.createElement('section');dmPane.id='concordDmPane';dmPane.
 dmPane.innerHTML='<div class="concord-dm-header"><button type="button" id="dmBack">← Voltar</button><strong>Conversas privadas</strong><span id="dmPeerLabel">Selecione um amigo</span></div><div id="dmHistory" class="concord-dm-history" role="log" aria-live="polite">Selecione um amigo na lista à esquerda.</div><form id="dmForm" class="concord-dm-form"><input id="dmInput" type="text" maxlength="2000" placeholder="Mensagem privada..." autocomplete="off" required disabled><button type="submit" disabled id="dmSend">Enviar</button></form>';
 const chatContainer=$('#messages');
 if(chatContainer)chatContainer.parentNode.insertBefore(dmPane,chatContainer.nextSibling);
-const dmNav=$('#concordDmNav');
+const dmNav=$('#concordFriendsNav');
 const dmFriends=document.createElement('div');dmFriends.id='dmFriends';dmFriends.className='concord-dm-friends';dmFriends.hidden=true;
 socialPanel.append(dmFriends);
 let dmOpen=false,dmPeer=null,dmRequest=0,dmBusy=false,dmFriendIds=new Set(),dmTimer=null,dmSending=false,dmNeedsRefresh=false;
@@ -884,8 +889,8 @@ function dmShow(open){
   $('#concordFriendsNav').setAttribute('aria-pressed',String(open));
   if(!open){dmPeer=null;$('#dmPeerLabel').textContent='Selecione um amigo';$('#dmInput').disabled=true;$('#dmSend').disabled=true;renderChatHistory()}
 }
-dmNav.onclick=()=>{dmShow(!dmOpen);if(dmOpen){$('#dmHistory').textContent='Escolha um amigo na lista à esquerda para iniciar uma conversa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true}};
-$('#concordFriendsNav').onclick=()=>{dmShow(true);$('#concordAddFriend').focus();};
+
+$('#concordFriendsNav').onclick=()=>{dmShow(true);$('#concordAddFriend')?.focus();};
 $('#dmBack').onclick=()=>dmShow(false);
 function dmSelect(id){
   if(!dmFriendIds.has(id))return;
