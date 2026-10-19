@@ -427,7 +427,7 @@ async function saveConcordAvatarToCloud(id,photo,removed){
     }
     const {data}=bucket.getPublicUrl(path);
     return {ok:true,url:data.publicUrl+'?v='+Date.now()};
-  }catch(error){console.warn('Falha ao sincronizar avatar:',error);return {ok:false,message:error.message||'Erro ao enviar foto'}}
+  }catch(error){console.warn('Falha ao sincronizar avatar:',error);return {ok:false,message:(error.message||'Erro ao enviar foto')+(String(error.message||'').includes('row-level security')?' (política RLS bloqueou o envio)':'')}}
 }
 function saveConcordProfileForUser(){
   if(!concordProfileUser)return false;
@@ -439,7 +439,7 @@ function setConcordAvatar(el,profile){
   const name=profile.name||'Usuário',letter=profile.avatar||name.slice(0,1).toUpperCase();
   el.textContent=letter;el.style.background='linear-gradient(135deg,'+(profile.color||'#2bb77b')+',#0c5b40)';
   el.style.backgroundImage='';el.style.backgroundSize='';el.style.backgroundPosition='';
-  const photo=(typeof profile.cloudPhoto==='string'&&/^https:\/\/mthrcsfxyzswcaokzrvq\.supabase\.co\/storage\/v1\/object\/public\/concord-avatars\//.test(profile.cloudPhoto))?profile.cloudPhoto:profile.photo;
+  const photo=(typeof profile.photo==='string'&&profile.photo.startsWith('data:image/jpeg;base64,'))?profile.photo:profile.cloudPhoto;
   if(typeof photo==='string'&&((/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(photo)&&photo.length<350000)||/^https:\/\/mthrcsfxyzswcaokzrvq\.supabase\.co\/storage\/v1\/object\/public\/concord-avatars\//.test(photo))){
     el.textContent='';el.style.backgroundImage='url("'+photo+'")';el.style.backgroundSize='cover';el.style.backgroundPosition='center';
   }
@@ -498,9 +498,8 @@ function openProfileEditor(){
       let notice='Perfil salvo neste navegador.';
       if(photoChanged){
         const result=await saveConcordAvatarToCloud(id,selectedPhoto,!selectedPhoto);
-        if(!result.ok){photoError.textContent='Não foi possível sincronizar a foto: '+result.message+'. Confira as políticas do bucket concord-avatars no Supabase.';return}
-        cloudPhoto=result.url||'';
-        notice='Foto sincronizada no Supabase e salva neste navegador.';
+        if(result.ok){cloudPhoto=result.url||'';notice='Foto sincronizada no Supabase e salva neste navegador.'}
+        else {cloudPhoto='';notice='Foto salva somente neste navegador. O Supabase recusou a sincronização: '+result.message+'. Confira as políticas de Storage antes de testar em outro dispositivo.'}
       }
       if(id!==concordProfileUser){photoError.textContent='A conta mudou durante o salvamento. Abra o perfil novamente.';return}
       concordData.profile={name:n,avatar:avatarInput.value.trim()||n.slice(0,1).toUpperCase(),color:colorInput.value,photo:selectedPhoto,cloudPhoto};
