@@ -332,10 +332,70 @@ const CONCORD_STORE='concord-local-v2';
 let concordData={profile:{name:'Thauwan',avatar:'T',color:'#16865e'},communities:[]};
 try{const saved=JSON.parse(localStorage.getItem(CONCORD_STORE)||'null');if(saved&&typeof saved==='object')concordData={...concordData,...saved,profile:{...concordData.profile,...(saved.profile||{})},communities:Array.isArray(saved.communities)?saved.communities:[]}}catch(e){}
 function saveConcordData(){try{localStorage.setItem(CONCORD_STORE,JSON.stringify(concordData))}catch(e){}}
-function updateProfileUI(){const name=concordData.profile.name||'Thauwan',av=concordData.profile.avatar||name.slice(0,1).toUpperCase();const user=$('.user');if(user){const a=user.querySelector('.avatar');if(a){a.textContent=av;a.style.background=`linear-gradient(135deg,${concordData.profile.color||'#2bb77b'},#0c5b40)`}const b=user.querySelector('b');if(b)b.textContent=name}document.querySelectorAll('.message .msghead b').forEach(b=>{if(b.dataset.self==='true'||b.textContent==='Thauwan'||b.textContent==='Você')b.textContent=name});}
+function setConcordAvatar(el,profile){
+  if(!el)return;
+  const name=profile.name||'Usuário',letter=profile.avatar||name.slice(0,1).toUpperCase();
+  el.textContent=letter;el.style.background='linear-gradient(135deg,'+(profile.color||'#2bb77b')+',#0c5b40)';
+  el.style.backgroundImage='';el.style.backgroundSize='';el.style.backgroundPosition='';
+  if(typeof profile.photo==='string'&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(profile.photo)&&profile.photo.length<350000){
+    el.textContent='';el.style.backgroundImage='url("'+profile.photo+'")';el.style.backgroundSize='cover';el.style.backgroundPosition='center';
+  }
+}
+function updateProfileUI(){const name=concordData.profile.name||'Thauwan';const user=$('.user');if(user){setConcordAvatar(user.querySelector('.avatar'),concordData.profile);const b=user.querySelector('b');if(b)b.textContent=name}document.querySelectorAll('.message .msghead b').forEach(b=>{if(b.dataset.self==='true'||b.textContent==='Thauwan'||b.textContent==='Você')b.textContent=name});}
 function renderCommunities(){const rail=$('.servers');if(!rail)return;rail.querySelectorAll('[data-community-id]').forEach(el=>el.remove());const add=$('#addServer');concordData.communities.forEach(c=>{const b=document.createElement('button');b.className='server';b.dataset.communityId=c.id;b.title=c.name;b.textContent=c.icon||c.name.slice(0,1).toUpperCase();b.onclick=()=>{document.querySelectorAll('.server').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('#channelTitle').textContent=c.name;$('.topbar .sub').textContent=' — Comunidade criada neste navegador';const welcome=$('#messages .welcome');if(welcome){welcome.querySelector('h1').textContent='Bem-vindo à '+c.name;welcome.querySelector('p').textContent='Esta comunidade foi criada neste navegador. Os canais compartilhados ainda estão em desenvolvimento.'}if(dmOpen)dmShow(false);};rail.insertBefore(b,add)});}
 function openCommunityCreator(){const title=prompt('Nome da comunidade:','Minha comunidade');if(!title||!title.trim())return;const name=title.trim().slice(0,40);if(concordData.communities.some(c=>c.name.toLowerCase()===name.toLowerCase())){simple('Comunidade já existe','Escolha outro nome para esta comunidade.');return}const icon=(prompt('Escolha um emoji para o ícone da comunidade:','🎮')||'🎮').trim().slice(0,4)||'🎮';concordData.communities.push({id:'c'+Date.now(),name,icon,createdAt:new Date().toISOString()});saveConcordData();renderCommunities();simple('Comunidade criada!','“'+name+'” foi adicionada à barra lateral neste navegador. Para ela aparecer para seus amigos e funcionar em outros dispositivos, falta conectar contas e banco de dados compartilhado.');}
-function openProfileEditor(){const modal=$('#simpleModal');$('#simpleTitle').textContent='Personalizar perfil';$('#simpleText').innerHTML='';const wrap=document.createElement('div');wrap.className='profile-fields';const preview=document.createElement('div');preview.className='profile-preview';const avatar=document.createElement('div');avatar.className='avatar';avatar.textContent=concordData.profile.avatar||'T';avatar.style.background=`linear-gradient(135deg,${concordData.profile.color||'#16865e'},#0c5b40)`;const previewText=document.createElement('div');const previewName=document.createElement('b');previewName.textContent=concordData.profile.name||'Thauwan';const previewSub=document.createElement('small');previewSub.textContent='Prévia do seu perfil';previewText.append(previewName,previewSub);preview.append(avatar,previewText);const nameLabel=document.createElement('label');nameLabel.textContent='Nome de exibição';const nameInput=document.createElement('input');nameInput.maxLength=28;nameInput.value=concordData.profile.name||'Thauwan';nameInput.placeholder='Seu nome';nameLabel.append(nameInput);const avatarLabel=document.createElement('label');avatarLabel.textContent='Letra ou emoji da foto';const avatarInput=document.createElement('input');avatarInput.maxLength=4;avatarInput.value=concordData.profile.avatar||'T';avatarInput.placeholder='Ex.: T ou 🎮';avatarLabel.append(avatarInput);const colorLabel=document.createElement('label');colorLabel.textContent='Cor principal';const colorInput=document.createElement('input');colorInput.type='color';colorInput.value=concordData.profile.color||'#16865e';colorLabel.append(colorInput);[preview, nameLabel,avatarLabel,colorLabel].forEach(x=>wrap.append(x));$('#simpleText').append(wrap);const foot=modal.querySelector('.footbuttons');foot.innerHTML='';const cancel=document.createElement('button');cancel.className='pill';cancel.textContent='Cancelar';cancel.onclick=()=>modal.classList.remove('show');const save=document.createElement('button');save.className='primary';save.textContent='Salvar perfil';save.onclick=()=>{const n=nameInput.value.trim();if(!n){nameInput.focus();return}concordData.profile={name:n,avatar:avatarInput.value.trim()||n.slice(0,1).toUpperCase(),color:colorInput.value};saveConcordData();updateProfileUI();modal.classList.remove('show');simple('Perfil atualizado','Suas alterações foram salvas neste navegador. Para sincronizar o perfil entre dispositivos, precisamos adicionar autenticação e banco de dados.');};nameInput.oninput=()=>previewName.textContent=nameInput.value||'Seu nome';avatarInput.oninput=()=>avatar.textContent=avatarInput.value||'🙂';colorInput.oninput=()=>avatar.style.background=`linear-gradient(135deg,${colorInput.value},#0c5b40)`;foot.append(cancel,save);modal.classList.add('show');}
+function openProfileEditor(){
+  const modal=$('#simpleModal');$('#simpleTitle').textContent='Personalizar perfil';$('#simpleText').replaceChildren();
+  const wrap=document.createElement('div');wrap.className='profile-fields';
+  const preview=document.createElement('div');preview.className='profile-preview';
+  const avatar=document.createElement('div');avatar.className='avatar';avatar.style.width='64px';avatar.style.height='64px';avatar.style.fontSize='26px';
+  let selectedPhoto=concordData.profile.photo||'';
+  const previewText=document.createElement('div'),previewName=document.createElement('b');previewName.textContent=concordData.profile.name||'Thauwan';
+  const previewSub=document.createElement('small');previewSub.textContent='Prévia do seu perfil';previewText.append(previewName,previewSub);preview.append(avatar,previewText);
+  const nameLabel=document.createElement('label');nameLabel.textContent='Nome de exibição';
+  const nameInput=document.createElement('input');nameInput.maxLength=28;nameInput.value=concordData.profile.name||'Thauwan';nameInput.placeholder='Seu nome';nameLabel.append(nameInput);
+  const avatarLabel=document.createElement('label');avatarLabel.textContent='Letra ou emoji (sem foto)';
+  const avatarInput=document.createElement('input');avatarInput.maxLength=4;avatarInput.value=concordData.profile.avatar||'T';avatarLabel.append(avatarInput);
+  const colorLabel=document.createElement('label');colorLabel.textContent='Cor principal';
+  const colorInput=document.createElement('input');colorInput.type='color';colorInput.value=concordData.profile.color||'#16865e';colorLabel.append(colorInput);
+  const photoLabel=document.createElement('label');photoLabel.textContent='Foto de perfil';
+  const photoInput=document.createElement('input');photoInput.type='file';photoInput.accept='image/jpeg,image/png,image/webp,image/gif';photoInput.setAttribute('aria-label','Escolher foto de perfil');
+  const photoHint=document.createElement('small');photoHint.textContent='JPG, PNG, WebP ou GIF. A imagem será ajustada para 192 × 192 e salva neste navegador.';
+  const removePhoto=document.createElement('button');removePhoto.type='button';removePhoto.className='pill';removePhoto.textContent='Remover foto';
+  const photoError=document.createElement('small');photoError.setAttribute('role','status');photoError.style.color='#f6a9a9';
+  function previewAvatar(){setConcordAvatar(avatar,{name:nameInput.value,avatar:avatarInput.value,color:colorInput.value,photo:selectedPhoto})}
+  photoInput.onchange=async()=>{
+    const file=photoInput.files?.[0];if(!file)return;
+    photoError.textContent='';
+    if(!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type)){photoError.textContent='Escolha uma imagem JPG, PNG, WebP ou GIF.';return}
+    if(file.size>8*1024*1024){photoError.textContent='A imagem deve ter no máximo 8 MB.';return}
+    try{
+      const bitmap=await createImageBitmap(file);const canvas=document.createElement('canvas');canvas.width=192;canvas.height=192;
+      const ctx=canvas.getContext('2d');if(!ctx)throw Error('Canvas indisponível');
+      const side=Math.min(bitmap.width,bitmap.height),sx=(bitmap.width-side)/2,sy=(bitmap.height-side)/2;
+      ctx.drawImage(bitmap,sx,sy,side,side,0,0,192,192);bitmap.close?.();
+      const encoded=canvas.toDataURL('image/jpeg',0.78);
+      if(encoded.length>300000)throw Error('Foto muito grande para salvar');
+      selectedPhoto=encoded;previewAvatar();
+    }catch(error){photoError.textContent='Não foi possível processar esta imagem. Tente outra foto.';console.warn('CONCORD avatar:',error)}
+  };
+  removePhoto.onclick=()=>{selectedPhoto='';photoInput.value='';photoError.textContent='Foto removida da prévia. Salve para confirmar.';previewAvatar()};
+  photoLabel.append(photoInput,photoHint);
+  [preview,nameLabel,avatarLabel,colorLabel,photoLabel,removePhoto,photoError].forEach(x=>wrap.append(x));
+  $('#simpleText').append(wrap);
+  const foot=modal.querySelector('.footbuttons');foot.replaceChildren();
+  const cancel=document.createElement('button');cancel.className='pill';cancel.textContent='Cancelar';cancel.onclick=()=>modal.classList.remove('show');
+  const save=document.createElement('button');save.className='primary';save.textContent='Salvar perfil';
+  save.onclick=()=>{
+    const n=nameInput.value.trim();if(!n){nameInput.focus();return}
+    concordData.profile={name:n,avatar:avatarInput.value.trim()||n.slice(0,1).toUpperCase(),color:colorInput.value,photo:selectedPhoto};
+    try{localStorage.setItem(CONCORD_STORE,JSON.stringify(concordData))}catch(error){photoError.textContent='Não foi possível salvar a foto neste navegador. Tente remover a foto ou liberar espaço.';return}
+    updateProfileUI();modal.classList.remove('show');simple('Perfil atualizado','Foto e nome salvos neste navegador. A sincronização entre dispositivos ainda será implementada.');
+  };
+  nameInput.oninput=()=>{previewName.textContent=nameInput.value||'Seu nome';previewAvatar()};
+  avatarInput.oninput=previewAvatar;colorInput.oninput=previewAvatar;
+  foot.append(cancel,save);previewAvatar();modal.classList.add('show');
+}
 $('#addServer').onclick=openCommunityCreator;$('#profileBtn').onclick=openProfileEditor;updateProfileUI();renderCommunities();
 // Anima o contorno da foto quando o microfone detecta voz (somente no dispositivo local).
 function setLocalSpeaking(on){document.querySelectorAll('.user .avatar,.roster-person.me .avatar,.room-member.you-in-room .mini-avatar').forEach(el=>el.classList.toggle('speaking',!!on));}
