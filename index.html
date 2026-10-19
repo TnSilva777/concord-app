@@ -147,12 +147,12 @@ let publicChatUser=null,publicChatAvailable=false,publicChatLoading=false,public
 const publicChatError=document.createElement('div');publicChatError.className='concord-public-error';publicChatError.hidden=true;localChatNotice.after(publicChatError);
 function renderChatHistory(){
   const list=$('#messageList');if(!list)return;
-  list.innerHTML=concordActiveChannel==='geral'?concordDefaultMessages:'';
-  const history=readChatHistory();
-  (Array.isArray(history[concordActiveChannel])?history[concordActiveChannel]:[]).slice(-100).forEach(appendChatMessage);
+  const usingShared=Boolean(publicChatUser&&concordPublicChannels.has(concordActiveChannel));
+  list.innerHTML=usingShared?'':concordActiveChannel==='geral'?concordDefaultMessages:'';
+  if(!usingShared){const history=readChatHistory();(Array.isArray(history[concordActiveChannel])?history[concordActiveChannel]:[]).slice(-100).forEach(appendChatMessage)}
   $('#messages').scrollTop=$('#messages').scrollHeight;
   publicChatAvailable=false;
-  if(publicChatUser&&concordPublicChannels.has(concordActiveChannel))loadPublicChat();
+  if(publicChatUser&&concordPublicChannels.has(concordActiveChannel)){localChatNotice.textContent='◌ Carregando mensagens compartilhadas…';loadPublicChat()}
 }
 async function loadPublicChat(){
   if(!publicChatUser||!concordPublicChannels.has(concordActiveChannel))return;
