@@ -29,6 +29,7 @@
 .concord-dm-navigation{padding:8px 10px 4px;border-bottom:1px solid var(--line)}.concord-dm-navigation .concord-dm-nav{display:flex;align-items:center;justify-content:flex-start;width:100%;margin:0;padding:11px 12px;font-weight:700;font-size:12px}.concord-dm-navigation .concord-dm-nav:focus-visible{outline:2px solid #7cf2b2;outline-offset:2px}.composer[hidden],.mobilebar[hidden]{display:none!important}#concordDmPane{order:0}#concordDmPane .concord-dm-history{overscroll-behavior:contain}@media(max-width:720px){.concord-dm-navigation{padding:7px}.concord-dm-navigation .concord-dm-nav{padding:10px 8px;font-size:11px}}
 .concord-local-notice{font-size:11px;line-height:1.5;color:#b8d5c2;background:#163527;border:1px solid #355f47;border-radius:10px;padding:9px 12px;margin:12px 0 18px}
 .concord-public-error{padding:8px 12px;margin-bottom:12px;border-radius:8px;background:#402c25;color:#ffcab5;font-size:11px;overflow-wrap:anywhere}.concord-public-error[hidden]{display:none!important}
+#concordDmNav{color:#fff;cursor:pointer;flex-shrink:0}#concordDmNav:hover,#concordDmNav:focus-visible{outline:2px solid #7ff0b2;outline-offset:3px}#concordDmNav.active{background:linear-gradient(135deg,#32c98b,#096b4a);box-shadow:0 0 0 3px #62f0b488,0 0 24px #16865e55}.concord-dm-friends[hidden]{display:none!important}.concord-dm-friends:not([hidden]){max-height:230px;border-top:1px solid #294238;padding-top:12px}
 /* CONCORD HUD refinement — consistent interactive surfaces and accessible focus */
 :root{--hud-glow:rgba(53,212,154,.14);--hud-ring:#68e4ac}
 button,.channel,.voice-room{transition:background-color .18s ease,border-color .18s ease,transform .18s ease,box-shadow .18s ease}
@@ -71,7 +72,7 @@ button:disabled{cursor:not-allowed;opacity:.58}
   );
 </script>
   </head><body>
-<div class="app"><aside class="servers"><div class="logo">C</div><button class="server active" title="Concord oficial">C</button><button class="server" title="Jogos">🎮</button><button class="server" title="Amigos">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
+<div class="app"><aside class="servers"><button type="button" class="logo" id="concordDmNav" title="Conversas privadas" aria-label="Abrir conversas privadas" aria-pressed="false">C</button><button class="server active" title="Concord oficial">C</button><button class="server" title="Jogos">🎮</button><button class="server" title="Amigos">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
 <aside class="sidebar"><div class="brand"><strong>CONCORD</strong><small>SUA COMUNIDADE. SEU ESPAÇO.</small></div><button class="search" id="searchBtn">⌕ &nbsp; Buscar canais</button><div class="section">CONCORD OFICIAL</div><button class="channel active" data-channel="geral"><span>#</span> geral</button><button class="channel" data-channel="regras"><span>#</span> regras</button><button class="channel" data-channel="anuncios"><span>#</span> anúncios</button><div class="section">COMUNIDADES</div><button class="channel" data-channel="jogos"><span>#</span> jogos</button><button class="channel" data-channel="tecnologia"><span>#</span> tecnologia</button><button class="channel" data-channel="memes"><span>#</span> memes</button><div class="section">CANAIS DE VOZ</div><button class="channel" id="voiceBtn"><span>◖</span> Sala de voz <span class="online"></span></button><div class="section voice-section-title">SALAS DE VOZ <button id="addVoiceRoom" title="Criar sala de voz">＋</button></div>
 <div class="voice-room-list" id="voiceRoomList">
   <button class="voice-room active" data-room="Geral"><span class="room-icon">◖</span><span class="room-name">Geral</span><span class="room-count" id="roomCountGeral">3</span></button>
@@ -497,10 +498,8 @@ const dmPane=document.createElement('section');dmPane.id='concordDmPane';dmPane.
 dmPane.innerHTML='<div class="concord-dm-header"><button type="button" id="dmBack">← Voltar</button><strong>Conversas privadas</strong><span id="dmPeerLabel">Selecione um amigo</span></div><div id="dmHistory" class="concord-dm-history" role="log" aria-live="polite">Selecione um amigo na lista à esquerda.</div><form id="dmForm" class="concord-dm-form"><input id="dmInput" type="text" maxlength="2000" placeholder="Mensagem privada..." autocomplete="off" required disabled><button type="submit" disabled id="dmSend">Enviar</button></form>';
 const chatContainer=$('#messages');
 if(chatContainer)chatContainer.parentNode.insertBefore(dmPane,chatContainer.nextSibling);
-const dmNav=document.createElement('button');dmNav.type='button';dmNav.id='concordDmNav';dmNav.className='concord-dm-nav';dmNav.textContent='✉ Conversas privadas';
-const dmNavigationArea=document.createElement('nav');dmNavigationArea.className='concord-dm-navigation';dmNavigationArea.setAttribute('aria-label','Mensagens privadas');dmNavigationArea.append(dmNav);
-const sidebarBrand=document.querySelector('.sidebar .brand');if(sidebarBrand)sidebarBrand.insertAdjacentElement('afterend',dmNavigationArea);else socialPanel.prepend(dmNavigationArea);
-const dmFriends=document.createElement('div');dmFriends.id='dmFriends';dmFriends.className='concord-dm-friends';
+const dmNav=$('#concordDmNav');
+const dmFriends=document.createElement('div');dmFriends.id='dmFriends';dmFriends.className='concord-dm-friends';dmFriends.hidden=true;
 socialPanel.append(dmFriends);
 let dmOpen=false,dmPeer=null,dmRequest=0,dmBusy=false,dmFriendIds=new Set(),dmTimer=null,dmSending=false,dmNeedsRefresh=false;
 function dmShow(open){
@@ -511,10 +510,11 @@ function dmShow(open){
   const mobileBar=$('.mobilebar');if(mobileBar)mobileBar.hidden=open;
   const header=$('#channelTitle');if(header)header.textContent=open?'Conversas privadas':concordActiveChannel;
   const headerIcon=$('.topbar .hash');if(headerIcon)headerIcon.textContent=open?'✉':'#';
-  dmNav.classList.toggle('active',open);
+  dmNav.classList.toggle('active',open);dmNav.setAttribute('aria-pressed',String(open));dmNav.title=open?'Voltar aos canais':'Conversas privadas';
+  dmFriends.hidden=!open;
   if(!open){dmPeer=null;$('#dmPeerLabel').textContent='Selecione um amigo';$('#dmInput').disabled=true;$('#dmSend').disabled=true;renderChatHistory()}
 }
-dmNav.onclick=()=>{dmShow(!dmOpen);if(dmOpen){$('#dmHistory').textContent='Escolha um amigo para iniciar uma conversa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true}};
+dmNav.onclick=()=>{dmShow(!dmOpen);if(dmOpen){$('#dmHistory').textContent='Escolha um amigo na lista à esquerda para iniciar uma conversa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true}};
 $('#dmBack').onclick=()=>dmShow(false);
 function dmSelect(id){
   if(!dmFriendIds.has(id))return;
