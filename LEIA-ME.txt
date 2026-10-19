@@ -1,0 +1,12 @@
+CONCORD — protótipo atualizado
+
+COMO ABRIR
+1. Extraia o ZIP para uma pasta.
+2. Para testar o microfone com permissões confiáveis, rode um servidor local nessa pasta:
+   - Se tiver Python instalado: abra o terminal nessa pasta e execute: python -m http.server 8000
+   - Abra http://localhost:8000 no Chrome ou Edge.
+3. Clique em “Sala de voz” e depois em “Entrar na sala”. Autorize o microfone.
+4. Fale para testar o indicador verde/roxo; use o botão do microfone para mutar e “Sair” para encerrar.
+
+IMPORTANTE
+Esta versão testa o microfone localmente e melhora a interface/fluxo da sala. Ela ainda NÃO conecta áudio entre usuários. Para chamadas reais multiusuário e compartilhamento de tela para outros participantes, é necessário implementar um backend de sinalização e infraestrutura WebRTC (por exemplo, LiveKit, Daily ou serviço equivalente), configurar HTTPS e publicar o app. O áudio capturado nesta versão não é enviado a outras pessoas.
