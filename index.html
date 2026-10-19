@@ -452,8 +452,9 @@ const dmNavigationArea=document.createElement('nav');dmNavigationArea.className=
 const sidebarBrand=document.querySelector('.sidebar .brand');if(sidebarBrand)sidebarBrand.insertAdjacentElement('afterend',dmNavigationArea);else socialPanel.prepend(dmNavigationArea);
 const dmFriends=document.createElement('div');dmFriends.id='dmFriends';dmFriends.className='concord-dm-friends';
 socialPanel.append(dmFriends);
-let dmOpen=false,dmPeer=null,dmRequest=0,dmBusy=false,dmFriendIds=new Set(),dmTimer=null;
+let dmOpen=false,dmPeer=null,dmRequest=0,dmBusy=false,dmFriendIds=new Set(),dmTimer=null,dmSending=false,dmNeedsRefresh=false;
 function dmShow(open){
+  ++dmRequest;
   dmOpen=open;dmPane.hidden=!open;
   if(chatContainer)chatContainer.hidden=open;
   const composer=$('#chatForm')?.closest('.composer');if(composer)composer.hidden=open;
@@ -468,6 +469,7 @@ $('#dmBack').onclick=()=>dmShow(false);
 function dmSelect(id){
   if(!dmFriendIds.has(id))return;
   dmShow(true);dmPeer=id;
+  $('#dmHistory').textContent='Carregando conversa…';
   $('#dmPeerLabel').textContent='Amigo '+id.slice(0,8);
   $('#dmInput').disabled=false;$('#dmSend').disabled=false;
   $('#dmInput').focus();dmLoad();
@@ -486,7 +488,8 @@ function dmRender(rows){
   list.scrollTop=list.scrollHeight;
 }
 async function dmLoad(){
-  if(!dmOpen||!dmPeer||!socialUser||dmBusy)return;
+  if(!dmOpen||!dmPeer||!socialUser)return;
+  if(dmBusy){dmNeedsRefresh=true;return}
   if(!dmFriendIds.has(dmPeer)){dmPeer=null;$('#dmHistory').textContent='Esta amizade não está mais ativa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true;return}
   dmBusy=true;const peer=dmPeer,seq=++dmRequest;
   try{
@@ -497,19 +500,19 @@ async function dmLoad(){
     if(error)throw error;
     if(dmPeer===peer&&seq===dmRequest)dmRender((data||[]).reverse());
   }catch(error){if(dmPeer===peer)$('#dmHistory').textContent='Mensagens privadas indisponíveis: '+(error.message||'verifique o SQL no Supabase');console.error('CONCORD DM:',error)}
-  finally{dmBusy=false}
+  finally{dmBusy=false;if(dmNeedsRefresh){dmNeedsRefresh=false;queueMicrotask(()=>dmLoad())}}
 }
 $('#dmForm').onsubmit=async event=>{
   event.preventDefault();
   const input=$('#dmInput'),body=input.value.trim(),peer=dmPeer;
-  if(!body||!peer||!socialUser||!dmFriendIds.has(peer))return;
-  $('#dmSend').disabled=true;
+  if(!body||!peer||!socialUser||!dmFriendIds.has(peer)||dmSending)return;
+  dmSending=true;$('#dmSend').disabled=true;
   try{
     const {error}=await concordSupabase.from('concord_direct_messages').insert({sender_id:socialUser,recipient_id:peer,body});
     if(error)throw error;
-    input.value='';await dmLoad();
+    if(dmPeer===peer){input.value='';await dmLoad()}
   }catch(error){simple('Mensagem não enviada',error.message||'Confira a conexão e as permissões.')}
-  finally{$('#dmSend').disabled=!dmFriendIds.has(dmPeer)}
+  finally{dmSending=false;$('#dmSend').disabled=!dmFriendIds.has(dmPeer)}
 };
 document.querySelectorAll('[data-channel]').forEach(btn=>btn.addEventListener('click',()=>{if(dmOpen)dmShow(false)}));
 dmTimer=setInterval(()=>{if(dmOpen&&document.visibilityState==='visible')dmLoad()},4000);
@@ -521,13 +524,14 @@ async function refreshSocial(){
     if(error)throw error;
     const accepted=friends.filter(f=>f.status==='accepted');
     const ids=accepted.map(f=>f.requester_id===socialUser?f.recipient_id:f.requester_id);
-    const {data:presence}=ids.length?await concordSupabase.from('concord_presence').select('user_id,last_seen').in('user_id',ids):{data:[]};
+    const {data:presence,error:presenceReadError}=ids.length?await concordSupabase.from('concord_presence').select('user_id,last_seen').in('user_id',ids):{data:[],error:null};
+    if(presenceReadError)console.warn('Falha ao consultar presença:',presenceReadError.message);
     const online=new Set((presence||[]).filter(p=>Date.now()-new Date(p.last_seen).getTime()<90000).map(p=>p.user_id));
     dmFriendIds=new Set(ids);
     const dmList=$('#dmFriends');dmList.replaceChildren();
     const dmLabel=document.createElement('div');dmLabel.className='concord-dm-label';dmLabel.textContent='CONVERSAS COM AMIGOS';dmList.append(dmLabel);
     if(!ids.length){const empty=document.createElement('div');empty.textContent='Aceite uma amizade para conversar.';dmList.append(empty)}
-    ids.forEach(id=>{const button=document.createElement('button');button.type='button';button.className='concord-dm-friend';button.textContent='✉ Amigo '+id.slice(0,8);button.onclick=()=>dmSelect(id);dmList.append(button)});
+    ids.forEach(id=>{const button=document.createElement('button');button.type='button';button.className='concord-dm-friend';button.textContent=(online.has(id)?'🟢 ':'✉ ')+'Amigo '+id.slice(0,8);button.setAttribute('aria-label','Abrir conversa privada com amigo '+id.slice(0,8));button.onclick=()=>dmSelect(id);dmList.append(button)});
     if(dmOpen&&dmPeer&&!dmFriendIds.has(dmPeer)){dmPeer=null;$('#dmHistory').textContent='Esta amizade não está mais ativa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true}
     const list=$('#concordFriends');list.replaceChildren();
     if(!friends.length){list.textContent='Nenhum amigo adicionado.'}
@@ -570,6 +574,7 @@ socialPanel.append(copyId);
 async function initConcordSocial(session){
   const id=session?.user?.id||null;
   if(id===socialUser)return;
+  dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#dmHistory').textContent='Selecione um amigo na lista à esquerda.';
   socialUser=id;voiceRoomsUser=id;clearInterval(socialTimer);socialTimer=null;
   if(!id){dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
   await Promise.all([refreshSocial(),refreshSharedVoiceRooms()]);
