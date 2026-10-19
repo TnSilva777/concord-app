@@ -673,7 +673,7 @@ socialPanel.innerHTML='<div class="section">AMIGOS <button id="concordAddFriend"
 socialPanel.hidden=true;
 const sidebarSearch=$('#searchBtn');
 if(sidebarSearch)sidebarSearch.parentNode.insertBefore(socialPanel,sidebarSearch);
-let socialUser=null,socialTimer=null,socialBusy=false;
+let socialUser=null,socialTimer=null,socialBusy=false,socialRefreshQueued=false;
 // Mensagens privadas: area separada dos canais publicos, com armazenamento no Supabase.
 const dmPane=document.createElement('section');dmPane.id='concordDmPane';dmPane.hidden=true;
 dmPane.innerHTML='<div class="concord-dm-header"><button type="button" id="dmBack">← Voltar</button><strong>Conversas privadas</strong><span id="dmPeerLabel">Selecione um amigo</span></div><div id="dmHistory" class="concord-dm-history" role="log" aria-live="polite">Selecione um amigo na lista à esquerda.</div><form id="dmForm" class="concord-dm-form"><input id="dmInput" type="text" maxlength="2000" placeholder="Mensagem privada..." autocomplete="off" required disabled><button type="submit" disabled id="dmSend">Enviar</button></form>';
@@ -725,13 +725,14 @@ async function dmLoad(){
   if(!dmFriendIds.has(dmPeer)){dmPeer=null;$('#dmHistory').textContent='Esta amizade não está mais ativa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true;return}
   dmBusy=true;const peer=dmPeer,seq=++dmRequest;
   try{
+    const account=socialUser;
     const {data,error}=await concordSupabase.from('concord_direct_messages')
       .select('id,sender_id,recipient_id,body,created_at')
-      .or('and(sender_id.eq.'+socialUser+',recipient_id.eq.'+peer+'),and(sender_id.eq.'+peer+',recipient_id.eq.'+socialUser+')')
+      .or('and(sender_id.eq.'+account+',recipient_id.eq.'+peer+'),and(sender_id.eq.'+peer+',recipient_id.eq.'+account+')')
       .order('created_at',{ascending:false}).limit(100);
     if(error)throw error;
-    if(dmPeer===peer&&seq===dmRequest)dmRender((data||[]).reverse());
-  }catch(error){if(dmPeer===peer)$('#dmHistory').textContent='Mensagens privadas indisponíveis: '+(error.message||'verifique o SQL no Supabase');console.error('CONCORD DM:',error)}
+    if(socialUser===account&&dmOpen&&dmPeer===peer&&seq===dmRequest)dmRender((data||[]).reverse());
+  }catch(error){if(dmOpen&&socialUser===account&&dmPeer===peer)$('#dmHistory').textContent='Mensagens privadas indisponíveis: '+(error.message||'verifique o SQL no Supabase');console.error('CONCORD DM:',error)}
   finally{dmBusy=false;if(dmNeedsRefresh){dmNeedsRefresh=false;queueMicrotask(()=>dmLoad())}}
 }
 $('#dmForm').onsubmit=async event=>{
@@ -750,7 +751,9 @@ document.querySelectorAll('[data-channel]').forEach(btn=>btn.addEventListener('c
 dmTimer=setInterval(()=>{if(dmOpen&&document.visibilityState==='visible')dmLoad()},4000);
 
 async async function refreshSocial(){
-  if(!socialUser||socialBusy)return;socialBusy=true;
+  if(!socialUser)return;
+  if(socialBusy){socialRefreshQueued=true;return}
+  socialBusy=true;
   const requestUser=socialUser;
   try{
     const {data:friends,error}=await concordSupabase.from('concord_friend_requests').select('id,requester_id,recipient_id,status').or('requester_id.eq.'+socialUser+',recipient_id.eq.'+socialUser).limit(100);
@@ -784,6 +787,7 @@ async async function refreshSocial(){
     const {error:presenceError}=await concordSupabase.from('concord_presence').upsert({user_id:requestUser,last_seen:new Date().toISOString()});
     if(presenceError)console.warn('Presença indisponível',presenceError.message);
   }catch(error){
+    if(requestUser!==socialUser)return;
     const list=$('#concordFriends');list.replaceChildren();
     const detail=document.createElement('div');detail.textContent='Não foi possível carregar os amigos.';
     const info=document.createElement('div');info.className='concord-social-error';
@@ -793,7 +797,7 @@ async async function refreshSocial(){
     list.append(detail,info,retry);
     console.error('CONCORD amigos:',error);
   }
-  finally{socialBusy=false}
+  finally{socialBusy=false;if(socialRefreshQueued){socialRefreshQueued=false;queueMicrotask(()=>refreshSocial())}}
 }
 $('#concordAddFriend').onclick=async()=>{
   if(!socialUser){simple('Entre na conta','Faça login antes de adicionar amigos.');return}
@@ -809,6 +813,7 @@ socialPanel.append(copyId);
 async function initConcordSocial(session){
   const id=session?.user?.id||null;
   if(id===socialUser)return;
+  socialRefreshQueued=false;
   dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#dmHistory').textContent='Selecione um amigo na lista à esquerda.';
   restoreConcordProfileForUser(id);if(id)syncConcordAvatarFromCloud(id);socialUser=id;voiceRoomsUser=id;initPublicChat(session);clearInterval(socialTimer);socialTimer=null;
   if(!id){dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
