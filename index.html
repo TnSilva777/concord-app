@@ -19,6 +19,9 @@
 .community-card{display:flex;gap:10px;align-items:center;padding:10px;background:#1a3025;border:1px solid #355b45;border-radius:10px;margin:8px 0}.community-card .community-symbol{width:42px;height:42px;display:grid;place-items:center;border-radius:14px;background:linear-gradient(135deg,#2bb77b,#0c5b40);font-size:22px}.community-card small{display:block;color:var(--muted);margin-top:3px}
 
 <
+.voice-room[data-custom="true"]{position:relative;padding-right:28px}
+.voice-room-remove{position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:20px;line-height:1;opacity:.65;padding:2px 5px;border-radius:6px;color:#f5b5b5}
+.voice-room-remove:hover,.voice-room-remove:focus-visible{opacity:1;background:#703333;color:white;outline:2px solid #ffb4b4}
 /* CONCORD HUD refinement — consistent interactive surfaces and accessible focus */
 :root{--hud-glow:rgba(53,212,154,.14);--hud-ring:#68e4ac}
 button,.channel,.voice-room{transition:background-color .18s ease,border-color .18s ease,transform .18s ease,box-shadow .18s ease}
@@ -185,7 +188,42 @@ document.querySelectorAll('.voice-room').forEach(btn=>btn.addEventListener('clic
 function syncLocalPresence(){for(const room of Object.keys(roomRoster)){roomRoster[room]=roomRoster[room].filter(m=>!m.isMe)}if(callJoined&&joinedRoom){if(!roomRoster[joinedRoom])roomRoster[joinedRoom]=[];roomRoster[joinedRoom].push({name:'Você',initial:'V',cls:'',game:false,isMe:true})}renderRooms();renderCallRoster()}
 const originalJoinCall=joinCall;joinCall=async function(){if(callJoined)return;const roomToJoin=activeRoom;await originalJoinCall();if(callJoined){joinedRoom=roomToJoin;$('#callSubtitle').textContent='Conectado à sala '+joinedRoom;playCallTone('join');syncLocalPresence()}};
 const originalLeaveCall=leaveCall;leaveCall=function(){const wasJoined=callJoined;if(stream)stopShare();originalLeaveCall();joinedRoom=null;syncLocalPresence();if(wasJoined)playCallTone('leave')};$('#joinCall').onclick=joinCall;$('#leaveCall').onclick=leaveCall;
-$('#addVoiceRoom').onclick=()=>{const name=prompt('Nome da nova sala de voz:');if(!name||!name.trim())return;const clean=name.trim().slice(0,24);if(roomRoster[clean]){simple('Sala já existe','Escolha outro nome para sua sala.');return}roomRoster[clean]=[];const id=clean.replace(/\s/g,'');const btn=document.createElement('button');btn.className='voice-room';btn.dataset.room=clean;btn.innerHTML='<span class="room-icon">◖</span><span class="room-name"></span><span class="room-count" id="roomCount'+id+'">0</span>';btn.querySelector('.room-name').textContent=clean;const box=document.createElement('div');box.className='room-members';box.id='members'+id;$('#voiceRoomList').append(btn,box);btn.onclick=()=>chooseRoom(clean);chooseRoom(clean);renderRooms()};
+// Salas personalizadas locais: criacao, exclusao e persistencia no navegador.
+const VOICE_ROOMS_STORE='concord-custom-voice-rooms-v1';
+const defaultVoiceRooms=new Set(['Geral','Squad PUBG','Resenha']);
+function readCustomVoiceRooms(){try{const saved=JSON.parse(localStorage.getItem(VOICE_ROOMS_STORE)||'[]');return Array.isArray(saved)?saved.filter(n=>typeof n==='string'&&n.trim()&&!defaultVoiceRooms.has(n)).slice(0,30):[]}catch{return []}}
+function saveCustomVoiceRooms(){try{localStorage.setItem(VOICE_ROOMS_STORE,JSON.stringify([...document.querySelectorAll('.voice-room[data-custom="true"]')].map(b=>b.dataset.room)))}catch(error){console.warn('Salas nao salvas',error)}}
+function createCustomVoiceRoom(name,openAfter=false){
+  const clean=name.trim().slice(0,24);
+  if(!clean||Object.prototype.hasOwnProperty.call(roomRoster,clean))return false;
+  roomRoster[clean]=[];
+  const btn=document.createElement('button');btn.className='voice-room';btn.dataset.room=clean;btn.dataset.custom='true';
+  const icon=document.createElement('span');icon.className='room-icon';icon.textContent='◖';
+  const title=document.createElement('span');title.className='room-name';title.textContent=clean;
+  const count=document.createElement('span');count.className='room-count';count.textContent='0';
+  const remove=document.createElement('span');remove.className='voice-room-remove';remove.textContent='×';remove.title='Remover sala '+clean;remove.setAttribute('role','button');remove.setAttribute('tabindex','0');remove.setAttribute('aria-label','Remover sala '+clean);
+  function removeRoom(event){
+    event.stopPropagation();
+    if(joinedRoom===clean){simple('Sala em uso','Saia da chamada antes de remover esta sala.');return}
+    if(!confirm('Remover a sala '+clean+' deste navegador?'))return;
+    if(activeRoom===clean)activeRoom='Geral';
+    delete roomRoster[clean];btn.remove();members.remove();saveCustomVoiceRooms();renderRooms();
+  }
+  remove.onclick=removeRoom;remove.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();removeRoom(e)}};
+  btn.append(icon,title,count,remove);
+  const members=document.createElement('div');members.className='room-members';
+  $('#voiceRoomList').append(btn,members);
+  btn.onclick=()=>chooseRoom(clean);
+  saveCustomVoiceRooms();
+  if(openAfter)chooseRoom(clean);else renderRooms();
+  return true;
+}
+$('#addVoiceRoom').onclick=()=>{
+  const name=prompt('Nome da nova sala de voz (até 24 caracteres):');
+  if(!name||!name.trim())return;
+  if(!createCustomVoiceRoom(name,true))simple('Sala já existe','Escolha outro nome para sua sala.');
+};
+readCustomVoiceRooms().forEach(name=>createCustomVoiceRoom(name));
 // Clicking a participant shows their room details, while the room itself opens the call panel.
 document.querySelectorAll('.room-member').forEach(btn=>btn.addEventListener('dblclick',()=>simple(btn.dataset.member||'Participante','Este perfil é demonstrativo nesta versão do Concord.')));renderRooms();
 
