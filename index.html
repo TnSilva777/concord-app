@@ -340,6 +340,19 @@ $('#chatInput').value=readConcordDrafts()[concordActiveChannel]||'';
 $('#chatForm').onsubmit=async event=>{
   event.preventDefault();const input=$('#chatInput'),value=input.value.trim();
   if(!value||publicChatSending)return;
+  if(document.body.classList.contains('concord-custom-server-view')){
+    const server=concordData.communities.find(item=>item.id===concordSelectedCommunity);
+    const room=server?.channels?.find(item=>item.id===concordSelectedTextRoom&&item.type==='text');
+    if(!room){simple('Selecione um canal','Abra um canal de texto para enviar mensagens.');return}
+    const entry={name:(concordData.profile?.name||'Você').slice(0,60),text:value,date:new Date().toLocaleString('pt-BR')};
+    const key='concord-server-chat:'+concordSelectedCommunity+':'+room.id;
+    let messages=[];
+    try{messages=JSON.parse(localStorage.getItem(key)||'[]');if(!Array.isArray(messages))messages=[]}
+    catch(error){messages=[]}
+    try{localStorage.setItem(key,JSON.stringify([...messages,entry].slice(-100)))}
+    catch(error){simple('Não foi possível salvar','Verifique se o armazenamento do navegador está disponível.');return}
+    appendChatMessage(entry);input.value='';$('#messages').scrollTop=$('#messages').scrollHeight;return;
+  }
   const profile=typeof concordData!=='undefined'?concordData.profile:null;
   const entry={name:(profile?.name||'Você').slice(0,60),text:value,date:new Date().toLocaleString('pt-BR')};
   if(publicChatUser&&concordPublicChannels.has(concordActiveChannel)){
@@ -608,7 +621,7 @@ function editLocalCommunity(id){
   }else{simple('Gerenciar comunidade','Escolha 1, 2 ou 3.');return}
   saveConcordData();renderCommunities();
 }
-let concordSelectedCommunity=null;
+let concordSelectedCommunity=null,concordSelectedTextRoom=null;
 const concordServerPanel=document.createElement('div');
 concordServerPanel.id='concordServerPanel';
 const concordSidebar=$('.sidebar');
@@ -647,7 +660,16 @@ function renderCommunityChannels(){
         if(welcome){welcome.querySelector('h1').textContent=room.name;welcome.querySelector('p').textContent=kind==='text'?'Canal personalizado salvo neste navegador. Mensagens compartilhadas exigem integração com Supabase.':'Sala de voz criada. Chamadas entre membros deste servidor exigem integração com Supabase.'}
         $('#messageList').replaceChildren();
         $('#messages').hidden=false;
-        $('#chatForm').closest('.composer').hidden=true;
+        concordSelectedTextRoom=kind==='text'?room.id:null;
+        const composer=$('#chatForm').closest('.composer');
+        composer.hidden=kind!=='text';
+        const input=$('#chatInput');input.disabled=kind!=='text';
+        if(kind==='text'){
+          input.placeholder='Mensagem em #'+room.name;
+          const key='concord-server-chat:'+concordSelectedCommunity+':'+room.id;
+          try{const saved=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(saved))saved.slice(-100).forEach(appendChatMessage)}catch(error){console.warn('Mensagens locais indisponíveis',error)}
+          input.focus();
+        }
         if(kind==='voice')simple('Sala de voz local','Esta sala está salva no navegador. Para realizar chamadas nela com outros membros, precisamos conectá-la ao sistema de servidores no Supabase.');
       };
       const rename=document.createElement('button');rename.type='button';rename.textContent='✎';rename.title='Renomear sala';
@@ -687,6 +709,7 @@ function renderCommunities(){
       document.body.classList.add('concord-custom-server-view');
       $('#messages').hidden=false;
       $('#chatForm').closest('.composer').hidden=true;
+      concordSelectedTextRoom=null;
       $('#messageList').replaceChildren();
     };
     b.oncontextmenu=e=>{e.preventDefault();editLocalCommunity(community.id)};
@@ -983,7 +1006,7 @@ function dmShow(open){
     }
   }
   document.body.classList.toggle('concord-home-view',open);
-  if(open){document.body.classList.remove('concord-server-view','concord-custom-server-view');concordSelectedCommunity=null;concordServerPanel.replaceChildren();}
+  if(open){document.body.classList.remove('concord-server-view','concord-custom-server-view');concordSelectedCommunity=null;concordSelectedTextRoom=null;concordServerPanel.replaceChildren();}
   if(chatContainer)chatContainer.hidden=open;
   const composer=$('#chatForm')?.closest('.composer');if(composer)composer.hidden=open;
   const mobileBar=$('.mobilebar');if(mobileBar)mobileBar.hidden=open;
