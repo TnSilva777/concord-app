@@ -18,7 +18,38 @@
 .profile-fields{display:grid;gap:8px;margin:14px 0}.profile-fields label{font-size:12px;color:var(--muted)}.profile-fields input{width:100%;margin-top:5px;padding:11px;border-radius:9px;background:#0d0d15;border:1px solid var(--line);color:var(--text);outline:none}.profile-fields input:focus{border-color:var(--purple2)}
 .community-card{display:flex;gap:10px;align-items:center;padding:10px;background:#1a3025;border:1px solid #355b45;border-radius:10px;margin:8px 0}.community-card .community-symbol{width:42px;height:42px;display:grid;place-items:center;border-radius:14px;background:linear-gradient(135deg,#2bb77b,#0c5b40);font-size:22px}.community-card small{display:block;color:var(--muted);margin-top:3px}
 
-<</style>
+<
+/* CONCORD HUD refinement — consistent interactive surfaces and accessible focus */
+:root{--hud-glow:rgba(53,212,154,.14);--hud-ring:#68e4ac}
+button,.channel,.voice-room{transition:background-color .18s ease,border-color .18s ease,transform .18s ease,box-shadow .18s ease}
+button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--hud-ring);outline-offset:3px}
+.channel:hover,.voice-room:hover{background:#1c4935}
+.channel.active{background:linear-gradient(90deg,#176644,#143c2d);box-shadow:inset 3px 0 0 #60e4a4;color:#fff}
+.server:hover,.iconbtn:hover,.voice-control:hover{transform:translateY(-2px);box-shadow:0 5px 16px var(--hud-glow)}
+.topbar{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 5px 20px #0002}
+.composebox{transition:border-color .18s,box-shadow .18s}
+.composebox:focus-within{border-color:#51c58d;box-shadow:0 0 0 3px var(--hud-glow)}
+.message{padding:7px 10px;margin:7px -10px;border-radius:12px;transition:background-color .15s}
+.message:hover{background:rgba(75,176,117,.065)}
+.msgbody{white-space:pre-wrap}
+.dialog{max-height:min(90dvh,900px);overflow-y:auto}
+button:disabled{cursor:not-allowed;opacity:.58}
+@media(max-width:720px){
+ .topbar{padding:0 12px;gap:7px}
+ .topbar .sub{display:none}
+ .top-actions{gap:5px}
+ .top-actions .pill{padding:8px}
+ .messages{padding:16px 14px}
+ .composer{padding:0 12px 12px}
+ .composebox{gap:6px;padding:7px}
+ .iconbtn{width:36px;height:36px;flex-shrink:0}
+ .welcome{margin:16px 0;padding:17px}
+ .welcome h1{font-size:21px}
+ .dialog{padding:18px;border-radius:16px}
+}
+@media(prefers-reduced-motion:reduce){button,.channel,.voice-room,.composebox,.message{transition:none!important;animation:none!important}}
+
+</style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const SUPABASE_URL = 'https://mthrcsfxyzswcaokzrvq.supabase.co';
