@@ -409,12 +409,22 @@ async function syncConcordAvatarFromCloud(id){
 async function saveConcordAvatarToCloud(id,photo,removed){
   if(!id)return {ok:false,message:'Faça login antes de salvar o perfil.'};
   try{
-    const bucket=concordSupabase.storage.from('concord-avatars'),path=id+'/avatar.jpg';
+    const {data:authData,error:authError}=await concordSupabase.auth.getUser();
+    if(authError||!authData?.user)throw Error('Sessão expirada. Saia da conta e entre novamente.');
+    if(authData.user.id!==id)throw Error('A conta ativa mudou. Atualize a página e tente novamente.');
+    const bucket=concordSupabase.storage.from('concord-avatars'),path=authData.user.id+'/avatar.jpg';
     if(removed){const {error}=await bucket.remove([path]);if(error)throw error;return {ok:true,url:''}}
     if(!photo)return {ok:true,url:null};
     const response=await fetch(photo);const blob=await response.blob();
-    const {error}=await bucket.upload(path,blob,{upsert:true,contentType:'image/jpeg',cacheControl:'60'});
-    if(error)throw error;
+    // Primeiro upload não usa upsert: evita exigir permissão UPDATE para um objeto novo.
+    const options={contentType:'image/jpeg',cacheControl:'60'};
+    const {error:uploadError}=await bucket.upload(path,blob,{...options,upsert:false});
+    if(uploadError){
+      if(uploadError.statusCode==='409'||uploadError.statusCode===409||/already exists|duplicate/i.test(uploadError.message||'')){
+        const {error:updateError}=await bucket.update(path,blob,options);
+        if(updateError)throw updateError;
+      }else throw uploadError;
+    }
     const {data}=bucket.getPublicUrl(path);
     return {ok:true,url:data.publicUrl+'?v='+Date.now()};
   }catch(error){console.warn('Falha ao sincronizar avatar:',error);return {ok:false,message:error.message||'Erro ao enviar foto'}}
@@ -488,7 +498,7 @@ function openProfileEditor(){
       let notice='Perfil salvo neste navegador.';
       if(photoChanged){
         const result=await saveConcordAvatarToCloud(id,selectedPhoto,!selectedPhoto);
-        if(!result.ok){photoError.textContent='Não foi possível sincronizar a foto: '+result.message+'. Confira se executou o SQL concord-avatars.sql.';return}
+        if(!result.ok){photoError.textContent='Não foi possível sincronizar a foto: '+result.message+'. Confira as políticas do bucket concord-avatars no Supabase.';return}
         cloudPhoto=result.url||'';
         notice='Foto sincronizada no Supabase e salva neste navegador.';
       }
