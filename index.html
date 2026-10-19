@@ -22,7 +22,7 @@
 .voice-room[data-custom="true"]{position:relative;padding-right:28px}
 .voice-room-remove{position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:20px;line-height:1;opacity:.65;padding:2px 5px;border-radius:6px;color:#f5b5b5}
 .voice-room-remove:hover,.voice-room-remove:focus-visible{opacity:1;background:#703333;color:white;outline:2px solid #ffb4b4}
-.concord-social{border-top:1px solid var(--line);padding-bottom:7px}.concord-social .section{display:flex;justify-content:space-between;align-items:center}.concord-social .section button{background:#1d4d36;border-radius:7px;padding:1px 7px}.concord-friends{padding:5px 12px;font-size:11px;color:var(--muted);max-height:155px;overflow:auto}.concord-friend{display:flex;align-items:center;gap:5px;margin:6px 0}.concord-friend span{flex:1;overflow:hidden;text-overflow:ellipsis}.concord-friend button,.concord-copy-id{background:#1b4935;border-radius:6px;padding:3px 6px;font-size:11px}.concord-copy-id{margin:2px 12px;color:#c9f3d9}.voice-room[data-custom="true"] .voice-room-remove{cursor:pointer}
+.concord-social{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px 0 12px;margin:4px 0 8px}.concord-social[hidden]{display:none!important}.concord-social .section{display:flex;justify-content:space-between;align-items:center}.concord-social .section button{background:#1d4d36;border-radius:7px;padding:1px 7px}.concord-friends{padding:5px 12px;font-size:11px;color:var(--muted);max-height:155px;overflow:auto}.concord-friend{display:flex;align-items:center;gap:5px;margin:6px 0}.concord-friend span{flex:1;overflow:hidden;text-overflow:ellipsis}.concord-friend button,.concord-copy-id{background:#1b4935;border-radius:6px;padding:3px 6px;font-size:11px}.concord-copy-id{margin:2px 12px;color:#c9f3d9}.voice-room[data-custom="true"] .voice-room-remove{cursor:pointer}
 .concord-connection-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #355a46;border-radius:20px;background:#172e23;color:#b4d6c2;font-size:12px;margin:8px 0}.concord-connection-badge[data-state="connected"]{border-color:#38bb7b;color:#7ff0b2;background:#103f2a}.concord-connection-badge[data-state="waiting"]{border-color:#9e8b44;color:#f0d98c}
 .concord-social-error{font-size:11px;line-height:1.4;color:#eab5a7;overflow-wrap:anywhere;margin:5px 0}
 #concordDmPane[hidden]{display:none!important}#concordDmPane{flex:1;min-height:0;display:flex;flex-direction:column;background:#071b14;margin:0;padding:18px 24px;overflow:hidden}#messages[hidden],#chatForm[hidden]{display:none!important}.concord-dm-header{display:flex;align-items:center;gap:16px;border-bottom:1px solid #315542;padding:10px 0 16px;flex-wrap:wrap}.concord-dm-header button,.concord-dm-form button,.concord-dm-nav,.concord-dm-friend{border:1px solid #35634a;background:#15583e;color:#d9fbe8;border-radius:9px;padding:9px 12px;cursor:pointer}.concord-dm-header span{color:#9fcdb3;font-size:12px}.concord-dm-history{flex:1;min-height:0;overflow:auto;padding:16px 0}.concord-dm-message{max-width:75%;padding:10px 13px;margin:10px 0;background:#17392b;border-radius:12px;overflow-wrap:anywhere}.concord-dm-message.mine{margin-left:auto;background:#176345}.concord-dm-message time{font-size:10px;opacity:.65;margin-left:10px}.concord-dm-message p{margin:5px 0 0;white-space:pre-wrap}.concord-dm-form{display:flex;gap:10px;padding:12px 0}.concord-dm-form input{flex:1;min-width:0;border:1px solid #386b50;background:#142e22;border-radius:9px;padding:12px;color:white}.concord-dm-nav{width:calc(100% - 24px);margin:10px 12px;text-align:left}.concord-dm-nav.active{background:#19835a}.concord-dm-friends{padding:4px 12px;max-height:170px;overflow:auto;color:#a7c9b4;font-size:11px}.concord-dm-label{font-size:10px;font-weight:bold;letter-spacing:1px;margin-bottom:8px}.concord-dm-friend{display:block;width:100%;margin:5px 0;text-align:left;font-size:11px;padding:7px}.concord-dm-form button:disabled{opacity:.5}@media(max-width:720px){#concordDmPane{padding:10px 12px}.concord-dm-message{max-width:94%}}
@@ -670,9 +670,10 @@ try{
 
 // Painel social e presenca; depende da migracao SQL versionada.
 const socialPanel=document.createElement('section');socialPanel.className='concord-social';
-socialPanel.innerHTML='<div class="section">AMIGOS <button id="concordAddFriend" title="Adicionar amigo por ID">＋</button></div><div id="concordFriends" class="concord-friends">Entre na conta para ver seus amigos.</div>';
-const voiceSection=document.querySelector('.voice-section-title');
-if(voiceSection)voiceSection.parentNode.insertBefore(socialPanel,voiceSection);
+socialPanel.innerHTML='<div class="section">AMIGOS <button id="concordAddFriend" title="Adicionar amigo por ID" aria-label="Adicionar amigo">＋ Adicionar</button></div><div id="concordFriends" class="concord-friends">Entre na conta para ver seus amigos.</div>';
+socialPanel.hidden=true;
+const sidebarSearch=$('#searchBtn');
+if(sidebarSearch)sidebarSearch.parentNode.insertBefore(socialPanel,sidebarSearch);
 let socialUser=null,socialTimer=null,socialBusy=false;
 // Mensagens privadas: area separada dos canais publicos, com armazenamento no Supabase.
 const dmPane=document.createElement('section');dmPane.id='concordDmPane';dmPane.hidden=true;
@@ -692,6 +693,7 @@ function dmShow(open){
   const header=$('#channelTitle');if(header)header.textContent=open?'Conversas privadas':concordActiveChannel;
   const headerIcon=$('.topbar .hash');if(headerIcon)headerIcon.textContent=open?'✉':'#';
   dmNav.classList.toggle('active',open);dmNav.setAttribute('aria-pressed',String(open));dmNav.title=open?'Voltar aos canais':'Conversas privadas';
+  socialPanel.hidden=!open;
   dmFriends.hidden=!open;
   if(!open){dmPeer=null;$('#dmPeerLabel').textContent='Selecione um amigo';$('#dmInput').disabled=true;$('#dmSend').disabled=true;renderChatHistory()}
 }
