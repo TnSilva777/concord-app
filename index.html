@@ -332,7 +332,32 @@ document.querySelectorAll('.room-member').forEach(btn=>btn.addEventListener('dbl
 const CONCORD_STORE='concord-local-v2';
 let concordData={profile:{name:'Thauwan',avatar:'T',color:'#16865e'},communities:[]};
 try{const saved=JSON.parse(localStorage.getItem(CONCORD_STORE)||'null');if(saved&&typeof saved==='object')concordData={...concordData,...saved,profile:{...concordData.profile,...(saved.profile||{})},communities:Array.isArray(saved.communities)?saved.communities:[]}}catch(e){}
-function saveConcordData(){try{localStorage.setItem(CONCORD_STORE,JSON.stringify(concordData))}catch(e){}}
+function saveConcordData(){try{localStorage.setItem(CONCORD_STORE,JSON.stringify(concordData));return true}catch(e){console.warn('Perfil não salvo',e);return false}}
+let concordProfileUser=null,concordProfileLoad=0;
+function concordProfileKey(id){return 'concord-profile-account-v1:'+id}
+function restoreConcordProfileForUser(id){
+  concordProfileUser=id;
+  const token=++concordProfileLoad;
+  const defaultProfile={name:'Você',avatar:'V',color:'#16865e',photo:''};
+  if(!id){concordData.profile={...defaultProfile};updateProfileUI();return}
+  try{
+    const saved=JSON.parse(localStorage.getItem(concordProfileKey(id))||'null');
+    if(saved&&typeof saved==='object'&&saved.profile&&typeof saved.profile==='object'){
+      concordData.profile={...defaultProfile,...saved.profile};updateProfileUI();return;
+    }
+    // Migração do perfil local antigo, somente uma vez e sem sobrescrever contas existentes.
+    const old=JSON.parse(localStorage.getItem(CONCORD_STORE)||'null');
+    const migrated=old?.profile&&typeof old.profile==='object'?{...defaultProfile,...old.profile}:defaultProfile;
+    concordData.profile=migrated;
+    localStorage.setItem(concordProfileKey(id),JSON.stringify({profile:migrated}));
+  }catch(error){console.warn('Não foi possível restaurar perfil',error);concordData.profile=defaultProfile}
+  if(token===concordProfileLoad)updateProfileUI();
+}
+function saveConcordProfileForUser(){
+  if(!concordProfileUser)return false;
+  try{localStorage.setItem(concordProfileKey(concordProfileUser),JSON.stringify({profile:concordData.profile}));return true}
+  catch(error){console.warn('Não foi possível salvar perfil da conta',error);return false}
+}
 function setConcordAvatar(el,profile){
   if(!el)return;
   const name=profile.name||'Usuário',letter=profile.avatar||name.slice(0,1).toUpperCase();
@@ -390,8 +415,8 @@ function openProfileEditor(){
   save.onclick=()=>{
     const n=nameInput.value.trim();if(!n){nameInput.focus();return}
     concordData.profile={name:n,avatar:avatarInput.value.trim()||n.slice(0,1).toUpperCase(),color:colorInput.value,photo:selectedPhoto};
-    try{localStorage.setItem(CONCORD_STORE,JSON.stringify(concordData))}catch(error){photoError.textContent='Não foi possível salvar a foto neste navegador. Tente remover a foto ou liberar espaço.';return}
-    updateProfileUI();if(typeof renderRooms==='function')renderRooms();modal.classList.remove('show');simple('Perfil atualizado','Foto e nome salvos neste navegador. A sincronização entre dispositivos ainda será implementada.');
+    if(!saveConcordProfileForUser()){photoError.textContent='Não foi possível salvar o perfil nesta conta. Entre novamente e confira o espaço do navegador.';return}
+    updateProfileUI();if(typeof renderRooms==='function')renderRooms();modal.classList.remove('show');simple('Perfil atualizado','Foto salva para esta conta neste navegador. A sincronização com outros dispositivos ainda não está ativa.');
   };
   nameInput.oninput=()=>{previewName.textContent=nameInput.value||'Seu nome';previewAvatar()};
   avatarInput.oninput=previewAvatar;colorInput.oninput=previewAvatar;
@@ -686,7 +711,7 @@ async function initConcordSocial(session){
   const id=session?.user?.id||null;
   if(id===socialUser)return;
   dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#dmHistory').textContent='Selecione um amigo na lista à esquerda.';
-  socialUser=id;voiceRoomsUser=id;initPublicChat(session);clearInterval(socialTimer);socialTimer=null;
+  restoreConcordProfileForUser(id);socialUser=id;voiceRoomsUser=id;initPublicChat(session);clearInterval(socialTimer);socialTimer=null;
   if(!id){dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
   await Promise.all([refreshSocial(),refreshSharedVoiceRooms()]);
   socialTimer=setInterval(()=>{if(document.visibilityState==='visible'){refreshSocial();refreshSharedVoiceRooms()}},30000);
