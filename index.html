@@ -170,6 +170,8 @@ function setLocalSpeaking(on){document.querySelectorAll('.user .avatar,.roster-p
 // Salas publicas de teste: nao use para conversas confidenciais ate adicionar autorizacao privada.
 const voicePeerId=crypto.randomUUID();
 let voiceSignal=null,voicePeers=new Map(),voiceAudio=new Map(),voiceStarting=false;
+const voicePendingIce=new Map();
+async function voiceFlushIce(id){const peer=voicePeers.get(id);if(!peer?.remoteDescription)return;const pending=voicePendingIce.get(id)||[];voicePendingIce.delete(id);for(const candidate of pending){try{await peer.addIceCandidate(new RTCIceCandidate(candidate))}catch(error){console.warn('Candidato ICE rejeitado',error)}}}
 function voiceStatus(text){const el=$('#voiceStatus');if(el)el.textContent=text}
 function voicePeerName(){return (typeof concordData!=='undefined'&&concordData.profile?.name)||'Participante'}
 function voiceParticipants(){
@@ -179,7 +181,7 @@ function voiceParticipants(){
     if(!p||!p.id||p.id===voicePeerId)return;
     if(!members.some(m=>m.id===p.id))members.push({id:p.id,name:String(p.name||'Amigo').slice(0,28),initial:String(p.name||'A').slice(0,1).toUpperCase(),isMe:false});
   });
-  for(const [id,peer] of voicePeers)if(!members.some(m=>m.id===id)){peer.close();voicePeers.delete(id);voiceAudio.get(id)?.remove();voiceAudio.delete(id)}
+  for(const [id,peer] of voicePeers)if(!members.some(m=>m.id===id)){peer.close();voicePeers.delete(id);voiceAudio.get(id)?.remove();voiceAudio.delete(id);voicePendingIce.delete(id)}
   roomRoster[joinedRoom]=[{id:voicePeerId,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true},...members];
   renderRooms();renderCallRoster();
   for(const member of members)if(voicePeerId<member.id&&!voicePeers.has(member.id))voiceConnect(member.id,true).catch(err=>console.warn('Falha na oferta de voz',err));
@@ -204,6 +206,7 @@ async function voiceConnect(id,initiator){
   };
   peer.onconnectionstatechange=()=>{
     if(peer.connectionState==='connected')voiceStatus('Chamada conectada! Vocês podem conversar.');
+    else if(peer.connectionState==='disconnected')voiceStatus('Conexão instável. Tentando recuperar o áudio…');
     else if(peer.connectionState==='failed')voiceStatus('Não foi possível estabelecer o áudio. Algumas redes exigem um servidor TURN.');
   };
   if(initiator){
@@ -222,14 +225,16 @@ async function voiceSignalReceived(packet){
       peer=peer||await voiceConnect(msg.from,false);
       if(!peer)return;
       await peer.setRemoteDescription(new RTCSessionDescription(msg.data));
+      await voiceFlushIce(msg.from);
       const answer=await peer.createAnswer();await peer.setLocalDescription(answer);
       await voiceSend(msg.from,'answer',peer.localDescription.toJSON());
     }else if(msg.kind==='answer'){
       const peer=voicePeers.get(msg.from);
-      if(peer&&peer.signalingState==='have-local-offer')await peer.setRemoteDescription(new RTCSessionDescription(msg.data));
+      if(peer&&peer.signalingState==='have-local-offer'){await peer.setRemoteDescription(new RTCSessionDescription(msg.data));await voiceFlushIce(msg.from)}
     }else if(msg.kind==='ice'){
       const peer=voicePeers.get(msg.from);
-      if(peer&&peer.remoteDescription)await peer.addIceCandidate(new RTCIceCandidate(msg.data));
+      if(peer?.remoteDescription)await peer.addIceCandidate(new RTCIceCandidate(msg.data));
+      else if(msg.data){const list=voicePendingIce.get(msg.from)||[];if(list.length<100)list.push(msg.data);voicePendingIce.set(msg.from,list)}
     }
   }catch(error){console.warn('Sinalizacao de voz',error);voiceStatus('Erro na conexão de voz: '+error.message)}
 }
@@ -261,7 +266,7 @@ function stopVoiceNetwork(){
   const channel=voiceSignal;voiceSignal=null;
   if(channel)concordSupabase.removeChannel(channel).catch(console.warn);
   for(const peer of voicePeers.values())peer.close();
-  voicePeers.clear();for(const audio of voiceAudio.values())audio.remove();voiceAudio.clear();
+  voicePeers.clear();voicePendingIce.clear();for(const audio of voiceAudio.values())audio.remove();voiceAudio.clear();
 }
 const localJoinCall=joinCall;
 joinCall=async function(){
