@@ -126,7 +126,12 @@ $('#chatForm').onsubmit=event=>{
 function openShare(){$('#shareModal').classList.add('show')}$('#shareBtn').onclick=openShare;$('#closeShare').onclick=()=>$('#shareModal').classList.remove('show');
 async function beginShare(){if(!navigator.mediaDevices?.getDisplayMedia){$('#shareStatus').textContent='Seu navegador não oferece compartilhamento de tela. Tente uma versão atualizada do Chrome ou Edge em um computador.';return}try{stream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:30},audio:true});const video=$('#screenPreview');video.srcObject=stream;video.style.display='block';$('#stopShare').style.display='inline-block';$('#shareStatus').textContent='Tela capturada neste dispositivo. Para transmitir aos outros participantes, falta conectar um servidor de voz/vídeo.';const stageVideo=$('#callScreenPreview');stageVideo.srcObject=stream;stageVideo.style.display='block';$('#callStageMessage').style.display='none';$('#stageBadge').style.display='block';$('#callSubtitle').textContent='Captura de tela ativa';stream.getVideoTracks()[0].addEventListener('ended',stopShare)}catch(err){$('#shareStatus').textContent=err.name==='NotAllowedError'?'Compartilhamento cancelado. Você pode tentar novamente quando quiser.':'Não foi possível iniciar o compartilhamento neste dispositivo.'}}
 function stopShare(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('#screenPreview').srcObject=null;$('#screenPreview').style.display='none';$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block';$('#stageBadge').style.display='none';$('#callSubtitle').textContent=callJoined?'Microfone local ativo':'Pronto para conectar';$('#stopShare').style.display='none';$('#shareStatus').textContent='Captura local encerrada.'}document.querySelectorAll('[data-share]').forEach(b=>b.onclick=beginShare);$('#stopShare').onclick=stopShare;
-let micStream=null,micContext=null,micAnalyser=null,micFrame=null,micEnabled=true,callJoined=false;function openVoice(){$('#voiceModal').classList.add('show')}$('#voiceBtn').onclick=$('#mobileVoice').onclick=openVoice;$('#closeVoice').onclick=()=>$('#voiceModal').classList.remove('show');async function joinCall(){if(callJoined)return;$('#voiceStatus').textContent='Solicitando permissão do microfone…';if(!navigator.mediaDevices?.getUserMedia){$('#voiceStatus').textContent='Este navegador não permite acessar o microfone aqui. Abra o Concord em Chrome/Edge atualizado usando localhost ou HTTPS.';return}try{micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});callJoined=true;micEnabled=true;$('#callState').textContent='Áudio local ativo';$('#callState').style.color='#42dca4';$('#callSubtitle').textContent='Você entrou na sala';$('#voiceStatus').textContent='Você entrou na sala e o microfone está funcionando neste dispositivo. A lista à esquerda mostra participantes conectados nesta sessão. Para ouvir outras pessoas em outros dispositivos, é necessário conectar um servidor de chamadas.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Microfone ligado';if($('#youRosterState'))$('#youRosterState').textContent='🎙';$('#audioStatus').textContent='Microfone ligado';$('#joinCall').textContent='Conectado';$('#joinCall').disabled=true;$('#micToggle').disabled=false;$('#headphoneToggle').disabled=false;$('#callShare').disabled=false;$('#micToggle').classList.add('on');try{micContext=new(window.AudioContext||window.webkitAudioContext)();const src=micContext.createMediaStreamSource(micStream);micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=256;src.connect(micAnalyser);const data=new Uint8Array(micAnalyser.frequencyBinCount);const meter=()=>{if(!micAnalyser)return;micAnalyser.getByteFrequencyData(data);const avg=data.reduce((a,b)=>a+b,0)/data.length;$('#micMeter').style.width=Math.min(100,avg*1.8)+'%';setLocalSpeaking(micEnabled&&avg>12);micFrame=requestAnimationFrame(meter)};meter()}catch(e){} }catch(err){$('#voiceStatus').textContent=err.name==='NotAllowedError'?'Permissão do microfone negada. Clique no cadeado ao lado do endereço do site, permita o microfone e tente novamente.':'Não foi possível acessar o microfone. Verifique se ele está conectado e se outro aplicativo não o está bloqueando.'}}function toggleMic(){if(!micStream)return;micEnabled=!micEnabled;micStream.getAudioTracks().forEach(t=>t.enabled=micEnabled);$('#micToggle').classList.toggle('on',micEnabled);$('#micToggle').textContent=micEnabled?'🎙':'🔇';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent=micEnabled?'Microfone ligado':'Microfone mutado';if($('#youRosterState'))$('#youRosterState').textContent=micEnabled?'🎙':'🔇';$('#audioStatus').textContent=micEnabled?'Microfone ligado':'Microfone mutado';$('#voiceStatus').textContent=micEnabled?'Microfone ligado. Fale para testar o indicador de nível.':'Microfone mutado.';renderCallRoster();renderRooms()}function leaveCall(){if(micFrame)cancelAnimationFrame(micFrame);micFrame=null;if(micStream)micStream.getTracks().forEach(t=>t.stop());micStream=null;if(micContext){micContext.close().catch(()=>{});micContext=null}micAnalyser=null;callJoined=false;micEnabled=true;if(typeof setLocalSpeaking==='function')setLocalSpeaking(false);$('#micMeter').style.width='0';$('#callState').textContent='Não conectado';$('#callState').style.color='#9fbaaa';$('#callSubtitle').textContent='Pronto para conectar';$('#voiceStatus').textContent='Você saiu da sala. Entre novamente para testar o microfone.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Ainda não entrou';if($('#youRosterState'))$('#youRosterState').textContent='○';$('#audioStatus').textContent='Microfone desligado';$('#joinCall').textContent='Entrar na sala';$('#joinCall').disabled=false;$('#micToggle').disabled=true;$('#headphoneToggle').disabled=true;$('#callShare').disabled=true;$('#micToggle').classList.remove('on');$('#micToggle').textContent='🎙'}$('#joinCall').onclick=joinCall;$('#micToggle').onclick=toggleMic;$('#leaveCall').onclick=leaveCall;$('#headphoneToggle').onclick=()=>{if(!micStream)return;$('#voiceStatus').textContent='Fale agora: a barra acima deve se mover conforme o microfone captar sua voz. Este teste é local e não transmite áudio para outra pessoa.'};$('#callShare').onclick=()=>{ $('#voiceModal').classList.remove('show');openShare()};$('#inviteBtn').onclick=$('#mobileInvite').onclick=()=>simple('Convidar pessoas','O sistema de convites por link será ativado quando o Concord tiver um servidor e contas de usuário.');/* ações de comunidade e perfil são inicializadas abaixo */$('#searchBtn').onclick=()=>{
+let micStream=null,micContext=null,micAnalyser=null,micFrame=null,micEnabled=true,callJoined=false;function openVoice(){$('#voiceModal').classList.add('show')}$('#voiceBtn').onclick=$('#mobileVoice').onclick=openVoice;$('#closeVoice').onclick=()=>$('#voiceModal').classList.remove('show');async function joinCall(){if(callJoined)return;$('#voiceStatus').textContent='Solicitando permissão do microfone…';if(!navigator.mediaDevices?.getUserMedia){$('#voiceStatus').textContent='Este navegador não permite acessar o microfone aqui. Abra o Concord em Chrome/Edge atualizado usando localhost ou HTTPS.';return}try{micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});callJoined=true;micEnabled=true;$('#callState').textContent='Áudio local ativo';$('#callState').style.color='#42dca4';$('#callSubtitle').textContent='Você entrou na sala';$('#voiceStatus').textContent='Você entrou na sala e o microfone está funcionando neste dispositivo. A lista à esquerda mostra participantes conectados nesta sessão. Para ouvir outras pessoas em outros dispositivos, é necessário conectar um servidor de chamadas.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Microfone ligado';if($('#youRosterState'))$('#youRosterState').textContent='🎙';$('#audioStatus').textContent='Microfone ligado';$('#joinCall').textContent='Conectado';$('#joinCall').disabled=true;$('#micToggle').disabled=false;$('#headphoneToggle').disabled=false;$('#callShare').disabled=false;$('#micToggle').classList.add('on');try{micContext=new(window.AudioContext||window.webkitAudioContext)();const src=micContext.createMediaStreamSource(micStream);micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=256;src.connect(micAnalyser);const data=new Uint8Array(micAnalyser.frequencyBinCount);const meter=()=>{if(!micAnalyser)return;micAnalyser.getByteFrequencyData(data);const avg=data.reduce((a,b)=>a+b,0)/data.length;$('#micMeter').style.width=Math.min(100,avg*1.8)+'%';setLocalSpeaking(micEnabled&&avg>12);micFrame=requestAnimationFrame(meter)};meter()}catch(e){} }catch(err){$('#voiceStatus').textContent=err.name==='NotAllowedError'?'Permissão do microfone negada. Clique no cadeado ao lado do endereço do site, permita o microfone e tente novamente.':'Não foi possível acessar o microfone. Verifique se ele está conectado e se outro aplicativo não o está bloqueando.'}}function toggleMic(){if(!micStream)return;micEnabled=!micEnabled;micStream.getAudioTracks().forEach(t=>t.enabled=micEnabled);$('#micToggle').classList.toggle('on',micEnabled);$('#micToggle').textContent=micEnabled?'🎙':'🔇';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent=micEnabled?'Microfone ligado':'Microfone mutado';if($('#youRosterState'))$('#youRosterState').textContent=micEnabled?'🎙':'🔇';$('#audioStatus').textContent=micEnabled?'Microfone ligado':'Microfone mutado';$('#voiceStatus').textContent=micEnabled?'Microfone ligado. Fale para testar o indicador de nível.':'Microfone mutado.';renderCallRoster();renderRooms()}function leaveCall(){if(micFrame)cancelAnimationFrame(micFrame);micFrame=null;if(micStream)micStream.getTracks().forEach(t=>t.stop());micStream=null;if(micContext){micContext.close().catch(()=>{});micContext=null}micAnalyser=null;callJoined=false;micEnabled=true;if(typeof setLocalSpeaking==='function')setLocalSpeaking(false);$('#micMeter').style.width='0';$('#callState').textContent='Não conectado';$('#callState').style.color='#9fbaaa';$('#callSubtitle').textContent='Pronto para conectar';$('#voiceStatus').textContent='Você saiu da sala. Entre novamente para testar o microfone.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Ainda não entrou';if($('#youRosterState'))$('#youRosterState').textContent='○';$('#audioStatus').textContent='Microfone desligado';$('#joinCall').textContent='Entrar na sala';$('#joinCall').disabled=false;$('#micToggle').disabled=true;$('#headphoneToggle').disabled=true;$('#callShare').disabled=true;$('#micToggle').classList.remove('on');$('#micToggle').textContent='🎙'}$('#joinCall').onclick=joinCall;$('#micToggle').onclick=toggleMic;$('#leaveCall').onclick=leaveCall;$('#headphoneToggle').onclick=()=>{if(!micStream)return;$('#voiceStatus').textContent='Fale agora: a barra acima deve se mover conforme o microfone captar sua voz. Este teste é local e não transmite áudio para outra pessoa.'};$('#callShare').onclick=()=>{ $('#voiceModal').classList.remove('show');openShare()};$('#inviteBtn').onclick=$('#mobileInvite').onclick=async()=>{
+  const room=typeof activeRoom==='string'?activeRoom:'Geral';
+  const url=new URL(location.href);url.hash='voz='+encodeURIComponent(room);
+  try{await navigator.clipboard.writeText(url.href);simple('Convite copiado','Envie o link para seu amigo. Ambos devem entrar com suas contas e clicar em Entrar na sala '+room+'. Esta sala de teste não é privada.')}
+  catch(error){prompt('Copie e envie este link para seu amigo:',url.href)}
+};/* ações de comunidade e perfil são inicializadas abaixo */$('#searchBtn').onclick=()=>{
   const query=prompt('Buscar canal ou mensagem neste navegador:');
   if(!query||!query.trim())return;
   const term=query.trim().toLocaleLowerCase('pt-BR');
@@ -171,6 +176,7 @@ function setLocalSpeaking(on){document.querySelectorAll('.user .avatar,.roster-p
 const voicePeerId=crypto.randomUUID();
 let voiceSignal=null,voicePeers=new Map(),voiceAudio=new Map(),voiceStarting=false;
 const voicePendingIce=new Map();
+let remoteAudioMuted=false;
 async function voiceFlushIce(id){const peer=voicePeers.get(id);if(!peer?.remoteDescription)return;const pending=voicePendingIce.get(id)||[];voicePendingIce.delete(id);for(const candidate of pending){try{await peer.addIceCandidate(new RTCIceCandidate(candidate))}catch(error){console.warn('Candidato ICE rejeitado',error)}}}
 function voiceStatus(text){const el=$('#voiceStatus');if(el)el.textContent=text}
 function voicePeerName(){return (typeof concordData!=='undefined'&&concordData.profile?.name)||'Participante'}
@@ -184,7 +190,9 @@ function voiceParticipants(){
   for(const [id,peer] of voicePeers)if(!members.some(m=>m.id===id)){peer.close();voicePeers.delete(id);voiceAudio.get(id)?.remove();voiceAudio.delete(id);voicePendingIce.delete(id)}
   roomRoster[joinedRoom]=[{id:voicePeerId,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true},...members];
   renderRooms();renderCallRoster();
-  for(const member of members)if(voicePeerId<member.id&&!voicePeers.has(member.id))voiceConnect(member.id,true).catch(err=>console.warn('Falha na oferta de voz',err));
+  if(members.length>1)voiceStatus('Sala experimental: no máximo duas pessoas podem conversar por enquanto.');
+  const other=members.slice(0,1);
+  for(const member of other)if(voicePeerId<member.id&&!voicePeers.has(member.id))voiceConnect(member.id,true).catch(err=>console.warn('Falha na oferta de voz',err));
 }
 async function voiceSend(to,kind,payload){
   if(!voiceSignal)return;
@@ -192,6 +200,7 @@ async function voiceSend(to,kind,payload){
 }
 async function voiceConnect(id,initiator){
   if(!callJoined||!micStream||!voiceSignal)return;
+  if(voicePeers.size>=1&&!voicePeers.has(id))return;
   if(voicePeers.has(id))return voicePeers.get(id);
   const peer=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
   voicePeers.set(id,peer);
@@ -199,7 +208,7 @@ async function voiceConnect(id,initiator){
   peer.onicecandidate=e=>{if(e.candidate)voiceSend(id,'ice',e.candidate.toJSON()).catch(console.warn)};
   peer.ontrack=e=>{
     let audio=voiceAudio.get(id);
-    if(!audio){audio=document.createElement('audio');audio.autoplay=true;audio.playsInline=true;audio.style.display='none';document.body.append(audio);voiceAudio.set(id,audio)}
+    if(!audio){audio=document.createElement('audio');audio.autoplay=true;audio.playsInline=true;audio.muted=remoteAudioMuted;audio.style.display='none';document.body.append(audio);voiceAudio.set(id,audio)}
     audio.srcObject=e.streams[0]||new MediaStream([e.track]);
     audio.play().catch(()=>voiceStatus('Clique na pagina para permitir a reproducao do audio.'));
     voiceStatus('Áudio remoto recebido. Vocês já podem conversar.');
@@ -218,6 +227,7 @@ async function voiceConnect(id,initiator){
 async function voiceSignalReceived(packet){
   const msg=packet?.payload;
   if(!callJoined||!msg||msg.to!==voicePeerId||msg.from===voicePeerId)return;
+  if(!Object.values(voiceSignal?.presenceState()||{}).flat().some(p=>p.id===msg.from))return;
   try{
     if(msg.kind==='offer'){
       let peer=voicePeers.get(msg.from);
@@ -263,6 +273,8 @@ async function startVoiceNetwork(){
   finally{voiceStarting=false}
 }
 function stopVoiceNetwork(){
+  remoteAudioMuted=false;
+  if($('#headphoneToggle'))$('#headphoneToggle').textContent='🎧';
   const channel=voiceSignal;voiceSignal=null;
   if(channel)concordSupabase.removeChannel(channel).catch(console.warn);
   for(const peer of voicePeers.values())peer.close();
@@ -277,7 +289,22 @@ const localLeaveCall=leaveCall;
 leaveCall=function(){stopVoiceNetwork();localLeaveCall()};
 $('#joinCall').onclick=joinCall;
 $('#leaveCall').onclick=leaveCall;
+$('#headphoneToggle').onclick=()=>{
+  if(!callJoined)return;
+  remoteAudioMuted=!remoteAudioMuted;
+  for(const audio of voiceAudio.values())audio.muted=remoteAudioMuted;
+  $('#headphoneToggle').textContent=remoteAudioMuted?'🔇':'🎧';
+  voiceStatus(remoteAudioMuted?'Áudio dos outros participantes silenciado.':'Áudio dos outros participantes ativado.');
+};
 window.addEventListener('pagehide',stopVoiceNetwork);
+try{
+  const invite=new URLSearchParams(location.hash.slice(1)).get('voz');
+  if(invite&&Object.prototype.hasOwnProperty.call(roomRoster,invite)){
+    activeRoom=invite;renderRooms();
+    $('#callSubtitle').textContent='Sala '+invite;
+  }
+}catch(error){console.warn('Convite de voz inválido',error)}
+
 
 if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 </script>
