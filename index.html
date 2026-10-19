@@ -181,7 +181,38 @@ let micStream=null,micContext=null,micAnalyser=null,micFrame=null,micEnabled=tru
 let activeRoom='Geral',joinedRoom=null;const roomRoster={Geral:[], 'Squad PUBG':[],Resenha:[]};
 function playCallTone(kind){try{const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;const ctx=new Ctx();if(ctx.state==='suspended')ctx.resume();const notes=kind==='join'?[660,880]:[520,390];notes.forEach((freq,i)=>{const osc=ctx.createOscillator(),gain=ctx.createGain();osc.type='sine';osc.frequency.value=freq;gain.gain.setValueAtTime(0.0001,ctx.currentTime+i*.13);gain.gain.exponentialRampToValueAtTime(.12,ctx.currentTime+i*.13+.025);gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+i*.13+.16);osc.connect(gain);gain.connect(ctx.destination);osc.start(ctx.currentTime+i*.13);osc.stop(ctx.currentTime+i*.13+.18)});setTimeout(()=>ctx.close().catch(()=>{}),700)}catch(e){}}
 function renderCallRoster(){const list=$('#callRosterList');if(!list)return;list.innerHTML='';const members=roomRoster[joinedRoom||activeRoom]||[];$('#participantCount').textContent=members.length;if(!members.length){list.innerHTML='<div class="room-empty" style="padding:12px 7px">Ninguém entrou nesta sala ainda.</div>';return}members.forEach(m=>{const row=document.createElement('div');row.className='roster-person'+(m.isMe?' me':'');const av=document.createElement('div');av.className='avatar '+(m.cls||'');av.textContent=m.initial||'?';const meta=document.createElement('div');meta.className='person-meta';const name=document.createElement('b');name.textContent=m.name+(m.isMe?' (você)':'');const sub=document.createElement('small');sub.textContent=m.isMe?(micEnabled?'Microfone ligado':'Microfone mutado'):'Na sala';meta.append(name,sub);const state=document.createElement('span');state.className='person-state';state.textContent=m.isMe?(micEnabled?'🎙':'🔇'):'●';row.append(av,meta,state);list.append(row)})}
-function renderRooms(){document.querySelectorAll('.voice-room').forEach(btn=>{const room=btn.dataset.room;btn.classList.toggle('active',room===activeRoom);const members=roomRoster[room]||[];const count=document.getElementById('roomCount'+room.replace(/\s/g,''));if(count)count.textContent=members.length;const box=document.getElementById('members'+room.replace(/\s/g,''));if(!box)return;box.innerHTML='';if(!members.length){box.innerHTML='<div class="room-empty">Ninguém por aqui ainda</div>';return}members.forEach(m=>{const b=document.createElement('button');b.className='room-member'+(m.name==='Thauwan'?' you-in-room':'')+(m.name==='WAVE IGL'?' muted-member':'');b.title='Abrir sala '+room+' · '+m.name;b.innerHTML='<span class="mini-avatar '+(m.cls||'')+'">'+m.initial+'</span><span class="member-name"></span><span class="game-status">'+(m.game?'🎮':m.name==='Thauwan'?(micEnabled?'🎙':'🔇'):'')+'</span>';b.querySelector('.member-name').textContent=m.name;b.onclick=()=>{activeRoom=room;renderRooms();openVoice();$('#callSubtitle').textContent='Sala '+room;};box.appendChild(b)})});renderCallRoster()}
+function renderRooms(){
+  document.querySelectorAll('.voice-room').forEach(btn=>{
+    const room=btn.dataset.room;
+    btn.classList.toggle('active',room===activeRoom);
+    const people=roomRoster[room]||[];
+    const count=btn.querySelector('.room-count');
+    if(count)count.textContent=String(people.length);
+    const box=btn.nextElementSibling;
+    if(!box||!box.classList.contains('room-members'))return;
+    box.replaceChildren();
+    if(!people.length){
+      const empty=document.createElement('div');
+      empty.className='room-empty';empty.textContent='Ninguém por aqui ainda';
+      box.append(empty);return;
+    }
+    people.forEach(member=>{
+      const b=document.createElement('button');b.className='room-member';
+      if(member.isMe)b.classList.add('you-in-room');
+      b.title='Abrir sala '+room+' · '+String(member.name||'Participante');
+      const avatar=document.createElement('span');avatar.className='mini-avatar';
+      avatar.textContent=String(member.initial||'?').slice(0,2);
+      const name=document.createElement('span');name.className='member-name';
+      name.textContent=String(member.name||'Participante');
+      const status=document.createElement('span');status.className='game-status';
+      status.textContent=member.isMe?(micEnabled?'🎙':'🔇'):(member.game?'🎮':'');
+      b.append(avatar,name,status);
+      b.onclick=()=>chooseRoom(room);
+      box.append(b);
+    });
+  });
+  renderCallRoster();
+}
 function chooseRoom(room){if(callJoined&&joinedRoom&&joinedRoom!==room){simple('Você já está em uma call','Saia da sala '+joinedRoom+' antes de entrar em '+room+'.');return}activeRoom=room;renderRooms();$('#callSubtitle').textContent='Sala '+room;$('#voiceModal').classList.add('show');if(callJoined){$('#voiceStatus').textContent='Você está conectado à sala '+room+'.';renderCallRoster()}}
 
 document.querySelectorAll('.voice-room').forEach(btn=>btn.addEventListener('click',()=>chooseRoom(btn.dataset.room)));
