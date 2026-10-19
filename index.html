@@ -62,6 +62,65 @@ button:disabled{cursor:not-allowed;opacity:.58}
 }
 @media(prefers-reduced-motion:reduce){button,.channel,.voice-room,.composebox,.message{transition:none!important;animation:none!important}}
 
+
+/* CONCORD HUD 2.0 — inspiracao em interfaces de comunidades, identidade verde propria */
+:root{--hud-surface:#111f1a;--hud-raised:#192c23;--hud-border:#2a4437;--hud-accent:#52d69a;--hud-muted:#a2b7a9}
+.app{grid-template-columns:70px 252px minmax(0,1fr)}
+.servers{gap:11px;background:#09120f;padding-top:16px}
+.logo{border-radius:18px;box-shadow:0 5px 20px #0005,0 0 0 1px #7debb43b;transition:border-radius .18s ease,transform .18s ease}
+.logo:hover,.logo.active{border-radius:14px}
+.server{border:1px solid #31524055;box-shadow:inset 0 1px 0 #ffffff09}
+.server:active,.iconbtn:active,.pill:active{transform:scale(.96)}
+#concordFriendsNav.active{background:#226b49;border-color:#57d797;box-shadow:inset 3px 0 0 #92f5bf}
+.sidebar{background:#101d17}
+.brand{padding:20px 18px 16px;background:linear-gradient(140deg,#162e21,#0e1c16)}
+.brand strong{font-size:18px;letter-spacing:1.6px}
+.search{border-radius:9px;background:#1a2d23;min-height:42px}
+.search:hover{background:#223b2d;border-color:#4e966e;color:#fff}
+.section{letter-spacing:1.15px;margin-top:5px}
+.channel{min-height:39px;border-radius:9px;font-weight:550}
+.voice-room{min-height:38px;border-radius:9px}
+.voice-room.active{box-shadow:inset 3px 0 0 #54d798;background:#1d4833}
+.room-member{border-radius:9px}
+.room-member:hover{background:#244b35}
+.user{background:#15271e;border-top-color:#315442;min-height:69px}
+.user b{font-size:13px}
+.main{background:#101e18}
+.topbar{height:64px;background:#14241ce8;border-bottom:1px solid #2e493b}
+.topbar strong{letter-spacing:.1px}
+.pill{border-radius:9px;background:#1c3227}
+.messages{scrollbar-color:#355b46 transparent;scrollbar-width:thin}
+.welcome{border-radius:14px;background:linear-gradient(110deg,#1a3e2b,#10221a 75%);box-shadow:0 10px 30px #0002}
+.message{border-radius:9px}
+.composer{padding-bottom:15px}
+.composebox{background:#1c3025;border-color:#3a5845;border-radius:12px;min-height:53px}
+.composebox input::placeholder{color:#a7b9ac}
+.iconbtn{border-radius:9px}
+.modal{backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.dialog{border-color:#3a674d;border-radius:16px;box-shadow:0 28px 80px #000b}
+.voice-dialog{border-radius:17px}
+.call-roster{background:#101f18}
+.call-main{background:radial-gradient(ellipse at 50% 0%,#174632 0,transparent 60%),#13251c}
+.call-stage{border-radius:15px;border-color:#3c7152}
+.roster-person{border-radius:10px}
+.roster-person:hover{background:#20402e}
+.voice-control{transition:transform .16s,background .16s,box-shadow .16s}
+.voice-control:not(:disabled):hover{background:#315c42;box-shadow:0 0 0 3px #4bc58c25}
+.voice-control.danger:hover{background:#ed4764}
+.concord-connection-badge{border-radius:9px}
+.concord-copy-id{border:1px solid #3b7052;background:#1b3a2a;color:#d6f9e4;border-radius:9px;padding:9px 12px;font-size:12px;font-weight:700;margin:8px 0;align-self:flex-start}
+.concord-copy-id:hover{background:#25573c;border-color:#70e3a3}
+.concord-social{border-radius:9px}
+#concordAddFriend{width:auto;min-width:86px;height:auto;padding:6px 9px;font-size:11px;line-height:1.2;border-radius:8px}
+#concordAddFriend:hover{background:#2b6c49}
+#concordDmPane{background:#101e18}
+.concord-dm-header{border-bottom-color:#31503f}
+.concord-dm-message{border-radius:11px}
+[hidden]{display:none!important}
+@media(max-width:1050px) and (min-width:761px){.app{grid-template-columns:62px 218px minmax(0,1fr)}.servers{padding-left:7px;padding-right:7px}.topbar{padding:0 14px}.topbar .sub{display:none}}
+@media(max-width:760px){.app{grid-template-columns:58px minmax(0,1fr)}.sidebar{display:none}.topbar{height:60px}.call-layout{grid-template-columns:1fr}.call-stage{min-height:190px}.voice-dialog{max-height:94dvh;overflow:auto}}
+@media(prefers-reduced-motion:reduce){.logo,.voice-control{transition:none!important}}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
