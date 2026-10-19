@@ -597,8 +597,9 @@ function openCommunityCreator(){
   if(concordData.communities.some(item=>item.name.toLowerCase()===name.toLowerCase())){simple('Comunidade já existe','Escolha outro nome.');return}
   const icon=(prompt('Emoji ou símbolo da comunidade:','🎮')||'🎮').trim().slice(0,4)||'🎮';
   concordData.communities.push({id:'c'+Date.now(),name,icon,createdAt:new Date().toISOString()});
-  saveConcordData();renderCommunities();
-  simple('Comunidade criada','Use a engrenagem do ícone para personalizar ou excluir. Comunidades criadas aqui ficam somente neste navegador.');
+  if(!saveConcordData()){concordData.communities.pop();simple('Não foi possível salvar','O navegador bloqueou o armazenamento local. Verifique se está em modo anônimo ou com os dados do site bloqueados.');return}
+  renderCommunities();
+  simple('Comunidade criada','Comunidade salva neste navegador. Ela deve continuar após atualizar a página. Para compartilhar com outras pessoas, ainda será necessário integrar servidores ao Supabase.');
 }
 function openProfileEditor(){
   const modal=$('#simpleModal');$('#simpleTitle').textContent='Personalizar perfil';$('#simpleText').replaceChildren();
