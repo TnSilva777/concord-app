@@ -387,11 +387,9 @@ function restoreConcordProfileForUser(id){
     if(saved&&typeof saved==='object'&&saved.profile&&typeof saved.profile==='object'){
       concordData.profile={...defaultProfile,...saved.profile};updateProfileUI();return;
     }
-    // Migração do perfil local antigo, somente uma vez e sem sobrescrever contas existentes.
-    const old=JSON.parse(localStorage.getItem(CONCORD_STORE)||'null');
-    const migrated=old?.profile&&typeof old.profile==='object'?{...defaultProfile,...old.profile}:defaultProfile;
-    concordData.profile=migrated;
-    localStorage.setItem(concordProfileKey(id),JSON.stringify({profile:migrated}));
+    // Perfis são exclusivos de cada conta; nunca importar dados genéricos de outro login.
+    concordData.profile={...defaultProfile};
+    localStorage.setItem(concordProfileKey(id),JSON.stringify({profile:concordData.profile}));
   }catch(error){console.warn('Não foi possível restaurar perfil',error);concordData.profile=defaultProfile}
   if(token===concordProfileLoad)updateProfileUI();
 }
@@ -403,7 +401,7 @@ async function syncConcordAvatarFromCloud(id){
     const response=await fetch(url+'?v='+Date.now(),{cache:'no-store'});
     if(id!==concordProfileUser)return;
     if(response.ok){concordData.profile.cloudPhoto=url+'?v='+Date.now();updateProfileUI();renderRooms()}
-    else if(response.status===404){concordData.profile.cloudPhoto='';updateProfileUI()}
+    else if(response.status===404){concordData.profile.cloudPhoto='';updateProfileUI();renderRooms()}
   }catch(error){console.warn('Avatar remoto indisponível',error)}
 }
 async function saveConcordAvatarToCloud(id,photo,removed){
@@ -453,6 +451,7 @@ function openProfileEditor(){
   const preview=document.createElement('div');preview.className='profile-preview';
   const avatar=document.createElement('div');avatar.className='avatar';avatar.style.width='64px';avatar.style.height='64px';avatar.style.fontSize='26px';
   let selectedPhoto=concordData.profile.photo||'';
+  let selectedPhotoRemoved=false;
   const previewText=document.createElement('div'),previewName=document.createElement('b');previewName.textContent=concordData.profile.name||'Thauwan';
   const previewSub=document.createElement('small');previewSub.textContent='Prévia do seu perfil';previewText.append(previewName,previewSub);preview.append(avatar,previewText);
   const nameLabel=document.createElement('label');nameLabel.textContent='Nome de exibição';
@@ -466,7 +465,7 @@ function openProfileEditor(){
   const photoHint=document.createElement('small');photoHint.textContent='JPG, PNG, WebP ou GIF. A imagem será ajustada para 192 × 192 e salva neste navegador.';
   const removePhoto=document.createElement('button');removePhoto.type='button';removePhoto.className='pill';removePhoto.textContent='Remover foto';
   const photoError=document.createElement('small');photoError.setAttribute('role','status');photoError.style.color='#f6a9a9';
-  function previewAvatar(){setConcordAvatar(avatar,{name:nameInput.value,avatar:avatarInput.value,color:colorInput.value,photo:selectedPhoto})}
+  function previewAvatar(){setConcordAvatar(avatar,{name:nameInput.value,avatar:avatarInput.value,color:colorInput.value,photo:selectedPhoto,cloudPhoto:selectedPhotoRemoved?'':concordData.profile.cloudPhoto})}
   photoInput.onchange=async()=>{
     const file=photoInput.files?.[0];if(!file)return;
     photoError.textContent='';
@@ -479,10 +478,10 @@ function openProfileEditor(){
       ctx.drawImage(bitmap,sx,sy,side,side,0,0,192,192);bitmap.close?.();
       const encoded=canvas.toDataURL('image/jpeg',0.78);
       if(encoded.length>300000)throw Error('Foto muito grande para salvar');
-      selectedPhoto=encoded;previewAvatar();
+      selectedPhoto=encoded;selectedPhotoRemoved=false;previewAvatar();
     }catch(error){photoError.textContent='Não foi possível processar esta imagem. Tente outra foto.';console.warn('CONCORD avatar:',error)}
   };
-  removePhoto.onclick=()=>{selectedPhoto='';photoInput.value='';photoError.textContent='Foto removida da prévia. Salve para confirmar.';previewAvatar()};
+  removePhoto.onclick=()=>{selectedPhotoRemoved=true;selectedPhoto='';photoInput.value='';photoError.textContent='Foto removida da prévia. Salve para confirmar.';previewAvatar()};
   photoLabel.append(photoInput,photoHint);
   [preview,nameLabel,avatarLabel,colorLabel,photoLabel,removePhoto,photoError].forEach(x=>wrap.append(x));
   $('#simpleText').append(wrap);
@@ -491,7 +490,7 @@ function openProfileEditor(){
   const save=document.createElement('button');save.className='primary';save.textContent='Salvar perfil';
   save.onclick=async()=>{
     const n=nameInput.value.trim();if(!n){nameInput.focus();return}
-    const id=concordProfileUser,previous=concordData.profile,photoChanged=selectedPhoto!==previous.photo;
+    const id=concordProfileUser,previous=concordData.profile,photoChanged=selectedPhotoRemoved||selectedPhoto!==previous.photo;
     save.disabled=true;save.textContent='Salvando…';
     try{
       let cloudPhoto=previous.cloudPhoto||'';
@@ -750,15 +749,18 @@ $('#dmForm').onsubmit=async event=>{
 document.querySelectorAll('[data-channel]').forEach(btn=>btn.addEventListener('click',()=>{if(dmOpen)dmShow(false)}));
 dmTimer=setInterval(()=>{if(dmOpen&&document.visibilityState==='visible')dmLoad()},4000);
 
-async function refreshSocial(){
+async async function refreshSocial(){
   if(!socialUser||socialBusy)return;socialBusy=true;
+  const requestUser=socialUser;
   try{
     const {data:friends,error}=await concordSupabase.from('concord_friend_requests').select('id,requester_id,recipient_id,status').or('requester_id.eq.'+socialUser+',recipient_id.eq.'+socialUser).limit(100);
     if(error)throw error;
+    if(!socialUser||socialUser!==requestUser)return;
     const accepted=friends.filter(f=>f.status==='accepted');
     const ids=accepted.map(f=>f.requester_id===socialUser?f.recipient_id:f.requester_id);
     const {data:presence,error:presenceReadError}=ids.length?await concordSupabase.from('concord_presence').select('user_id,last_seen').in('user_id',ids):{data:[],error:null};
     if(presenceReadError)console.warn('Falha ao consultar presença:',presenceReadError.message);
+    if(requestUser!==socialUser)return;
     const online=new Set((presence||[]).filter(p=>Date.now()-new Date(p.last_seen).getTime()<90000).map(p=>p.user_id));
     dmFriendIds=new Set(ids);
     const dmList=$('#dmFriends');dmList.replaceChildren();
@@ -779,7 +781,7 @@ async function refreshSocial(){
       const remove=document.createElement('button');remove.textContent='×';remove.title='Remover pedido ou amizade';remove.onclick=async()=>{if(!confirm('Remover esta amizade ou pedido?'))return;const {error}=await concordSupabase.from('concord_friend_requests').delete().eq('id',f.id);if(error)alert(error.message);else refreshSocial()};row.append(remove);
       list.append(row);
     }
-    const {error:presenceError}=await concordSupabase.from('concord_presence').upsert({user_id:socialUser,last_seen:new Date().toISOString()});
+    const {error:presenceError}=await concordSupabase.from('concord_presence').upsert({user_id:requestUser,last_seen:new Date().toISOString()});
     if(presenceError)console.warn('Presença indisponível',presenceError.message);
   }catch(error){
     const list=$('#concordFriends');list.replaceChildren();
