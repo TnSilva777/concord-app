@@ -143,7 +143,7 @@ function appendChatMessage(entry){
   $('#messageList').append(article);
 }
 const concordPublicChannels=new Set(['geral','regras','anuncios','jogos','tecnologia','memes']);
-let publicChatUser=null,publicChatAvailable=false,publicChatLoading=false,publicChatTimer=null,publicChatSeq=0,publicChatSending=false;
+let publicChatUser=null,publicChatAvailable=false,publicChatLoading=false,publicChatTimer=null,publicChatSeq=0,publicChatSending=false,publicChatRefreshPending=false,publicChatLoadIdentity=0;
 const publicChatError=document.createElement('div');publicChatError.className='concord-public-error';publicChatError.hidden=true;localChatNotice.after(publicChatError);
 function renderChatHistory(){
   const list=$('#messageList');if(!list)return;
@@ -151,27 +151,29 @@ function renderChatHistory(){
   const history=readChatHistory();
   (Array.isArray(history[concordActiveChannel])?history[concordActiveChannel]:[]).slice(-100).forEach(appendChatMessage);
   $('#messages').scrollTop=$('#messages').scrollHeight;
+  publicChatAvailable=false;
   if(publicChatUser&&concordPublicChannels.has(concordActiveChannel))loadPublicChat();
 }
 async function loadPublicChat(){
-  if(!publicChatUser||!concordPublicChannels.has(concordActiveChannel)||publicChatLoading)return;
-  publicChatLoading=true;const channel=concordActiveChannel,seq=++publicChatSeq;
+  if(!publicChatUser||!concordPublicChannels.has(concordActiveChannel))return;
+  if(publicChatLoading){publicChatRefreshPending=true;return}
+  publicChatLoading=true;const channel=concordActiveChannel,user=publicChatUser,seq=++publicChatSeq,identity=publicChatLoadIdentity;
   try{
     const {data,error}=await concordSupabase.from('concord_public_messages').select('id,channel,author_id,author_name,body,created_at').eq('channel',channel).order('created_at',{ascending:false}).limit(100);
     if(error)throw error;
+    if(channel!==concordActiveChannel||seq!==publicChatSeq||identity!==publicChatLoadIdentity||user!==publicChatUser)return;
     publicChatAvailable=true;localChatNotice.textContent='✓ Canal compartilhado: mensagens sincronizadas pelo Supabase.';publicChatError.hidden=true;
-    if(channel!==concordActiveChannel||seq!==publicChatSeq)return;
     const list=$('#messageList');list.replaceChildren();
     (data||[]).reverse().forEach(row=>appendChatMessage({name:row.author_name,text:row.body,date:new Date(row.created_at).toLocaleString('pt-BR')}));
     $('#messages').scrollTop=$('#messages').scrollHeight;
-  }catch(error){publicChatAvailable=false;localChatNotice.textContent='⚠ Modo local: as mensagens não chegam aos seus amigos.';publicChatError.hidden=false;publicChatError.textContent='Sincronização indisponível: '+(error.message||'verifique o SQL dos canais públicos');console.warn('CONCORD chat publico:',error)}
-  finally{publicChatLoading=false}
+  }catch(error){if(channel===concordActiveChannel&&identity===publicChatLoadIdentity&&user===publicChatUser){publicChatAvailable=false;localChatNotice.textContent='⚠ Modo local: as mensagens não chegam aos seus amigos.';publicChatError.hidden=false;publicChatError.textContent='Sincronização indisponível: '+(error.message||'verifique o SQL dos canais públicos')}console.warn('CONCORD chat publico:',error)}
+  finally{publicChatLoading=false;if(publicChatRefreshPending){publicChatRefreshPending=false;queueMicrotask(()=>loadPublicChat())}}
 }
 function initPublicChat(session){
   const id=session?.user?.id||null;
   if(id===publicChatUser)return;
-  publicChatUser=id;publicChatAvailable=false;clearInterval(publicChatTimer);publicChatTimer=null;
-  localChatNotice.textContent='⚠ Chat público em teste: mensagens salvas apenas neste navegador. Seus amigos ainda não recebem essas mensagens.';
+  ++publicChatLoadIdentity;publicChatUser=id;publicChatAvailable=false;clearInterval(publicChatTimer);publicChatTimer=null;
+  localChatNotice.textContent=id?'◌ Verificando sincronização do canal…':'⚠ Faça login para acessar o chat compartilhado.';
   publicChatError.hidden=true;renderChatHistory();
   if(id){publicChatTimer=setInterval(()=>{if(document.visibilityState==='visible'&&!dmOpen)loadPublicChat()},5000)}
 }
@@ -179,6 +181,7 @@ document.querySelectorAll('[data-channel]').forEach(button=>button.onclick=()=>{
   document.querySelectorAll('[data-channel]').forEach(item=>item.classList.remove('active'));
   saveConcordDraft(concordActiveChannel,$('#chatInput').value);
   button.classList.add('active');concordActiveChannel=button.dataset.channel;
+  localChatNotice.textContent='◌ Verificando sincronização do canal…';publicChatError.hidden=true;
   $('#chatInput').value=readConcordDrafts()[concordActiveChannel]||'';
   $('#channelTitle').textContent=concordActiveChannel;
   $('#chatInput').placeholder='Mensagem em #'+concordActiveChannel;
@@ -192,7 +195,8 @@ $('#chatForm').onsubmit=async event=>{
   if(!value||publicChatSending)return;
   const profile=typeof concordData!=='undefined'?concordData.profile:null;
   const entry={name:(profile?.name||'Você').slice(0,60),text:value,date:new Date().toLocaleString('pt-BR')};
-  if(publicChatUser&&publicChatAvailable&&concordPublicChannels.has(concordActiveChannel)){
+  if(publicChatUser&&concordPublicChannels.has(concordActiveChannel)){
+    if(!publicChatAvailable){simple('Aguarde a conexão','O canal não está sincronizado. Verifique o aviso acima antes de enviar mensagens.');return}
     publicChatSending=true;const channel=concordActiveChannel;
     try{
       const {error}=await concordSupabase.from('concord_public_messages').insert({channel,author_id:publicChatUser,author_name:entry.name,body:value});
@@ -202,6 +206,7 @@ $('#chatForm').onsubmit=async event=>{
     finally{publicChatSending=false}
     return;
   }
+  if(publicChatUser){simple('Canal indisponível','Este canal ainda não está configurado para mensagens compartilhadas.');return}
   const history=readChatHistory(),items=Array.isArray(history[concordActiveChannel])?history[concordActiveChannel]:[];
   history[concordActiveChannel]=[...items,entry].slice(-100);
   if(!saveChatHistory(history)){simple('Não foi possível salvar','Verifique se o navegador permite armazenamento local.');return}
