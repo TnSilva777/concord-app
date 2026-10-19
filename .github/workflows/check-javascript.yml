@@ -1,0 +1,28 @@
+name: Verificar JavaScript do CONCORD
+on:
+  push:
+    branches: [concord-development]
+  pull_request:
+    branches: [main, concord-development]
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar scripts do index.html
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const vm = require('node:vm');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)]
+            .map(match => match[1]).filter(source => source.trim());
+          if (!scripts.length) throw new Error('Nenhum script encontrado.');
+          for (const [index, source] of scripts.entries()) {
+            new vm.Script(source, { filename: 'index.html script ' + (index + 1) });
+          }
+          console.log('Sintaxe validada em ' + scripts.length + ' scripts.');
+          NODE
