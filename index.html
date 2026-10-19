@@ -89,4 +89,119 @@ $('#addServer').onclick=openCommunityCreator;$('#profileBtn').onclick=openProfil
 function setLocalSpeaking(on){document.querySelectorAll('.user .avatar,.roster-person.me .avatar,.room-member.you-in-room .mini-avatar').forEach(el=>el.classList.toggle('speaking',!!on));}
 
 if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
-</script></body></html>
+</script>
+<style>
+  #concordAuth {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: #09090f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+    color: white;
+  }
+  #concordAuth .auth-box {
+    background: #171725;
+    border: 1px solid #303047;
+    border-radius: 16px;
+    padding: 28px;
+    width: 100%;
+    max-width: 380px;
+    box-sizing: border-box;
+  }
+  #concordAuth input, #concordAuth button {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px;
+    margin-top: 12px;
+    border-radius: 8px;
+  }
+  #concordAuth input {
+    background: #242436;
+    color: white;
+    border: 1px solid #44445a;
+  }
+  #concordAuth button {
+    background: #7c3cff;
+    color: white;
+    border: 0;
+    cursor: pointer;
+  }
+  #concordAuth a { color: #b9a0ff; cursor: pointer; }
+  #authMessage { font-size: 13px; line-height: 1.5; }
+</style>
+
+<div id="concordAuth">
+  <div class="auth-box">
+    <h2>CONCORD</h2>
+    <p id="authTitle">Entre na sua conta</p>
+    <form id="concordAuthForm">
+      <input id="authEmail" type="email" placeholder="Seu e-mail" required>
+      <input id="authPassword" type="password" placeholder="Sua senha" minlength="6" required>
+      <button id="authSubmit" type="submit">Entrar</button>
+    </form>
+    <p id="authMessage" role="status"></p>
+    <p><a id="authToggle">Não tem conta? Cadastre-se</a></p>
+  </div>
+</div>
+
+<script>
+(() => {
+  const overlay = document.getElementById('concordAuth');
+  const form = document.getElementById('concordAuthForm');
+  const message = document.getElementById('authMessage');
+  const submit = document.getElementById('authSubmit');
+  let registering = false;
+
+  document.getElementById('authToggle').onclick = () => {
+    registering = !registering;
+    document.getElementById('authTitle').textContent =
+      registering ? 'Crie sua conta' : 'Entre na sua conta';
+    submit.textContent = registering ? 'Cadastrar' : 'Entrar';
+    document.getElementById('authToggle').textContent =
+      registering ? 'Já tem conta? Entrar' : 'Não tem conta? Cadastre-se';
+    message.textContent = '';
+  };
+
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    submit.disabled = true;
+    message.textContent = 'Aguarde...';
+
+    try {
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value;
+      const { data, error } = registering
+        ? await concordSupabase.auth.signUp({ email, password })
+        : await concordSupabase.auth.signInWithPassword({ email, password });
+
+      if (error) throw error;
+
+      if (registering) {
+        message.textContent = 'Cadastro solicitado! Verifique seu e-mail para confirmar a conta.';
+      } else if (data.session) {
+        overlay.style.display = 'none';
+        document.getElementById('authPassword').value = '';
+      }
+    } catch (error) {
+      message.textContent = error.message || 'Não foi possível entrar.';
+    } finally {
+      submit.disabled = false;
+    }
+  };
+
+  concordSupabase.auth.getSession().then(({ data }) => {
+    overlay.style.display = data.session ? 'none' : 'flex';
+  }).catch(() => {
+    message.textContent = 'Erro ao verificar a sessão.';
+  });
+
+  concordSupabase.auth.onAuthStateChange((_event, session) => {
+    overlay.style.display = session ? 'none' : 'flex';
+  });
+})();
+</script>
+</body></html>                              
