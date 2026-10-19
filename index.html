@@ -135,6 +135,18 @@ button:disabled{cursor:not-allowed;opacity:.58}
 #voiceRoomList>.voice-room:not([data-custom="true"]),
 #voiceRoomList>.voice-room:not([data-custom="true"])+.room-members{display:none!important}
 #voiceRoomList:empty::after{content:"Crie sua primeira sala no botão +";display:block;color:var(--muted);font-size:12px;padding:14px 10px}
+
+/* Home de amigos: a navegacao de canais so aparece dentro de uma comunidade. */
+body.concord-home-view .sidebar>.section,
+body.concord-home-view .sidebar>.channel,
+body.concord-home-view .sidebar>.voice-room-list,
+body.concord-home-view .sidebar>.voice-section-title{display:none!important}
+body.concord-home-view .sidebar>.search{display:none!important}
+body.concord-home-view .sidebar .brand small{font-size:10px}
+body.concord-home-view #concordDmPane{display:flex;flex-direction:column;min-height:0;flex:1}
+body.concord-home-view #concordDmPane[hidden]{display:none!important}
+body.concord-home-view #concordDmNav{box-shadow:0 0 0 2px #67dca35c}
+body.concord-home-view #concordFriendsNav{background:#225c40}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -548,6 +560,7 @@ function renderCommunities(){
       const welcome=$('#messages .welcome');
       if(welcome){welcome.querySelector('h1').textContent='Bem-vindo à '+community.name;welcome.querySelector('p').textContent='Comunidade salva neste navegador. Salas e mensagens próprias compartilhadas ainda não estão disponíveis.'}
       if(dmOpen)dmShow(false);
+      document.body.classList.add('concord-server-view');
     };
     b.oncontextmenu=e=>{e.preventDefault();editLocalCommunity(community.id)};
     const edit=document.createElement('button');edit.type='button';edit.className='concord-community-edit';
@@ -831,6 +844,8 @@ let dmOpen=false,dmPeer=null,dmRequest=0,dmBusy=false,dmFriendIds=new Set(),dmTi
 function dmShow(open){
   ++dmRequest;
   dmOpen=open;dmPane.hidden=!open;
+  document.body.classList.toggle('concord-home-view',open);
+  if(open)document.body.classList.remove('concord-server-view');
   if(chatContainer)chatContainer.hidden=open;
   const composer=$('#chatForm')?.closest('.composer');if(composer)composer.hidden=open;
   const mobileBar=$('.mobilebar');if(mobileBar)mobileBar.hidden=open;
@@ -964,7 +979,8 @@ async function initConcordSocial(session){
   socialRefreshQueued=false;
   dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#dmHistory').textContent='Selecione um amigo na lista à esquerda.';
   restoreConcordProfileForUser(id);if(id)syncConcordAvatarFromCloud(id);socialUser=id;voiceRoomsUser=id;initPublicChat(session);clearInterval(socialTimer);socialTimer=null;
-  if(!id){dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
+  if(!id){dmShow(true);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
+  dmShow(true);
   await Promise.all([refreshSocial(),refreshSharedVoiceRooms()]);
   socialTimer=setInterval(()=>{if(document.visibilityState==='visible'){refreshSocial();refreshSharedVoiceRooms()}},30000);
 }
