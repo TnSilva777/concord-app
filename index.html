@@ -506,7 +506,7 @@ function setConcordAvatar(el,profile){
     el.textContent='';el.style.backgroundImage='url("'+photo+'")';el.style.backgroundSize='cover';el.style.backgroundPosition='center';
   }
 }
-function updateProfileUI(){const name=concordData.profile.name||'Thauwan';const user=$('.user');if(user){setConcordAvatar(user.querySelector('.avatar'),concordData.profile);const b=user.querySelector('b');if(b)b.textContent=name}document.querySelectorAll('.message .msghead b').forEach(b=>{if(b.dataset.self==='true'||b.textContent==='Thauwan'||b.textContent==='Você')b.textContent=name});}
+function updateProfileUI(){const name=concordData.profile.name||'Você';const user=$('.user');if(user){setConcordAvatar(user.querySelector('.avatar'),concordData.profile);const label=user.querySelector('b');if(label)label.textContent=name;const status=user.querySelector('small');if(status){status.textContent='● '+(concordData.profile.status||'Online');status.title=concordData.profile.bio||'Editar perfil para adicionar uma biografia'}}document.querySelectorAll('.message .msghead b').forEach(label=>{if(label.dataset.self==='true'||label.textContent==='Thauwan'||label.textContent==='Você')label.textContent=name});}
 function editLocalCommunity(id){
   const community=concordData.communities.find(item=>item.id===id);if(!community)return;
   const action=prompt('Gerenciar "'+community.name+'" neste navegador. Digite 1 para renomear, 2 para trocar o ícone ou 3 para excluir:','1');
