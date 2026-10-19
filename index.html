@@ -24,6 +24,7 @@
 .voice-room-remove:hover,.voice-room-remove:focus-visible{opacity:1;background:#703333;color:white;outline:2px solid #ffb4b4}
 .concord-social{border-top:1px solid var(--line);padding-bottom:7px}.concord-social .section{display:flex;justify-content:space-between;align-items:center}.concord-social .section button{background:#1d4d36;border-radius:7px;padding:1px 7px}.concord-friends{padding:5px 12px;font-size:11px;color:var(--muted);max-height:155px;overflow:auto}.concord-friend{display:flex;align-items:center;gap:5px;margin:6px 0}.concord-friend span{flex:1;overflow:hidden;text-overflow:ellipsis}.concord-friend button,.concord-copy-id{background:#1b4935;border-radius:6px;padding:3px 6px;font-size:11px}.concord-copy-id{margin:2px 12px;color:#c9f3d9}.voice-room[data-custom="true"] .voice-room-remove{cursor:pointer}
 .concord-connection-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #355a46;border-radius:20px;background:#172e23;color:#b4d6c2;font-size:12px;margin:8px 0}.concord-connection-badge[data-state="connected"]{border-color:#38bb7b;color:#7ff0b2;background:#103f2a}.concord-connection-badge[data-state="waiting"]{border-color:#9e8b44;color:#f0d98c}
+.concord-social-error{font-size:11px;line-height:1.4;color:#eab5a7;overflow-wrap:anywhere;margin:5px 0}
 /* CONCORD HUD refinement — consistent interactive surfaces and accessible focus */
 :root{--hud-glow:rgba(53,212,154,.14);--hud-ring:#68e4ac}
 button,.channel,.voice-room{transition:background-color .18s ease,border-color .18s ease,transform .18s ease,box-shadow .18s ease}
@@ -254,7 +255,7 @@ function createCustomVoiceRoom(name,ownerId,id){
 async function refreshSharedVoiceRooms(){
   if(!voiceRoomsUser)return;
   const {data,error}=await concordSupabase.from('concord_voice_rooms').select('id,name,owner_id').order('created_at',{ascending:true}).limit(100);
-  if(error){voiceRoomsReady=false;$('#addVoiceRoom').title='Execute supabase/concord-social-voice.sql no Supabase';console.warn('Salas compartilhadas indisponíveis',error.message);return}
+  if(error){voiceRoomsReady=false;$('#addVoiceRoom').title='Salas compartilhadas indisponíveis: '+(error.message||'erro de consulta');console.error('CONCORD salas compartilhadas:',error);return}
   voiceRoomsReady=true;sharedVoiceRooms=new Map(data.map(room=>[room.name,room]));
   document.querySelectorAll('.voice-room[data-custom="true"]').forEach(btn=>{const name=btn.dataset.room;if(!sharedVoiceRooms.has(name)){btn.nextElementSibling?.remove();btn.remove();delete roomRoster[name];if(activeRoom===name)activeRoom='Geral'}});
   data.forEach(room=>{if(!Object.prototype.hasOwnProperty.call(roomRoster,room.name))createCustomVoiceRoom(room.name,room.owner_id,room.id)});
@@ -463,7 +464,16 @@ async function refreshSocial(){
     }
     const {error:presenceError}=await concordSupabase.from('concord_presence').upsert({user_id:socialUser,last_seen:new Date().toISOString()});
     if(presenceError)console.warn('Presença indisponível',presenceError.message);
-  }catch(error){$('#concordFriends').textContent='Amigos indisponíveis. Configure o SQL do projeto.';console.warn(error)}
+  }catch(error){
+    const list=$('#concordFriends');list.replaceChildren();
+    const detail=document.createElement('div');detail.textContent='Não foi possível carregar os amigos.';
+    const info=document.createElement('div');info.className='concord-social-error';
+    const code=String(error?.code||'');
+    info.textContent=code==='42P01'||code==='PGRST205'?'Tabela de amigos não encontrada. Verifique o projeto Supabase.':code==='42501'?'Permissão negada ao consultar amigos. Verifique as políticas RLS.':error?.message||'Falha na conexão com o Supabase.';
+    const retry=document.createElement('button');retry.textContent='Tentar novamente';retry.onclick=()=>refreshSocial();
+    list.append(detail,info,retry);
+    console.error('CONCORD amigos:',error);
+  }
   finally{socialBusy=false}
 }
 $('#concordAddFriend').onclick=async()=>{
