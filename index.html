@@ -753,7 +753,7 @@ $('#dmForm').onsubmit=async event=>{
 document.querySelectorAll('[data-channel]').forEach(btn=>btn.addEventListener('click',()=>{if(dmOpen)dmShow(false)}));
 dmTimer=setInterval(()=>{if(dmOpen&&document.visibilityState==='visible')dmLoad()},4000);
 
-async async function refreshSocial(){
+async function refreshSocial(){
   if(!socialUser)return;
   if(socialBusy){socialRefreshQueued=true;return}
   socialBusy=true;
