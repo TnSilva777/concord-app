@@ -236,7 +236,7 @@ let micStream=null,micContext=null,micAnalyser=null,micFrame=null,micEnabled=tru
 // Interações das salas de voz: seleção, contagem e presença local do usuário.
 let activeRoom='Geral',joinedRoom=null;const roomRoster={Geral:[], 'Squad PUBG':[],Resenha:[]};
 function playCallTone(kind){try{const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;const ctx=new Ctx();if(ctx.state==='suspended')ctx.resume();const notes=kind==='join'?[660,880]:[520,390];notes.forEach((freq,i)=>{const osc=ctx.createOscillator(),gain=ctx.createGain();osc.type='sine';osc.frequency.value=freq;gain.gain.setValueAtTime(0.0001,ctx.currentTime+i*.13);gain.gain.exponentialRampToValueAtTime(.12,ctx.currentTime+i*.13+.025);gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+i*.13+.16);osc.connect(gain);gain.connect(ctx.destination);osc.start(ctx.currentTime+i*.13);osc.stop(ctx.currentTime+i*.13+.18)});setTimeout(()=>ctx.close().catch(()=>{}),700)}catch(e){}}
-function renderCallRoster(){const list=$('#callRosterList');if(!list)return;list.innerHTML='';const members=roomRoster[joinedRoom||activeRoom]||[];$('#participantCount').textContent=members.length;if(!members.length){list.innerHTML='<div class="room-empty" style="padding:12px 7px">Ninguém entrou nesta sala ainda.</div>';return}members.forEach(m=>{const row=document.createElement('div');row.className='roster-person'+(m.isMe?' me':'');const av=document.createElement('div');av.className='avatar '+(m.cls||'');av.textContent=m.initial||'?';const meta=document.createElement('div');meta.className='person-meta';const name=document.createElement('b');name.textContent=m.name+(m.isMe?' (você)':'');const sub=document.createElement('small');sub.textContent=m.isMe?(micEnabled?'Microfone ligado':'Microfone mutado'):'Na sala';meta.append(name,sub);const state=document.createElement('span');state.className='person-state';state.textContent=m.isMe?(micEnabled?'🎙':'🔇'):'●';row.append(av,meta,state);list.append(row)})}
+function renderCallRoster(){const list=$('#callRosterList');if(!list)return;list.innerHTML='';const members=roomRoster[joinedRoom||activeRoom]||[];$('#participantCount').textContent=members.length;if(!members.length){list.innerHTML='<div class="room-empty" style="padding:12px 7px">Ninguém entrou nesta sala ainda.</div>';return}members.forEach(m=>{const row=document.createElement('div');row.className='roster-person'+(m.isMe?' me':'');const av=document.createElement('div');av.className='avatar '+(m.cls||'');av.textContent=m.initial||'?';if(m.isMe&&typeof concordData!=='undefined')setConcordAvatar(av,concordData.profile);const meta=document.createElement('div');meta.className='person-meta';const name=document.createElement('b');name.textContent=m.name+(m.isMe?' (você)':'');const sub=document.createElement('small');sub.textContent=m.isMe?(micEnabled?'Microfone ligado':'Microfone mutado'):'Na sala';meta.append(name,sub);const state=document.createElement('span');state.className='person-state';state.textContent=m.isMe?(micEnabled?'🎙':'🔇'):'●';row.append(av,meta,state);list.append(row)})}
 function renderRooms(){
   document.querySelectorAll('.voice-room').forEach(btn=>{
     const room=btn.dataset.room;
@@ -258,6 +258,7 @@ function renderRooms(){
       b.title='Abrir sala '+room+' · '+String(member.name||'Participante');
       const avatar=document.createElement('span');avatar.className='mini-avatar';
       avatar.textContent=String(member.initial||'?').slice(0,2);
+      if(member.isMe&&typeof concordData!=='undefined')setConcordAvatar(avatar,concordData.profile);
       const name=document.createElement('span');name.className='member-name';
       name.textContent=String(member.name||'Participante');
       const status=document.createElement('span');status.className='game-status';
@@ -390,7 +391,7 @@ function openProfileEditor(){
     const n=nameInput.value.trim();if(!n){nameInput.focus();return}
     concordData.profile={name:n,avatar:avatarInput.value.trim()||n.slice(0,1).toUpperCase(),color:colorInput.value,photo:selectedPhoto};
     try{localStorage.setItem(CONCORD_STORE,JSON.stringify(concordData))}catch(error){photoError.textContent='Não foi possível salvar a foto neste navegador. Tente remover a foto ou liberar espaço.';return}
-    updateProfileUI();modal.classList.remove('show');simple('Perfil atualizado','Foto e nome salvos neste navegador. A sincronização entre dispositivos ainda será implementada.');
+    updateProfileUI();if(typeof renderRooms==='function')renderRooms();modal.classList.remove('show');simple('Perfil atualizado','Foto e nome salvos neste navegador. A sincronização entre dispositivos ainda será implementada.');
   };
   nameInput.oninput=()=>{previewName.textContent=nameInput.value||'Seu nome';previewAvatar()};
   avatarInput.oninput=previewAvatar;colorInput.oninput=previewAvatar;
