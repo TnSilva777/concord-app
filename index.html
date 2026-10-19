@@ -22,6 +22,7 @@
 .voice-room[data-custom="true"]{position:relative;padding-right:28px}
 .voice-room-remove{position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:20px;line-height:1;opacity:.65;padding:2px 5px;border-radius:6px;color:#f5b5b5}
 .voice-room-remove:hover,.voice-room-remove:focus-visible{opacity:1;background:#703333;color:white;outline:2px solid #ffb4b4}
+.concord-social{border-top:1px solid var(--line);padding-bottom:7px}.concord-social .section{display:flex;justify-content:space-between;align-items:center}.concord-social .section button{background:#1d4d36;border-radius:7px;padding:1px 7px}.concord-friends{padding:5px 12px;font-size:11px;color:var(--muted);max-height:155px;overflow:auto}.concord-friend{display:flex;align-items:center;gap:5px;margin:6px 0}.concord-friend span{flex:1;overflow:hidden;text-overflow:ellipsis}.concord-friend button,.concord-copy-id{background:#1b4935;border-radius:6px;padding:3px 6px;font-size:11px}.concord-copy-id{margin:2px 12px;color:#c9f3d9}.voice-room[data-custom="true"] .voice-room-remove{cursor:pointer}
 /* CONCORD HUD refinement — consistent interactive surfaces and accessible focus */
 :root{--hud-glow:rgba(53,212,154,.14);--hud-ring:#68e4ac}
 button,.channel,.voice-room{transition:background-color .18s ease,border-color .18s ease,transform .18s ease,box-shadow .18s ease}
@@ -220,41 +221,54 @@ function syncLocalPresence(){for(const room of Object.keys(roomRoster)){roomRost
 const originalJoinCall=joinCall;joinCall=async function(){if(callJoined)return;const roomToJoin=activeRoom;await originalJoinCall();if(callJoined){joinedRoom=roomToJoin;$('#callSubtitle').textContent='Conectado à sala '+joinedRoom;playCallTone('join');syncLocalPresence()}};
 const originalLeaveCall=leaveCall;leaveCall=function(){const wasJoined=callJoined;if(stream)stopShare();originalLeaveCall();joinedRoom=null;syncLocalPresence();if(wasJoined)playCallTone('leave')};$('#joinCall').onclick=joinCall;$('#leaveCall').onclick=leaveCall;
 // Salas personalizadas locais: criacao, exclusao e persistencia no navegador.
-const VOICE_ROOMS_STORE='concord-custom-voice-rooms-v1';
+// Salas compartilhadas: requer supabase/concord-social-voice.sql no SQL Editor.
 const defaultVoiceRooms=new Set(['Geral','Squad PUBG','Resenha']);
-function readCustomVoiceRooms(){try{const saved=JSON.parse(localStorage.getItem(VOICE_ROOMS_STORE)||'[]');return Array.isArray(saved)?saved.filter(n=>typeof n==='string'&&n.trim()&&!defaultVoiceRooms.has(n)).slice(0,30):[]}catch{return []}}
-function saveCustomVoiceRooms(){try{localStorage.setItem(VOICE_ROOMS_STORE,JSON.stringify([...document.querySelectorAll('.voice-room[data-custom="true"]')].map(b=>b.dataset.room)))}catch(error){console.warn('Salas nao salvas',error)}}
-function createCustomVoiceRoom(name,openAfter=false){
-  const clean=name.trim().slice(0,24);
-  if(!clean||Object.prototype.hasOwnProperty.call(roomRoster,clean))return false;
-  roomRoster[clean]=[];
-  const btn=document.createElement('button');btn.className='voice-room';btn.dataset.room=clean;btn.dataset.custom='true';
+let voiceRoomsUser=null,sharedVoiceRooms=new Map(),voiceRoomsReady=false;
+function createCustomVoiceRoom(name,ownerId,id){
+  if(Object.prototype.hasOwnProperty.call(roomRoster,name))return;
+  roomRoster[name]=[];
+  const btn=document.createElement('button');btn.className='voice-room';btn.dataset.room=name;btn.dataset.custom='true';
   const icon=document.createElement('span');icon.className='room-icon';icon.textContent='◖';
-  const title=document.createElement('span');title.className='room-name';title.textContent=clean;
+  const title=document.createElement('span');title.className='room-name';title.textContent=name;
   const count=document.createElement('span');count.className='room-count';count.textContent='0';
-  const remove=document.createElement('span');remove.className='voice-room-remove';remove.textContent='×';remove.title='Remover sala '+clean;remove.setAttribute('role','button');remove.setAttribute('tabindex','0');remove.setAttribute('aria-label','Remover sala '+clean);
-  function removeRoom(event){
-    event.stopPropagation();
-    if(joinedRoom===clean){simple('Sala em uso','Saia da chamada antes de remover esta sala.');return}
-    if(!confirm('Remover a sala '+clean+' deste navegador?'))return;
-    if(activeRoom===clean)activeRoom='Geral';
-    delete roomRoster[clean];btn.remove();members.remove();saveCustomVoiceRooms();renderRooms();
-  }
-  remove.onclick=removeRoom;remove.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();removeRoom(e)}};
-  btn.append(icon,title,count,remove);
+  btn.append(icon,title,count);
   const members=document.createElement('div');members.className='room-members';
-  $('#voiceRoomList').append(btn,members);
-  btn.onclick=()=>chooseRoom(clean);
-  saveCustomVoiceRooms();
-  if(openAfter)chooseRoom(clean);else renderRooms();
-  return true;
+  if(ownerId===voiceRoomsUser){
+    const remove=document.createElement('span');remove.className='voice-room-remove';
+    remove.textContent='×';remove.title='Excluir sala '+name;remove.setAttribute('role','button');
+    remove.setAttribute('tabindex','0');remove.setAttribute('aria-label','Excluir sala '+name);
+    const removeRoom=async event=>{
+      event.stopPropagation();
+      if(joinedRoom===name){simple('Sala em uso','Saia da chamada antes de excluir esta sala.');return}
+      if(!confirm('Excluir a sala '+name+' para todos os usuários?'))return;
+      const {error}=await concordSupabase.from('concord_voice_rooms').delete().eq('id',id).eq('owner_id',voiceRoomsUser);
+      if(error){simple('Não foi possível excluir',error.message);return}
+      await refreshSharedVoiceRooms();
+    };
+    remove.onclick=removeRoom;remove.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();removeRoom(e)}};
+    btn.append(remove);
+  }
+  $('#voiceRoomList').append(btn,members);btn.onclick=()=>chooseRoom(name);
 }
-$('#addVoiceRoom').onclick=()=>{
-  const name=prompt('Nome da nova sala de voz (até 24 caracteres):');
+async function refreshSharedVoiceRooms(){
+  if(!voiceRoomsUser)return;
+  const {data,error}=await concordSupabase.from('concord_voice_rooms').select('id,name,owner_id').order('created_at',{ascending:true}).limit(100);
+  if(error){voiceRoomsReady=false;$('#addVoiceRoom').title='Execute supabase/concord-social-voice.sql no Supabase';console.warn('Salas compartilhadas indisponíveis',error.message);return}
+  voiceRoomsReady=true;sharedVoiceRooms=new Map(data.map(room=>[room.name,room]));
+  document.querySelectorAll('.voice-room[data-custom="true"]').forEach(btn=>{const name=btn.dataset.room;if(!sharedVoiceRooms.has(name)){btn.nextElementSibling?.remove();btn.remove();delete roomRoster[name];if(activeRoom===name)activeRoom='Geral'}});
+  data.forEach(room=>{if(!Object.prototype.hasOwnProperty.call(roomRoster,room.name))createCustomVoiceRoom(room.name,room.owner_id,room.id)});
+  renderRooms();
+}
+$('#addVoiceRoom').onclick=async()=>{
+  if(!voiceRoomsReady){simple('Configuração necessária','Execute o arquivo supabase/concord-social-voice.sql no SQL Editor do Supabase.');return}
+  const name=prompt('Nome da nova sala compartilhada (até 24 caracteres):');
   if(!name||!name.trim())return;
-  if(!createCustomVoiceRoom(name,true))simple('Sala já existe','Escolha outro nome para sua sala.');
+  const clean=name.trim().slice(0,24);
+  if(defaultVoiceRooms.has(clean)||sharedVoiceRooms.has(clean)){simple('Sala já existe','Escolha outro nome.');return}
+  const {error}=await concordSupabase.from('concord_voice_rooms').insert({name:clean,owner_id:voiceRoomsUser});
+  if(error){simple('Erro ao criar sala',error.message);return}
+  await refreshSharedVoiceRooms();chooseRoom(clean);
 };
-readCustomVoiceRooms().forEach(name=>createCustomVoiceRoom(name));
 // Clicking a participant shows their room details, while the room itself opens the call panel.
 document.querySelectorAll('.room-member').forEach(btn=>btn.addEventListener('dblclick',()=>simple(btn.dataset.member||'Participante','Este perfil é demonstrativo nesta versão do Concord.')));renderRooms();
 
@@ -405,6 +419,61 @@ try{
   }
 }catch(error){console.warn('Convite de voz inválido',error)}
 
+
+// Painel social e presenca; depende da migracao SQL versionada.
+const socialPanel=document.createElement('section');socialPanel.className='concord-social';
+socialPanel.innerHTML='<div class="section">AMIGOS <button id="concordAddFriend" title="Adicionar amigo por ID">＋</button></div><div id="concordFriends" class="concord-friends">Entre na conta para ver seus amigos.</div>';
+const voiceSection=document.querySelector('.voice-section-title');
+if(voiceSection)voiceSection.parentNode.insertBefore(socialPanel,voiceSection);
+let socialUser=null,socialTimer=null,socialBusy=false;
+async function refreshSocial(){
+  if(!socialUser||socialBusy)return;socialBusy=true;
+  try{
+    const {data:friends,error}=await concordSupabase.from('concord_friend_requests').select('id,requester_id,recipient_id,status').or('requester_id.eq.'+socialUser+',recipient_id.eq.'+socialUser).limit(100);
+    if(error)throw error;
+    const accepted=friends.filter(f=>f.status==='accepted');
+    const ids=accepted.map(f=>f.requester_id===socialUser?f.recipient_id:f.requester_id);
+    const {data:presence}=ids.length?await concordSupabase.from('concord_presence').select('user_id,last_seen').in('user_id',ids):{data:[]};
+    const online=new Set((presence||[]).filter(p=>Date.now()-new Date(p.last_seen).getTime()<90000).map(p=>p.user_id));
+    const list=$('#concordFriends');list.replaceChildren();
+    if(!friends.length){list.textContent='Nenhum amigo adicionado.'}
+    for(const f of friends){
+      const other=f.requester_id===socialUser?f.recipient_id:f.requester_id;
+      const row=document.createElement('div');row.className='concord-friend';
+      const label=document.createElement('span');label.textContent=(online.has(other)?'🟢 ':'⚪ ')+other.slice(0,8)+(f.status==='pending'?' · pendente':'');
+      label.title='ID: '+other;row.append(label);
+      if(f.status==='pending'&&f.recipient_id===socialUser){
+        const accept=document.createElement('button');accept.textContent='Aceitar';accept.onclick=async()=>{const {error}=await concordSupabase.from('concord_friend_requests').update({status:'accepted'}).eq('id',f.id);if(error)alert(error.message);else refreshSocial()};row.append(accept);
+      }
+      const remove=document.createElement('button');remove.textContent='×';remove.title='Remover pedido ou amizade';remove.onclick=async()=>{if(!confirm('Remover esta amizade ou pedido?'))return;const {error}=await concordSupabase.from('concord_friend_requests').delete().eq('id',f.id);if(error)alert(error.message);else refreshSocial()};row.append(remove);
+      list.append(row);
+    }
+    const {error:presenceError}=await concordSupabase.from('concord_presence').upsert({user_id:socialUser,last_seen:new Date().toISOString()});
+    if(presenceError)console.warn('Presença indisponível',presenceError.message);
+  }catch(error){$('#concordFriends').textContent='Amigos indisponíveis. Configure o SQL do projeto.';console.warn(error)}
+  finally{socialBusy=false}
+}
+$('#concordAddFriend').onclick=async()=>{
+  if(!socialUser){simple('Entre na conta','Faça login antes de adicionar amigos.');return}
+  const id=prompt('Cole o ID de usuário (UUID) do seu amigo:');
+  if(!id)return;
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id.trim())){simple('ID inválido','Peça ao amigo para copiar o ID dele no painel Amigos.');return}
+  if(id.trim()===socialUser){simple('Amigos','Você não pode adicionar sua própria conta.');return}
+  const {error}=await concordSupabase.from('concord_friend_requests').insert({requester_id:socialUser,recipient_id:id.trim()});
+  if(error)simple('Erro ao enviar pedido',error.message);else{simple('Pedido enviado','Seu amigo pode aceitar no painel Amigos.');refreshSocial()}
+};
+const copyId=document.createElement('button');copyId.className='concord-copy-id';copyId.textContent='Copiar meu ID';copyId.onclick=async()=>{if(!socialUser)return;try{await navigator.clipboard.writeText(socialUser);simple('ID copiado','Envie esse ID somente para quem você deseja adicionar.')}catch{prompt('Copie seu ID:',socialUser)}};
+socialPanel.append(copyId);
+async function initConcordSocial(session){
+  const id=session?.user?.id||null;
+  if(id===socialUser)return;
+  socialUser=id;voiceRoomsUser=id;clearInterval(socialTimer);socialTimer=null;
+  if(!id){$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
+  await Promise.all([refreshSocial(),refreshSharedVoiceRooms()]);
+  socialTimer=setInterval(()=>{if(document.visibilityState==='visible'){refreshSocial();refreshSharedVoiceRooms()}},30000);
+}
+concordSupabase.auth.getSession().then(({data})=>initConcordSocial(data.session)).catch(console.warn);
+concordSupabase.auth.onAuthStateChange((_event,session)=>{setTimeout(()=>initConcordSocial(session),0);if(!session&&callJoined)leaveCall()});
 
 if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 </script>
