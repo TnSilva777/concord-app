@@ -1016,60 +1016,55 @@ concordSupabase.auth.onAuthStateChange((_event,session)=>{setTimeout(()=>initCon
 if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 </script>
 <style>
-  #concordAuth {
-    position: fixed;
-    inset: 0;
-    z-index: 99999;
-    background: #07110e;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    font-family: Arial, sans-serif;
-    color: white;
-  }
-  #concordAuth .auth-box {
-    background: #14251f;
-    border: 1px solid #355541;
-    border-radius: 16px;
-    padding: 28px;
-    width: 100%;
-    max-width: 380px;
-    box-sizing: border-box;
-  }
-  #concordAuth input, #concordAuth button {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 12px;
-    margin-top: 12px;
-    border-radius: 8px;
-  }
-  #concordAuth input {
-    background: #1c3629;
-    color: white;
-    border: 1px solid #41654f;
-  }
-  #concordAuth button {
-    background: #16865e;
-    color: white;
-    border: 0;
-    cursor: pointer;
-  }
-  #concordAuth a { color: #a3e6bf; cursor: pointer; }
-  #authMessage { font-size: 13px; line-height: 1.5; }
+#concordAuth{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 15% 20%,#1d6a4960,transparent 35%),radial-gradient(circle at 85% 80%,#174e3980,transparent 40%),#07120e;color:#eefcf4;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,sans-serif}
+#concordAuth .auth-shell{width:min(880px,100%);display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,1fr);border:1px solid #3b7656;border-radius:24px;overflow:hidden;background:#101f18;box-shadow:0 32px 100px #0009}
+#concordAuth .auth-welcome{padding:45px 34px;background:linear-gradient(155deg,#20563c,#0c291d 70%);display:flex;flex-direction:column;justify-content:center;position:relative;isolation:isolate}
+#concordAuth .auth-welcome:before{content:"";position:absolute;width:190px;height:190px;border:1px solid #8cf1b542;border-radius:45px;right:-75px;top:-60px;transform:rotate(28deg);z-index:-1}
+#concordAuth .auth-mark{display:grid;place-items:center;width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,#67e9a7,#12734d);color:#06271a;font-size:34px;font-weight:900;box-shadow:0 12px 32px #0004}
+#concordAuth .auth-welcome h1{font-size:clamp(28px,4vw,39px);line-height:1.15;margin:24px 0 12px;letter-spacing:-1px}
+#concordAuth .auth-welcome p{font-size:14px;line-height:1.75;color:#c0e5ce;margin:0}
+#concordAuth .auth-welcome .auth-features{margin-top:28px;display:grid;gap:13px;font-size:13px;color:#d7f6e4}
+#concordAuth .auth-welcome .auth-features span{display:flex;align-items:center;gap:10px}
+#concordAuth .auth-welcome .auth-features b{display:grid;place-items:center;width:29px;height:29px;border-radius:9px;background:#ffffff17;font-size:15px}
+#concordAuth .auth-box{padding:42px 34px;background:#102019;min-width:0}
+#concordAuth .auth-box h2{font-size:25px;margin:0 0 7px;letter-spacing:-.5px}
+#concordAuth .auth-box>p{color:#a8c9b5;font-size:13px;line-height:1.5}
+#concordAuth #authTitle{margin:0 0 23px}
+#concordAuth .auth-field{display:block;font-size:12px;font-weight:700;color:#cbe6d6;margin-top:15px}
+#concordAuth input{display:block;width:100%;padding:13px 14px;margin-top:7px;border-radius:10px;background:#1b3326;border:1px solid #41654f;color:#fff;outline:none;font:inherit;font-size:14px}
+#concordAuth input:focus{border-color:#66e4a3;box-shadow:0 0 0 3px #48c88b25}
+#concordAuth input::placeholder{color:#91b19e}
+#concordAuth #authSubmit{width:100%;padding:14px;border:0;border-radius:11px;background:linear-gradient(115deg,#48d795,#159564);color:#082417;font-weight:800;margin-top:22px;cursor:pointer;transition:filter .18s,transform .18s}
+#concordAuth #authSubmit:hover{filter:brightness(1.1);transform:translateY(-1px)}
+#concordAuth #authSubmit:disabled{opacity:.6;cursor:wait;transform:none}
+#concordAuth #authToggle{color:#7ce5ac;cursor:pointer;text-decoration:underline;text-underline-offset:4px;font-weight:700}
+#concordAuth #authMessage{font-size:12px;line-height:1.55;min-height:18px;color:#b9e9cd}
+#concordAuth .auth-switch{text-align:center;margin:18px 0 0}
+#concordAuth .auth-footer{font-size:11px!important;text-align:center;color:#83a895!important;margin-top:24px}
+@media(max-width:700px){#concordAuth{padding:14px;overflow:auto;align-items:flex-start}#concordAuth .auth-shell{grid-template-columns:1fr;margin:auto}#concordAuth .auth-welcome{padding:25px 24px}#concordAuth .auth-welcome h1{font-size:26px;margin:14px 0 7px}#concordAuth .auth-welcome .auth-features{display:none}#concordAuth .auth-box{padding:26px 24px}#concordAuth .auth-mark{width:48px;height:48px;font-size:25px;border-radius:15px}}
+@media(prefers-reduced-motion:reduce){#concordAuth #authSubmit{transition:none}}
 </style>
 
 <div id="concordAuth">
-  <div class="auth-box">
-    <h2>CONCORD</h2>
-    <p id="authTitle">Entre na sua conta</p>
-    <form id="concordAuthForm">
-      <input id="authEmail" type="email" placeholder="Seu e-mail" required>
-      <input id="authPassword" type="password" placeholder="Sua senha" minlength="6" required>
-      <button id="authSubmit" type="submit">Entrar</button>
-    </form>
-    <p id="authMessage" role="status"></p>
-    <p><a id="authToggle">Não tem conta? Cadastre-se</a></p>
+  <div class="auth-shell">
+    <section class="auth-welcome" aria-label="Bem-vindo ao CONCORD">
+      <div class="auth-mark" aria-hidden="true">C</div>
+      <h1>Seu espaço.<br>Sua comunidade. ✨</h1>
+      <p>Bem-vindo ao CONCORD! Encontre amigos, compartilhe momentos e crie um lugar para chamar de seu.</p>
+      <div class="auth-features"><span><b>✦</b> Amigos e conversas privadas</span><span><b>🎙</b> Chamadas para jogar e conversar</span><span><b>✚</b> Comunidades do seu jeito</span></div>
+    </section>
+    <div class="auth-box">
+      <h2 id="authHeading">Que bom ter você aqui!</h2>
+      <p id="authTitle">Entre na sua conta para continuar.</p>
+      <form id="concordAuthForm">
+        <label class="auth-field" for="authEmail">E-mail<input id="authEmail" type="email" placeholder="voce@exemplo.com" autocomplete="email" required></label>
+        <label class="auth-field" for="authPassword">Senha<input id="authPassword" type="password" placeholder="Sua senha" autocomplete="current-password" minlength="6" required></label>
+        <button id="authSubmit" type="submit">Entrar no CONCORD →</button>
+      </form>
+      <p id="authMessage" role="status" aria-live="polite"></p>
+      <p class="auth-switch"><a id="authToggle" role="button" tabindex="0">Ainda não tem conta? Cadastre-se</a></p>
+      <p class="auth-footer">CONCORD · Sua comunidade, seu espaço.</p>
+    </div>
   </div>
 </div>
 
@@ -1084,12 +1079,16 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   document.getElementById('authToggle').onclick = () => {
     registering = !registering;
     document.getElementById('authTitle').textContent =
-      registering ? 'Crie sua conta' : 'Entre na sua conta';
-    submit.textContent = registering ? 'Cadastrar' : 'Entrar';
+      registering ? 'Crie sua conta e venha fazer parte.' : 'Entre na sua conta para continuar.';
+    document.getElementById('authHeading').textContent = registering ? 'Comece sua jornada! 🚀' : 'Que bom ter você aqui!';
+    document.getElementById('authPassword').autocomplete = registering ? 'new-password' : 'current-password';
+    submit.textContent = registering ? 'Criar minha conta →' : 'Entrar no CONCORD →';
     document.getElementById('authToggle').textContent =
-      registering ? 'Já tem conta? Entrar' : 'Não tem conta? Cadastre-se';
+      registering ? 'Já tem conta? Entrar' : 'Ainda não tem conta? Cadastre-se';
     message.textContent = '';
   };
+
+  document.getElementById('authToggle').onkeydown = event => { if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('authToggle').click()} };
 
   form.onsubmit = async (event) => {
     event.preventDefault();
