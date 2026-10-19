@@ -353,6 +353,30 @@ function restoreConcordProfileForUser(id){
   }catch(error){console.warn('Não foi possível restaurar perfil',error);concordData.profile=defaultProfile}
   if(token===concordProfileLoad)updateProfileUI();
 }
+async function syncConcordAvatarFromCloud(id){
+  if(!id||id!==concordProfileUser)return;
+  try{
+    const {data}=concordSupabase.storage.from('concord-avatars').getPublicUrl(id+'/avatar.jpg');
+    const url=data?.publicUrl;if(!url)return;
+    const response=await fetch(url+'?v='+Date.now(),{cache:'no-store'});
+    if(id!==concordProfileUser)return;
+    if(response.ok){concordData.profile.cloudPhoto=url+'?v='+Date.now();updateProfileUI();renderRooms()}
+    else if(response.status===404){concordData.profile.cloudPhoto='';updateProfileUI()}
+  }catch(error){console.warn('Avatar remoto indisponível',error)}
+}
+async function saveConcordAvatarToCloud(id,photo,removed){
+  if(!id)return {ok:false,message:'Faça login antes de salvar o perfil.'};
+  try{
+    const bucket=concordSupabase.storage.from('concord-avatars'),path=id+'/avatar.jpg';
+    if(removed){const {error}=await bucket.remove([path]);if(error)throw error;return {ok:true,url:''}}
+    if(!photo)return {ok:true,url:null};
+    const response=await fetch(photo);const blob=await response.blob();
+    const {error}=await bucket.upload(path,blob,{upsert:true,contentType:'image/jpeg',cacheControl:'60'});
+    if(error)throw error;
+    const {data}=bucket.getPublicUrl(path);
+    return {ok:true,url:data.publicUrl+'?v='+Date.now()};
+  }catch(error){console.warn('Falha ao sincronizar avatar:',error);return {ok:false,message:error.message||'Erro ao enviar foto'}}
+}
 function saveConcordProfileForUser(){
   if(!concordProfileUser)return false;
   try{localStorage.setItem(concordProfileKey(concordProfileUser),JSON.stringify({profile:concordData.profile}));return true}
@@ -363,8 +387,9 @@ function setConcordAvatar(el,profile){
   const name=profile.name||'Usuário',letter=profile.avatar||name.slice(0,1).toUpperCase();
   el.textContent=letter;el.style.background='linear-gradient(135deg,'+(profile.color||'#2bb77b')+',#0c5b40)';
   el.style.backgroundImage='';el.style.backgroundSize='';el.style.backgroundPosition='';
-  if(typeof profile.photo==='string'&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(profile.photo)&&profile.photo.length<350000){
-    el.textContent='';el.style.backgroundImage='url("'+profile.photo+'")';el.style.backgroundSize='cover';el.style.backgroundPosition='center';
+  const photo=(typeof profile.cloudPhoto==='string'&&/^https:\/\/mthrcsfxyzswcaokzrvq\.supabase\.co\/storage\/v1\/object\/public\/concord-avatars\//.test(profile.cloudPhoto))?profile.cloudPhoto:profile.photo;
+  if(typeof photo==='string'&&((/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(photo)&&photo.length<350000)||/^https:\/\/mthrcsfxyzswcaokzrvq\.supabase\.co\/storage\/v1\/object\/public\/concord-avatars\//.test(photo))){
+    el.textContent='';el.style.backgroundImage='url("'+photo+'")';el.style.backgroundSize='cover';el.style.backgroundPosition='center';
   }
 }
 function updateProfileUI(){const name=concordData.profile.name||'Thauwan';const user=$('.user');if(user){setConcordAvatar(user.querySelector('.avatar'),concordData.profile);const b=user.querySelector('b');if(b)b.textContent=name}document.querySelectorAll('.message .msghead b').forEach(b=>{if(b.dataset.self==='true'||b.textContent==='Thauwan'||b.textContent==='Você')b.textContent=name});}
@@ -412,11 +437,24 @@ function openProfileEditor(){
   const foot=modal.querySelector('.footbuttons');foot.replaceChildren();
   const cancel=document.createElement('button');cancel.className='pill';cancel.textContent='Cancelar';cancel.onclick=()=>modal.classList.remove('show');
   const save=document.createElement('button');save.className='primary';save.textContent='Salvar perfil';
-  save.onclick=()=>{
+  save.onclick=async()=>{
     const n=nameInput.value.trim();if(!n){nameInput.focus();return}
-    concordData.profile={name:n,avatar:avatarInput.value.trim()||n.slice(0,1).toUpperCase(),color:colorInput.value,photo:selectedPhoto};
-    if(!saveConcordProfileForUser()){photoError.textContent='Não foi possível salvar o perfil nesta conta. Entre novamente e confira o espaço do navegador.';return}
-    updateProfileUI();if(typeof renderRooms==='function')renderRooms();modal.classList.remove('show');simple('Perfil atualizado','Foto salva para esta conta neste navegador. A sincronização com outros dispositivos ainda não está ativa.');
+    const id=concordProfileUser,previous=concordData.profile,photoChanged=selectedPhoto!==previous.photo;
+    save.disabled=true;save.textContent='Salvando…';
+    try{
+      let cloudPhoto=previous.cloudPhoto||'';
+      let notice='Perfil salvo neste navegador.';
+      if(photoChanged){
+        const result=await saveConcordAvatarToCloud(id,selectedPhoto,!selectedPhoto);
+        if(!result.ok){photoError.textContent='Não foi possível sincronizar a foto: '+result.message+'. Confira se executou o SQL concord-avatars.sql.';return}
+        cloudPhoto=result.url||'';
+        notice='Foto sincronizada no Supabase e salva neste navegador.';
+      }
+      if(id!==concordProfileUser){photoError.textContent='A conta mudou durante o salvamento. Abra o perfil novamente.';return}
+      concordData.profile={name:n,avatar:avatarInput.value.trim()||n.slice(0,1).toUpperCase(),color:colorInput.value,photo:selectedPhoto,cloudPhoto};
+      if(!saveConcordProfileForUser()){concordData.profile=previous;photoError.textContent='Não foi possível salvar o perfil neste navegador.';return}
+      updateProfileUI();if(typeof renderRooms==='function')renderRooms();modal.classList.remove('show');simple('Perfil atualizado',notice);
+    }finally{save.disabled=false;save.textContent='Salvar perfil'}
   };
   nameInput.oninput=()=>{previewName.textContent=nameInput.value||'Seu nome';previewAvatar()};
   avatarInput.oninput=previewAvatar;colorInput.oninput=previewAvatar;
@@ -711,7 +749,7 @@ async function initConcordSocial(session){
   const id=session?.user?.id||null;
   if(id===socialUser)return;
   dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#dmHistory').textContent='Selecione um amigo na lista à esquerda.';
-  restoreConcordProfileForUser(id);socialUser=id;voiceRoomsUser=id;initPublicChat(session);clearInterval(socialTimer);socialTimer=null;
+  restoreConcordProfileForUser(id);if(id)syncConcordAvatarFromCloud(id);socialUser=id;voiceRoomsUser=id;initPublicChat(session);clearInterval(socialTimer);socialTimer=null;
   if(!id){dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
   await Promise.all([refreshSocial(),refreshSharedVoiceRooms()]);
   socialTimer=setInterval(()=>{if(document.visibilityState==='visible'){refreshSocial();refreshSharedVoiceRooms()}},30000);
