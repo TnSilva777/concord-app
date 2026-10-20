@@ -490,6 +490,23 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
 #concordStreamSizeControl input{width:95px;accent-color:#42dca4;cursor:pointer}
 #concordStreamSizeControl output{min-width:37px;text-align:right}
 
+
+/* Responsive friend navigation: adapt gracefully to the user's sidebar width */
+.sidebar{min-width:0;max-width:100%;overflow-x:hidden}
+.sidebar .concord-friend,.sidebar .concord-dm-friend-row{min-width:0;width:100%;max-width:100%;box-sizing:border-box}
+.sidebar .concord-friend{display:flex;align-items:center;gap:7px}
+.sidebar .concord-friend-avatar{flex:0 0 38px;width:38px;height:38px;border-radius:50%;display:grid;place-items:center}
+.sidebar .concord-friend-details{min-width:0;flex:1}
+.sidebar .concord-friend-details strong,.sidebar .concord-friend-details small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar .concord-friend>button{flex-shrink:0}
+.sidebar .concord-dm-friend-row{display:flex;gap:5px}
+.sidebar .concord-dm-friend{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.sidebar .concord-dm-visit{flex-shrink:0}
+.sidebar #concordFriends,.sidebar #dmFriends{min-width:0;max-width:100%;overflow-x:hidden}
+.sidebar input{max-width:100%;min-width:0}
+.sidebar .concord-user-identity{min-width:0}
+@media(min-width:761px){.sidebar{width:100%;min-width:0}}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -1668,7 +1685,7 @@ function concordViewProfile(userId){
  const card=document.createElement('div');card.className='concord-profile-card';
  const banner=document.createElement('div');banner.className='concord-profile-banner';banner.style.background=own?(profile.color||'#16865e'):'#28644a';
  const avatar=document.createElement('div');avatar.className='avatar concord-profile-card-avatar';
- if(own)setConcordAvatar(avatar,profile);else avatar.textContent=String(userId||'?').slice(0,2).toUpperCase();
+ if(own)setConcordAvatar(avatar,profile);else avatar.textContent=concordFriendNames.has(userId)?concordFriendDisplayName(userId).slice(0,2).toUpperCase():'?';
  const name=document.createElement('h3');name.textContent=own?(profile.name||'Você'):concordFriendDisplayName(userId);
  const status=document.createElement('p');status.textContent=own?(profile.status||'● Online'):'Dados públicos não sincronizados';
  const about=document.createElement('div');about.className='concord-profile-about';
@@ -2199,7 +2216,7 @@ document.querySelectorAll('[data-channel]').forEach(btn=>btn.addEventListener('c
 dmTimer=setInterval(()=>{if(dmOpen&&document.visibilityState==='visible')dmLoad()},4000);
 
 const concordFriendNames=new Map();
-function concordFriendDisplayName(id){return concordFriendNames.get(id)||'Amigo '+String(id).slice(0,8)}
+function concordFriendDisplayName(id){return concordFriendNames.get(id)||'Nome indisponível'}
 async function concordPublishPublicProfile(){
   if(!concordProfileUser)return;
   const name=String(concordData.profile.name||'').trim().slice(0,28);
@@ -2224,6 +2241,7 @@ async function refreshSocial(){
     const online=new Set((presence||[]).filter(p=>Date.now()-new Date(p.last_seen).getTime()<90000).map(p=>p.user_id));
     dmFriendIds=new Set(ids);
     const visibleIds=[...new Set(friends.map(f=>f.requester_id===socialUser?f.recipient_id:f.requester_id))];
+    for(const id of [...concordFriendNames.keys()])if(!visibleIds.includes(id))concordFriendNames.delete(id);
     if(visibleIds.length){
       const {data:publicProfiles,error:publicError}=await concordSupabase.from('concord_public_profiles').select('user_id,display_name').in('user_id',visibleIds);
       if(!publicError&&requestUser===socialUser){
@@ -2244,7 +2262,7 @@ async function refreshSocial(){
       const row=document.createElement('div');row.className='concord-friend';
       row.dataset.friendStatus=f.status==='pending'?'pending':online.has(other)?'online':'offline';
       row.dataset.friendName=concordFriendDisplayName(other).toLowerCase();
-      const avatar=document.createElement('span');avatar.className='concord-friend-avatar';avatar.textContent=other.slice(0,2).toUpperCase();
+      const avatar=document.createElement('span');avatar.className='concord-friend-avatar';avatar.textContent=concordFriendNames.has(other)?concordFriendDisplayName(other).slice(0,2).toUpperCase():'?';
       const details=document.createElement('div');details.className='concord-friend-details';
       const label=document.createElement('strong');label.textContent=concordFriendDisplayName(other);
       label.title=concordFriendDisplayName(other);
