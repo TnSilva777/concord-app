@@ -2130,6 +2130,7 @@ function setLocalSpeaking(on){
  on=!!(on&&callJoined&&micEnabled&&micStream?.getAudioTracks().some(t=>t.enabled&&t.readyState==='live'));
  document.querySelectorAll('.user .avatar,.roster-person.me .avatar,.room-member.you-in-room .mini-avatar,.concord-local-voice-person[data-concord-self-voice="true"] .mini-avatar').forEach(el=>el.classList.toggle('speaking',on));
  document.querySelectorAll('.room-member.you-in-room,.concord-local-voice-person[data-concord-self-voice="true"]').forEach(el=>el.classList.toggle('concord-member-speaking',on));
+ document.querySelectorAll('#concordVoiceGrid .cvg-tile[data-concord-self="true"] .cvg-avatar').forEach(el=>el.classList.toggle('speaking',on));
  if(on===concordIsLocallySpeaking)return;
  concordIsLocallySpeaking=on;
  if(concordVoiceLobby&&callJoined&&joinedRoom){
@@ -2338,6 +2339,9 @@ function concordSyncVoiceLobby(){
  if(joinedRoom&&callJoined){
    const speaking=new Map((groups.get(joinedRoom)||[]).map(member=>[member.id,!!member.speaking]));
    for(const member of roomRoster[joinedRoom]||[])if(!member.isMe)member.speaking=speaking.get(member.id)===true;
+   document.querySelectorAll('#concordVoiceGrid .cvg-tile[data-concord-self="false"]').forEach(tile=>{
+    tile.querySelector('.cvg-avatar')?.classList.toggle('speaking',speaking.get(tile.dataset.memberId)===true);
+   });
    renderCallRoster();
  }
  concordVoiceLobbyRooms.clear();
@@ -3264,9 +3268,9 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   tiles.replaceChildren();
   if(!members.length){const p=document.createElement('p');p.textContent='Aguardando participantes nesta sala.';tiles.append(p);return}
   members.forEach(member=>{
-   const tile=document.createElement('div');tile.className='cvg-tile';tile.dataset.memberId=String(member.id||'');
+   const tile=document.createElement('div');tile.className='cvg-tile';tile.dataset.memberId=String(member.id||'');tile.dataset.concordSelf=String(!!member.isMe);
    if(expanded===tile.dataset.memberId)tile.classList.add('cvg-expanded');
-   const avatar=document.createElement('div');avatar.className='cvg-avatar';avatar.textContent=String(member.name||'?').slice(0,1).toUpperCase();if(member.isMe)setConcordAvatar(avatar,concordData.profile);else concordVoiceAvatar(avatar,member);
+   const avatar=document.createElement('div');avatar.className='cvg-avatar';if(member.isMe?concordIsLocallySpeaking:!!member.speaking)avatar.classList.add('speaking');avatar.textContent=String(member.name||'?').slice(0,1).toUpperCase();if(member.isMe)setConcordAvatar(avatar,concordData.profile);else concordVoiceAvatar(avatar,member);
    const name=document.createElement('span');name.className='cvg-name';name.textContent=(member.name||'Participante')+(member.isMe?' (você)':'');
    tile.append(avatar,name);
    const live=member.isMe?(typeof stream!=='undefined'?stream:null):(typeof concordLiveStreams!=='undefined'?concordLiveStreams.get(member.id):null);
@@ -3498,4 +3502,9 @@ body.concord-home-view .app>.sidebar .user{margin-top:auto;flex-shrink:0}
 .concord-local-voice-person.concord-member-speaking{background:rgba(37,203,113,.12);border-radius:8px}
 .concord-local-voice-person .mini-avatar.speaking{outline:2px solid #54ffa7;outline-offset:2px;box-shadow:0 0 0 5px #27ff8560,0 0 18px #26ff88!important;animation:concordSpeakingGlow .75s ease-in-out infinite alternate}
 @media(prefers-reduced-motion:reduce){.concord-local-voice-person .mini-avatar.speaking{animation:none}}
+</style><style>
+/* Aura CONCORD somente com fala detectada: avatar da sala e grade de voz. */
+#concordVoiceGrid .cvg-avatar.speaking{outline:3px solid #4dff9a!important;outline-offset:5px!important;box-shadow:0 0 0 7px rgba(49,255,145,.2),0 0 26px rgba(49,255,145,.65)!important;animation:concordVoiceGridSpeaking .75s ease-in-out infinite alternate!important}
+@keyframes concordVoiceGridSpeaking{from{filter:brightness(1)}to{filter:brightness(1.2)}}
+@media(prefers-reduced-motion:reduce){#concordVoiceGrid .cvg-avatar.speaking{animation:none!important}}
 </style></body></html>                              
