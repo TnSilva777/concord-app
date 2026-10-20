@@ -1448,7 +1448,12 @@ async function voiceConnect(id,initiator){
   peer.onconnectionstatechange=()=>{
     if(peer.connectionState==='connected')voiceStatus('Chamada conectada! Vocês podem conversar.');
     else if(peer.connectionState==='disconnected')voiceStatus('Conexão instável. Tentando recuperar o áudio…');
-    else if(peer.connectionState==='failed')voiceStatus('Não foi possível estabelecer o áudio. Algumas redes exigem um servidor TURN.');
+    else if(peer.connectionState==='failed'){
+      voiceStatus('Conexão falhou. Tentando reconectar a chamada…');
+      if(peer.signalingState==='stable'&&voicePeerId<id){
+        peer.createOffer({iceRestart:true}).then(offer=>peer.setLocalDescription(offer)).then(()=>voiceSend(id,'offer',peer.localDescription.toJSON())).catch(error=>voiceStatus('Não foi possível reconectar. Sua rede pode exigir um servidor TURN.'));
+      }else if(voicePeerId>=id)voiceStatus('Conexão falhou. Aguarde o outro participante tentar reconectar.');
+    }
   };
   if(initiator){
     const offer=await peer.createOffer();await peer.setLocalDescription(offer);
@@ -1463,7 +1468,13 @@ async function voiceSignalReceived(packet){
   try{
     if(msg.kind==='offer'){
       let peer=voicePeers.get(msg.from);
-      if(peer&&peer.signalingState!=='stable'){console.warn('Oferta recebida enquanto outra negociação estava em andamento');return}
+      if(peer&&peer.signalingState!=='stable'){
+        // A oferta recebida pode coincidir com uma renegociação local.
+        // O par de ID menor mantém sua oferta; o outro aceita a oferta recebida.
+        if(voicePeerId<msg.from){console.warn('Oferta simultânea: mantendo negociação local');return}
+        if(peer.signalingState==='have-local-offer')await peer.setLocalDescription({type:'rollback'});
+        else {console.warn('Aguardando sinalização estável para aceitar oferta');return}
+      }
       peer=peer||await voiceConnect(msg.from,false);
       if(!peer)return;
       await peer.setRemoteDescription(new RTCSessionDescription(msg.data));
