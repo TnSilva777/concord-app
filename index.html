@@ -438,9 +438,9 @@ body.concord-custom-server-view #concordServerPanel{padding:0 7px 14px;backgroun
 .concord-server-heading{position:relative;display:block;padding:0 0 8px;margin:0}
 .concord-server-menu-wrap{position:relative;width:100%}
 .concord-server-heading .concord-server-menu-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 13px;background:#13241d;border:0;border-bottom:1px solid #365344;border-radius:0;color:#f2fff7;font-size:14px;font-weight:800;text-align:left}
-.concord-server-menu-trigger span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.concord-server-menu-trigger span:last-child{font-size:22px;font-weight:400;transition:transform .18s}
-.concord-server-menu-trigger[aria-expanded="true"] span:last-child{transform:rotate(180deg)}
+.concord-server-menu-trigger > span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.concord-server-menu-trigger > span:last-child{font-size:22px;font-weight:400;transition:transform .18s}
+.concord-server-menu-trigger[aria-expanded="true"] > span:last-child{transform:rotate(180deg)}
 .concord-server-heading .concord-server-menu-trigger:hover,.concord-server-heading .concord-server-menu-trigger[aria-expanded="true"]{background:#1b3b2b}
 .concord-server-dropdown[hidden]{display:none!important}
 .concord-server-dropdown{position:absolute;top:calc(100% + 4px);left:6px;right:6px;z-index:35;padding:7px;background:#1c2823;border:1px solid #405549;border-radius:12px;box-shadow:0 16px 36px #000a;display:flex;flex-direction:column;max-height:min(65vh,440px);overflow-y:auto}
@@ -487,6 +487,13 @@ body.concord-custom-server-view .concord-server-room{grid-template-columns:minma
 body.concord-custom-server-view .concord-server-room:has(>button:not(.concord-server-room-name)){grid-template-columns:minmax(0,1fr) repeat(4,24px)!important}
 body.concord-custom-server-view .concord-server-room:has(.concord-local-voice-members):not(:has(>button:not(.concord-server-room-name))){grid-template-columns:minmax(0,1fr)!important}
 body.concord-custom-server-view .concord-server-room .concord-server-room-name{text-align:left;min-width:0}
+</style><style>
+/* Apenas a seta gira: o nome do servidor deve permanecer fixo ao abrir o menu. */
+.concord-server-menu-trigger>.concord-server-identity{transform:none!important;transition:none!important;flex:1;min-width:0;text-align:left}
+.concord-server-menu-trigger>.concord-server-identity .concord-server-identity-copy,
+.concord-server-menu-trigger>.concord-server-identity .concord-server-identity-copy>span{transform:none!important;transition:none!important}
+.concord-server-menu-trigger>.concord-server-chevron{flex-shrink:0;transform:rotate(0deg);transform-origin:center;transition:transform .18s}
+.concord-server-menu-trigger[aria-expanded="true"]>.concord-server-chevron{transform:rotate(180deg)}
 </style></head><body>
 <div class="app"><aside class="servers"><div class="logo concord-brand-mark" aria-label="Logo CONCORD" title="CONCORD">C</div><button type="button" class="server" id="concordFriendsNav" title="Amigos e conversas privadas" aria-label="Abrir amigos e conversas privadas">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
 <aside class="sidebar"><div class="brand"><strong>CONCORD</strong><small>SUA COMUNIDADE. SEU ESPAÇO.</small></div><button class="search" id="searchBtn">⌕ &nbsp; Buscar canais</button><div class="section">CONCORD OFICIAL</div><button class="channel active" data-channel="geral"><span>#</span> geral</button><button class="channel" data-channel="regras"><span>#</span> regras</button><button class="channel" data-channel="anuncios"><span>#</span> anúncios</button><div class="section">COMUNIDADES</div><button class="channel" data-channel="jogos"><span>#</span> jogos</button><button class="channel" data-channel="tecnologia"><span>#</span> tecnologia</button><button class="channel" data-channel="memes"><span>#</span> memes</button><div class="section">CANAIS DE VOZ</div><button class="channel" id="voiceBtn"><span>◖</span> Sala de voz <span class="online"></span></button><div class="section voice-section-title">SALAS DE VOZ <button id="addVoiceRoom" title="Criar sala de voz">＋</button></div>
