@@ -2856,6 +2856,17 @@ async function initConcordSocial(session){
   if(!id){dmShow(true);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
   dmShow(true);
   await concordPublishPublicProfile().catch(error=>console.warn('Falha ao publicar perfil:',error));
+  // Convite discreto para escolher nome, apenas quando esta conta não tem perfil público.
+  try{
+    const {data:ownPublic}=await concordSupabase.from('concord_public_profiles').select('display_name').eq('user_id',id).maybeSingle();
+    document.getElementById('concordChooseNameHint')?.remove();
+    if(!ownPublic?.display_name&&socialUser===id){
+      const hint=document.createElement('button');hint.type='button';hint.id='concordChooseNameHint';
+      hint.textContent='✎ Escolha seu nome para seus amigos reconhecerem você';
+      hint.onclick=()=>openProfileEditor();
+      socialPanel.querySelector('.section')?.after(hint);
+    }
+  }catch(error){console.warn('Não foi possível verificar nome público',error)}
   await Promise.all([refreshSocial(),refreshSharedVoiceRooms()]);
   socialTimer=setInterval(()=>{if(document.visibilityState==='visible'){refreshSocial();refreshSharedVoiceRooms()}},30000);
 }
@@ -3404,4 +3415,7 @@ body.concord-home-view .app>.sidebar .user{margin-top:auto;flex-shrink:0}
  body.concord-home-view .app>.sidebar #concordFriends{padding-bottom:16px!important}
 }
 </style>
-</body></html>                              
+<style>
+#concordChooseNameHint{margin:6px 12px 9px;padding:10px 11px;text-align:left;border-radius:9px;background:#1c4932;color:#c8f4da;border:1px solid #376b4b;font-size:12px}
+#concordChooseNameHint:hover,#concordChooseNameHint:focus-visible{background:#265d40}
+</style></body></html>                              
