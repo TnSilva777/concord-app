@@ -1471,7 +1471,7 @@ $('#dmForm').onsubmit=async event=>{
     const {error}=await concordSupabase.from('concord_direct_messages').insert({sender_id:socialUser,recipient_id:peer,body});
     if(error)throw error;
     if(dmPeer===peer){input.value='';await dmLoad()}
-  }catch(error){simple('Mensagem não enviada',error.message||'Confira a conexão e as permissões.')}
+  }catch(error){const message=error.message||'Confira a conexão e as permissões.';simple('Mensagem não enviada',message.includes('row-level security')?'O Supabase bloqueou o envio pela política de segurança (RLS). Verifique se a política de INSERT compara concord_direct_messages.sender_id e concord_direct_messages.recipient_id com uma amizade aceita. Detalhes: '+message:message);console.error('CONCORD: falha ao enviar mensagem privada',{code:error.code,message:error.message,details:error.details,hint:error.hint})}
   finally{dmSending=false;$('#dmSend').disabled=!dmFriendIds.has(dmPeer)}
 };
 document.querySelectorAll('[data-channel]').forEach(btn=>btn.addEventListener('click',()=>{if(dmOpen)dmShow(false)}));
