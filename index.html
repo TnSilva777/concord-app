@@ -1453,6 +1453,7 @@ function updateProfileUI(){const name=concordData.profile.name||'Você';const us
     const own=(roomRoster[joinedRoom]||[]).find(member=>member.isMe);
     if(own){own.name=name;own.initial=name.slice(0,1).toUpperCase();renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}
     if(typeof voiceSignal!=='undefined'&&voiceSignal)voiceSignal.track({id:voicePeerId,userId:socialUser,name:voicePeerName(),sharing:!!stream}).catch(console.warn);
+    if(typeof concordVoiceLobby!=='undefined'&&concordVoiceLobby)concordVoiceLobby.track({id:voicePeerId,userId:socialUser,room:joinedRoom,name:voicePeerName(),sharing:!!stream}).catch(console.warn);
   }
 }
 function concordHud(title,fields,onSave,onDelete){
@@ -2454,7 +2455,15 @@ async function concordPublishPublicProfile(){
   const name=String(concordData.profile.name||'').trim().slice(0,28);
   if(!name||name==='Você')return;
   const {error}=await concordSupabase.from('concord_public_profiles').upsert({user_id:concordProfileUser,display_name:name,updated_at:new Date().toISOString()},{onConflict:'user_id'});
-  if(error)console.warn('Perfil público ainda não sincronizado:',error.message);
+  if(error){
+    console.warn('Perfil público ainda não sincronizado:',error.message);
+    const panel=document.getElementById('concordFriends');
+    if(panel)panel.title='O nome público não foi sincronizado. Confira a migração concord-public-profiles.sql no Supabase.';
+    return false;
+  }
+  const panel=document.getElementById('concordFriends');
+  if(panel)panel.removeAttribute('title');
+  return true;
 }
 async function refreshSocial(){
   if(!socialUser)return;
@@ -2553,6 +2562,12 @@ const copyId=document.createElement('button');copyId.className='concord-copy-id'
 async function initConcordSocial(session){
   const id=session?.user?.id||null;
   if(id===socialUser){if(id)concordPublishPublicProfile().catch(console.warn);return;}
+  // A previous account must never keep its microphone, room presence or DM state.
+  if(socialUser&&socialUser!==id&&typeof callJoined!=='undefined'&&callJoined){
+    try{leaveCall()}catch(error){console.warn('Falha ao encerrar chamada anterior:',error)}
+  }
+  concordFriendNames.clear();
+  if(typeof concordVoiceNameLookupAttempted!=='undefined')concordVoiceNameLookupAttempted.clear();
   socialRefreshQueued=false;
   dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#dmHistory').textContent='Selecione um amigo na lista à esquerda.';
   if(id!==concordProfileUser)restoreConcordProfileForUser(id);
