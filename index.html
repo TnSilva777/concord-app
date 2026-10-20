@@ -2512,7 +2512,7 @@ async function concordRefreshFriendAvatars(ids){
    const url=concordFriendAvatarUrl(id);
    if(!url)return;
    try{
-     const response=await fetch(url,{method:'HEAD',cache:'no-store'});
+     const response=await fetch(url,{method:'GET',cache:'no-store'});
      if(account!==socialUser)return;
      if(response.ok)concordFriendAvatars.set(id,url+'?v='+Math.floor(Date.now()/60000));
      else concordFriendAvatars.delete(id);
@@ -2644,6 +2644,7 @@ async function initConcordSocial(session){
     try{leaveCall()}catch(error){console.warn('Falha ao encerrar chamada anterior:',error)}
   }
   concordFriendNames.clear();
+  concordFriendAvatars.clear();
   concordFriendAvatars.clear();
   if(typeof concordVoiceNameLookupAttempted!=='undefined')concordVoiceNameLookupAttempted.clear();
   socialRefreshQueued=false;
