@@ -2713,7 +2713,7 @@ async function refreshSocial(){
     }
     const missingCount=visibleIds.filter(id=>!concordFriendNames.has(id)).length;
     missingNotice.hidden=missingCount===0;
-    if(missingCount)missingNotice.textContent=missingCount+' perfil(is) sem nome público. Peça para essas pessoas salvarem o nome no perfil. Se continuar, é necessário aplicar a migração concord-public-profiles.sql no Supabase.';
+    if(missingCount)missingNotice.textContent=missingCount+' perfil(is) sem nome público. Peça para essas pessoas salvarem o nome no perfil. Se continuar, execute concord-repair-missing-names.sql no Supabase e confira as permissões.';
     // Refresh all visible avatars after both friends lists have been rebuilt.
     document.querySelectorAll('[data-concord-friend-avatar]').forEach(el=>concordApplyFriendAvatar(el,el.dataset.concordFriendAvatar));
     const {error:presenceError}=await concordSupabase.from('concord_presence').upsert({user_id:requestUser,last_seen:new Date().toISOString()});
