@@ -463,6 +463,10 @@ body.concord-custom-server-view #concordInlineStage[hidden]{display:none!importa
 @media(min-width:1150px){.app{grid-template-columns:72px 260px minmax(250px,1fr)}}
 @media(max-width:760px){.concord-voice-dock{margin-inline:5px;padding:8px}.sidebar .user{padding:9px 7px}}
 
+
+/* Hide duplicate headset in upper voice dock; keep profile audio control */
+#concordVoiceDockSound{display:none!important}
+#concordVoiceDock .voice-dock-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
