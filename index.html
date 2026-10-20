@@ -438,6 +438,31 @@ body.concord-custom-server-view #concordInlineStage[hidden]{display:none!importa
 .sidebar .user>.concord-user-controls .gear{margin:0;flex:0 1 34px;min-width:28px}
 @media(min-width:340px){.sidebar .user{grid-template-columns:36px minmax(0,1fr);}}
 
+
+/* CONCORD identity HUD — inspired by familiar chat navigation, distinctly emerald */
+:root{--concord-accent:#42dca4}
+.servers{background:#07120f;border-right:1px solid #244235}
+.servers .server{border-radius:15px;transition:border-radius .18s,background .18s,transform .18s}
+.servers .server:hover{border-radius:12px;transform:translateY(-1px)}
+.sidebar{background:linear-gradient(180deg,#13251e,#0c1914)}
+.sidebar .brand{border-bottom:1px solid #2b4c3c}
+.sidebar .search{margin:12px 10px;border-radius:10px;min-height:38px}
+.sidebar .section{letter-spacing:.09em}
+.sidebar .channel,.sidebar .voice-room{border-radius:9px}
+.sidebar .channel:hover,.sidebar .voice-room:hover{background:#214533}
+.sidebar .user{border-top:1px solid #2b4b3a;background:#14231d}
+.sidebar .user>.concord-user-controls{gap:4px}
+.sidebar .user>.concord-user-controls .gear{border-radius:9px}
+.concord-voice-dock{border-radius:12px;background:linear-gradient(145deg,#193b2b,#10291d);border:1px solid #315e45;box-shadow:0 8px 20px #0002}
+.concord-voice-dock .voice-dock-label{letter-spacing:.01em}
+.concord-voice-dock .voice-dock-actions button{transition:background .15s,transform .15s}
+.concord-voice-dock .voice-dock-actions button:active{transform:scale(.95)}
+#concordVoiceDockRoom{max-width:160px}
+#concordVoiceDock .voice-dock-top .voice-dock-disconnect{background:#42272b}
+#concordVoiceDock .voice-dock-top .voice-dock-disconnect:hover{background:#69333b}
+@media(min-width:1150px){.app{grid-template-columns:72px 260px minmax(250px,1fr)}}
+@media(max-width:760px){.concord-voice-dock{margin-inline:5px;padding:8px}.sidebar .user{padding:9px 7px}}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2483,6 +2508,24 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  new MutationObserver(refresh).observe($id('joinCall'),{attributes:true,attributeFilter:['disabled']});
  const audio=$id('concordUserAudio');if(audio)new MutationObserver(refresh).observe(audio,{attributes:true,attributeFilter:['aria-pressed']});
  refresh();
+})();
+</script>
+<script>
+(() => {
+ const dock=document.getElementById('concordVoiceDock');
+ if(!dock||dock.dataset.concordEnhanced)return;
+ dock.dataset.concordEnhanced='true';
+ const room=dock.querySelector('#concordVoiceDockRoom');
+ if(room){room.title='Canal de voz conectado';}
+ const profile=document.querySelector('.sidebar .user .concord-user-identity');
+ if(profile){profile.title='Seu perfil CONCORD';profile.addEventListener('dblclick',()=>document.getElementById('profileBtn')?.click());}
+ const update=()=>{
+   const roomName=typeof joinedRoom!=='undefined'&&joinedRoom?joinedRoom:'Sala de voz';
+   if(room){room.textContent=roomName;room.title=roomName;}
+ };
+ const join=document.getElementById('joinCall');
+ if(join)new MutationObserver(update).observe(join,{attributes:true,attributeFilter:['disabled']});
+ update();
 })();
 </script>
 </body></html>                              
