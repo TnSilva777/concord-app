@@ -429,18 +429,18 @@ function renderChatHistory(){
   if(publicChatUser&&concordPublicChannels.has(concordActiveChannel)){localChatNotice.textContent='◌ Carregando mensagens compartilhadas…';loadPublicChat()}
 }
 async function loadPublicChat(){
-  if(!publicChatUser||!concordPublicChannels.has(concordActiveChannel))return;
+  if(document.body.classList.contains('concord-custom-server-view')||!publicChatUser||!concordPublicChannels.has(concordActiveChannel))return;
   if(publicChatLoading){publicChatRefreshPending=true;return}
   publicChatLoading=true;const channel=concordActiveChannel,user=publicChatUser,seq=++publicChatSeq,identity=publicChatLoadIdentity;
   try{
     const {data,error}=await concordSupabase.from('concord_public_messages').select('id,channel,author_id,author_name,body,created_at').eq('channel',channel).order('created_at',{ascending:false}).limit(100);
     if(error)throw error;
-    if(channel!==concordActiveChannel||seq!==publicChatSeq||identity!==publicChatLoadIdentity||user!==publicChatUser)return;
+    if(document.body.classList.contains('concord-custom-server-view')||dmOpen||channel!==concordActiveChannel||seq!==publicChatSeq||identity!==publicChatLoadIdentity||user!==publicChatUser)return;
     publicChatAvailable=true;localChatNotice.textContent='✓ Canal compartilhado: mensagens sincronizadas pelo Supabase.';publicChatError.hidden=true;
     const list=$('#messageList');list.replaceChildren();
     (data||[]).reverse().forEach(row=>appendChatMessage({name:row.author_name,text:row.body,date:new Date(row.created_at).toLocaleString('pt-BR')}));
     $('#messages').scrollTop=$('#messages').scrollHeight;
-  }catch(error){if(channel===concordActiveChannel&&identity===publicChatLoadIdentity&&user===publicChatUser){publicChatAvailable=false;localChatNotice.textContent='⚠ Modo local: as mensagens não chegam aos seus amigos.';publicChatError.hidden=false;publicChatError.textContent='Sincronização indisponível: '+(error.message||'verifique o SQL dos canais públicos')}console.warn('CONCORD chat publico:',error)}
+  }catch(error){if(!document.body.classList.contains('concord-custom-server-view')&&!dmOpen&&channel===concordActiveChannel&&identity===publicChatLoadIdentity&&user===publicChatUser){publicChatAvailable=false;localChatNotice.textContent='⚠ Modo local: as mensagens não chegam aos seus amigos.';publicChatError.hidden=false;publicChatError.textContent='Sincronização indisponível: '+(error.message||'verifique o SQL dos canais públicos')}console.warn('CONCORD chat publico:',error)}
   finally{publicChatLoading=false;if(publicChatRefreshPending){publicChatRefreshPending=false;queueMicrotask(()=>loadPublicChat())}}
 }
 function initPublicChat(session){
@@ -448,8 +448,8 @@ function initPublicChat(session){
   if(id===publicChatUser)return;
   ++publicChatLoadIdentity;publicChatUser=id;publicChatAvailable=false;clearInterval(publicChatTimer);publicChatTimer=null;
   localChatNotice.textContent=id?'◌ Verificando sincronização do canal…':'⚠ Faça login para acessar o chat compartilhado.';
-  publicChatError.hidden=true;renderChatHistory();
-  if(id){publicChatTimer=setInterval(()=>{if(document.visibilityState==='visible'&&!dmOpen)loadPublicChat()},5000)}
+  publicChatError.hidden=true;if(!document.body.classList.contains('concord-custom-server-view'))renderChatHistory();
+  if(id){publicChatTimer=setInterval(()=>{if(document.visibilityState==='visible'&&!dmOpen&&!document.body.classList.contains('concord-custom-server-view'))loadPublicChat()},5000)}
 }
 document.querySelectorAll('[data-channel]').forEach(button=>button.onclick=()=>{
   document.querySelectorAll('[data-channel]').forEach(item=>item.classList.remove('active'));
@@ -897,7 +897,8 @@ function renderCommunityChannels(){
         $('#messageList').replaceChildren();
         $('#messages').hidden=false;
         concordSelectedTextRoom=kind==='text'?room.id:null;
-        if(kind==='text')community.lastTextRoom=room.id;
+        if(kind==='text'){community.lastTextRoom=room.id;saveConcordData()}
+        ++publicChatSeq;publicChatRefreshPending=false;publicChatError.hidden=true;localChatNotice.textContent='✓ Canal local: mensagens salvas neste navegador.';
         const composer=$('#chatForm').closest('.composer');
         composer.hidden=kind!=='text';
         const input=$('#chatInput');input.disabled=kind!=='text';
