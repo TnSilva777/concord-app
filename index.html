@@ -2299,6 +2299,7 @@ $('#concordFriendsNav').onclick=()=>{dmShow(true);$('#concordAddFriend')?.focus(
 $('#dmBack').onclick=()=>dmShow(false);
 function dmSelect(id){
   if(!dmFriendIds.has(id))return;
+  if(dmOpen&&dmPeer===id){$('#dmInput').focus();return}
   dmShow(true);dmPeer=id;
   dmProfileAction.hidden=false;
   $('#dmHistory').textContent='Carregando conversa…';
@@ -2355,7 +2356,7 @@ async function dmLoad(){
     if(error)throw error;
     if(socialUser===account&&dmOpen&&dmPeer===peer&&seq===dmRequest)dmRender((data||[]).reverse());
   }catch(error){if(dmOpen&&socialUser===account&&dmPeer===peer&&seq===dmRequest)$('#dmHistory').textContent='Mensagens privadas indisponíveis: '+(error.message||'verifique o SQL no Supabase');console.error('CONCORD DM:',error)}
-  finally{dmBusy=false;if(dmNeedsRefresh){dmNeedsRefresh=false;queueMicrotask(()=>dmLoad())}}
+  finally{dmBusy=false;if(dmNeedsRefresh){dmNeedsRefresh=false;if(dmOpen&&dmPeer&&socialUser)queueMicrotask(()=>dmLoad())}}
 }
 $('#dmForm').onsubmit=async event=>{
   event.preventDefault();
