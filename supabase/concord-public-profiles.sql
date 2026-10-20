@@ -27,8 +27,8 @@ as $$
 declare chosen_name text;
 begin
   chosen_name := coalesce(
-    nullif(btrim(new.raw_user_meta_data->>'display_name'),''),
     nullif(btrim(new.raw_user_meta_data->'concord_profile'->>'name'),''),
+    nullif(btrim(new.raw_user_meta_data->>'display_name'),''),
     nullif(btrim(new.raw_user_meta_data->>'full_name'),''),
     nullif(btrim(new.raw_user_meta_data->>'name'),'')
   );
@@ -50,16 +50,20 @@ for each row execute function public.concord_sync_auth_display_name();
 -- Backfill accounts created before the trigger existed.
 insert into public.concord_public_profiles(user_id,display_name,updated_at)
 select id,left(coalesce(
- nullif(btrim(raw_user_meta_data->>'display_name'),''),
  nullif(btrim(raw_user_meta_data->'concord_profile'->>'name'),''),
+ nullif(btrim(raw_user_meta_data->>'display_name'),''),
  nullif(btrim(raw_user_meta_data->>'full_name'),''),
  nullif(btrim(raw_user_meta_data->>'name'),'')
 ),28),now()
 from auth.users
 where coalesce(
- nullif(btrim(raw_user_meta_data->>'display_name'),''),
  nullif(btrim(raw_user_meta_data->'concord_profile'->>'name'),''),
+ nullif(btrim(raw_user_meta_data->>'display_name'),''),
  nullif(btrim(raw_user_meta_data->>'full_name'),''),
  nullif(btrim(raw_user_meta_data->>'name'),'')
 ) is not null
 on conflict(user_id) do nothing;
+
+-- Existing accounts: after applying this migration, users without a saved name
+-- must sign in and save their chosen profile name. Do not expose email addresses
+-- or generate a public name from an email address without consent.
