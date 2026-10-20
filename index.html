@@ -246,6 +246,12 @@ body.concord-custom-server-view #concordServerPanel{padding:0 8px 18px;scrollbar
 .concord-server-room.concord-room-selected{background:#315a43}
 .concord-server-room.concord-room-selected .concord-server-room-name{color:#fff!important;font-weight:750}
 .concord-server-room.concord-room-selected button:not(.concord-server-room-name){opacity:.75}
+
+.concord-server-room{grid-template-columns:minmax(0,1fr) repeat(4,22px)!important}
+.concord-server-room:has(.concord-local-voice-members){grid-template-columns:minmax(0,1fr) repeat(4,22px)!important}
+.concord-server-room button:not(.concord-server-room-name){padding:7px 1px;font-size:12px}
+.concord-server-room .concord-server-room-name{min-width:0}
+@media(max-width:760px){.concord-server-room button:not(.concord-server-room-name){opacity:.8}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -809,7 +815,7 @@ function renderCommunityChannels(){
         concordServerPanel.querySelectorAll('.concord-server-room').forEach(el=>el.classList.remove('concord-room-selected'));
         row.classList.add('concord-room-selected');
         $('#channelTitle').textContent=room.name;
-        $('.topbar .sub').textContent=kind==='text'?' — Canal deste servidor':' — Sala de voz deste servidor';
+        $('.topbar .sub').textContent=room.topic?' — '+room.topic:(kind==='text'?' — Canal deste servidor':' — Sala de voz deste servidor');
         const welcome=$('#messages .welcome');
         if(welcome){welcome.querySelector('h1').textContent=room.name;welcome.querySelector('p').textContent=kind==='text'?'Este canal pertence ao servidor. Suas mensagens ficam salvas neste navegador.':'Entre na chamada para conversar. O servidor ainda não sincroniza membros entre contas.'}
         $('#messageList').replaceChildren();
@@ -838,13 +844,35 @@ function renderCommunityChannels(){
         if(!name||community.channels.some(item=>item.id!==room.id&&item.name.toLowerCase()===name.toLowerCase())){simple('Nome inválido','Escolha um nome único.');return}
         const previous=room.name;room.name=name;if(!saveConcordData()){room.name=previous;return}renderCommunityChannels();
       };
+      const topic=document.createElement('button');topic.type='button';topic.textContent='☷';topic.title='Editar descrição da sala';topic.setAttribute('aria-label','Editar descrição de '+room.name);
+      topic.onclick=()=>{
+        const value=prompt('Descrição da sala (até 100 caracteres):',room.topic||'');if(value===null)return;
+        const previous=room.topic;room.topic=value.trim().slice(0,100);
+        if(!saveConcordData()){room.topic=previous;simple('Erro ao salvar','Não foi possível salvar a descrição.');return}
+        if(concordSelectedTextRoom===room.id||joinedRoom==='srv-'+concordSelectedCommunity+'-'+room.id)$('.topbar .sub').textContent=room.topic?' — '+room.topic:' — Sala deste servidor';
+        showConcordToast('Sala atualizada','Descrição salva com sucesso.');
+      };
+      const move=document.createElement('button');move.type='button';move.textContent='↕';move.title='Mover sala para cima ou para baixo';move.setAttribute('aria-label','Reordenar '+room.name);
+      move.onclick=()=>{
+        const same=community.channels.filter(item=>item.type===kind);
+        const index=same.findIndex(item=>item.id===room.id);
+        const direction=prompt('Mover "'+room.name+'": digite 1 para cima ou 2 para baixo','1');
+        if(direction===null)return;
+        if(direction!=='1'&&direction!=='2'){simple('Opção inválida','Escolha 1 ou 2.');return}
+        const target=index+(direction==='1'?-1:1);
+        if(target<0||target>=same.length){showConcordToast('Ordem mantida','Esta sala já está no limite da lista.');return}
+        const other=same[target];const a=community.channels.indexOf(room),b=community.channels.indexOf(other);
+        [community.channels[a],community.channels[b]]=[community.channels[b],community.channels[a]];
+        if(!saveConcordData()){[community.channels[a],community.channels[b]]=[community.channels[b],community.channels[a]];simple('Erro ao salvar','Não foi possível alterar a ordem.');return}
+        renderCommunityChannels();showConcordToast('Ordem atualizada','A posição da sala foi salva.');
+      };
       const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.title='Excluir sala';
       remove.onclick=()=>{
         if(!confirm('Excluir a sala "'+room.name+'" deste servidor?'))return;
         const old=community.channels;community.channels=old.filter(item=>item.id!==room.id);
-        if(!saveConcordData()){community.channels=old;return}renderCommunityChannels();
+        if(!saveConcordData()){community.channels=old;return}if(concordSelectedTextRoom===room.id){concordSelectedTextRoom=null;$('#chatForm').closest('.composer').hidden=true;$('#messageList').replaceChildren()}renderCommunityChannels();
       };
-      row.append(open,rename,remove);concordServerPanel.append(row);
+      row.append(open,rename,topic,move,remove);concordServerPanel.append(row);
       if(kind==='text'&&concordSelectedTextRoom===room.id)row.classList.add('concord-room-selected');
       if(kind==='voice'&&joinedRoom==='srv-'+concordSelectedCommunity+'-'+room.id)row.classList.add('concord-room-selected');
       if(kind==='voice')renderConcordLocalVoiceMembers(row,room);
