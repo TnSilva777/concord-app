@@ -1271,7 +1271,17 @@ function concordLiveBadge(member){
   button.onclick=e=>{e.stopPropagation();if(document.body.classList.contains('concord-custom-server-view')){$('#concordVoiceDockView')?.click()}else if(member.isMe){$('#voiceModal').classList.add('show');$('#callScreenPreview').srcObject=stream;$('#callScreenPreview').style.display='block'}else concordShowLive(member.id)};
   return button;
 }
-function renderCallRoster(){const list=$('#callRosterList');if(!list)return;list.innerHTML='';const members=roomRoster[joinedRoom||activeRoom]||[];$('#participantCount').textContent=members.length;if(!members.length){list.innerHTML='<div class="room-empty" style="padding:12px 7px">Ninguém entrou nesta sala ainda.</div>';return}members.forEach(m=>{const row=document.createElement('div');row.className='roster-person'+(m.isMe?' me':'');const av=document.createElement('div');av.className='avatar '+(m.cls||'');av.textContent=m.initial||'?';if(m.isMe&&typeof concordData!=='undefined')setConcordAvatar(av,concordData.profile);const meta=document.createElement('div');meta.className='person-meta';const name=document.createElement('b');name.textContent=m.name+(m.isMe?' (você)':'');const sub=document.createElement('small');sub.textContent=m.isMe?(micEnabled?'Microfone ligado':'Microfone mutado'):'Na sala';meta.append(name,sub);const live=concordLiveBadge(m);if(live)meta.append(live);const state=document.createElement('span');state.className='person-state';state.textContent=m.isMe?(micEnabled?'🎙':'🔇'):'●';row.append(av,meta,state);list.append(row)})}
+function concordVoiceAvatar(element,member){
+ if(!element||!member?.userId||!window.concordVoiceAvatarsReady)return;
+ element.dataset.concordFriendAvatar=member.userId;
+ concordApplyFriendAvatar(element,member.userId);
+}
+function concordQueueVoiceAvatars(members){
+ if(!window.concordVoiceAvatarsReady)return;
+ const ids=[...new Set((members||[]).filter(m=>!m.isMe&&m.userId).map(m=>m.userId))];
+ if(ids.length)concordRefreshFriendAvatars(ids).catch(error=>console.warn('Fotos da chamada indisponíveis:',error));
+}
+function renderCallRoster(){const list=$('#callRosterList');if(!list)return;list.innerHTML='';const members=roomRoster[joinedRoom||activeRoom]||[];$('#participantCount').textContent=members.length;if(!members.length){list.innerHTML='<div class="room-empty" style="padding:12px 7px">Ninguém entrou nesta sala ainda.</div>';return}members.forEach(m=>{const row=document.createElement('div');row.className='roster-person'+(m.isMe?' me':'');const av=document.createElement('div');av.className='avatar '+(m.cls||'');av.textContent=m.initial||'?';if(m.isMe&&typeof concordData!=='undefined')setConcordAvatar(av,concordData.profile);else concordVoiceAvatar(av,m);const meta=document.createElement('div');meta.className='person-meta';const name=document.createElement('b');name.textContent=m.name+(m.isMe?' (você)':'');const sub=document.createElement('small');sub.textContent=m.isMe?(micEnabled?'Microfone ligado':'Microfone mutado'):'Na sala';meta.append(name,sub);const live=concordLiveBadge(m);if(live)meta.append(live);const state=document.createElement('span');state.className='person-state';state.textContent=m.isMe?(micEnabled?'🎙':'🔇'):'●';row.append(av,meta,state);list.append(row)})}
 function renderRooms(){
   document.querySelectorAll('.voice-room').forEach(btn=>{
     const room=btn.dataset.room;
@@ -1293,7 +1303,7 @@ function renderRooms(){
       b.title='Abrir sala '+room+' · '+String(member.name||'Participante');
       const avatar=document.createElement('span');avatar.className='mini-avatar';
       avatar.textContent=String(member.initial||'?').slice(0,2);
-      if(member.isMe&&typeof concordData!=='undefined')setConcordAvatar(avatar,concordData.profile);
+      if(member.isMe&&typeof concordData!=='undefined')setConcordAvatar(avatar,concordData.profile);else concordVoiceAvatar(avatar,member);
       const name=document.createElement('span');name.className='member-name';
       name.textContent=String(member.name||'Participante');
       const status=document.createElement('span');status.className='game-status';
@@ -1608,7 +1618,7 @@ function renderConcordLocalVoiceMembers(container,room){
   else for(const member of members){
     const row=document.createElement('div');row.className='concord-local-voice-person';
     const avatar=document.createElement('span');avatar.className='mini-avatar';avatar.textContent=String(member.initial||'?').slice(0,2);
-    if(member.isMe)setConcordAvatar(avatar,concordData.profile);
+    if(member.isMe)setConcordAvatar(avatar,concordData.profile);else concordVoiceAvatar(avatar,member);
     const name=document.createElement('span');name.textContent=member.isMe?String(concordData.profile?.name||member.name||'Participante').trim():String(member.name||'Participante');
     const status=document.createElement('span');status.textContent=member.isMe?(micEnabled?'🎙':'🔇'):'🎧';
     row.append(avatar,name,status);
@@ -2140,7 +2150,7 @@ function voiceParticipants(){
   });
   for(const [id,peer] of voicePeers)if(!members.some(m=>m.id===id)){peer.close();voicePeers.delete(id);for(const [key,audio] of voiceAudio){if(key.startsWith(id+':')){audio.remove();voiceAudio.delete(key)}}voicePendingIce.delete(id);concordLiveStreams.delete(id);if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none'}}
   roomRoster[joinedRoom]=[{id:voicePeerId,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream},...members];
-  renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();
+  renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();concordQueueVoiceAvatars(members);
   // A participant's chosen public name can arrive after presence sync.
   const unknownIds=[...new Set(members.filter(m=>m.userId&&!concordFriendNames.has(m.userId)&&!concordVoiceNameLookupAttempted.has(m.userId)).map(m=>m.userId))];
   if(unknownIds.length){unknownIds.forEach(id=>concordVoiceNameLookupAttempted.add(id));concordSupabase.from('concord_public_profiles').select('user_id,display_name').in('user_id',unknownIds).then(({data,error})=>{
@@ -2539,7 +2549,7 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 const concordFriendNames=new Map();
-const concordFriendAvatars=new Map();
+const concordFriendAvatars=new Map();window.concordVoiceAvatarsReady=true;
 function concordFriendAvatarUrl(id){
  if(!id||!concordSupabase)return '';
  const {data}=concordSupabase.storage.from('concord-avatars').getPublicUrl(id+'/avatar.jpg');
@@ -3081,7 +3091,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   members.forEach(member=>{
    const tile=document.createElement('div');tile.className='cvg-tile';tile.dataset.memberId=String(member.id||'');
    if(expanded===tile.dataset.memberId)tile.classList.add('cvg-expanded');
-   const avatar=document.createElement('div');avatar.className='cvg-avatar';avatar.textContent=String(member.name||'?').slice(0,1).toUpperCase();
+   const avatar=document.createElement('div');avatar.className='cvg-avatar';avatar.textContent=String(member.name||'?').slice(0,1).toUpperCase();if(member.isMe)setConcordAvatar(avatar,concordData.profile);else concordVoiceAvatar(avatar,member);
    const name=document.createElement('span');name.className='cvg-name';name.textContent=(member.name||'Participante')+(member.isMe?' (você)':'');
    tile.append(avatar,name);
    const live=member.isMe?(typeof stream!=='undefined'?stream:null):(typeof concordLiveStreams!=='undefined'?concordLiveStreams.get(member.id):null);
