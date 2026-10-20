@@ -2344,7 +2344,7 @@ function dmRender(rows){
 async function dmLoad(){
   if(!dmOpen||!dmPeer||!socialUser)return;
   if(dmBusy){dmNeedsRefresh=true;return}
-  if(!dmFriendIds.has(dmPeer)){dmPeer=null;$('#dmHistory').textContent='Esta amizade não está mais ativa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true;return}
+  if(!dmFriendIds.has(dmPeer)){dmPeer=null;dmProfileAction.hidden=true;$('#dmPeerLabel').textContent='Selecione um amigo';$('#dmHistory').textContent='Esta amizade não está mais ativa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true;return}
   dmBusy=true;const peer=dmPeer,seq=++dmRequest;
   try{
     const account=socialUser;
@@ -2354,19 +2354,19 @@ async function dmLoad(){
       .order('created_at',{ascending:false}).limit(100);
     if(error)throw error;
     if(socialUser===account&&dmOpen&&dmPeer===peer&&seq===dmRequest)dmRender((data||[]).reverse());
-  }catch(error){if(dmOpen&&socialUser===account&&dmPeer===peer)$('#dmHistory').textContent='Mensagens privadas indisponíveis: '+(error.message||'verifique o SQL no Supabase');console.error('CONCORD DM:',error)}
+  }catch(error){if(dmOpen&&socialUser===account&&dmPeer===peer&&seq===dmRequest)$('#dmHistory').textContent='Mensagens privadas indisponíveis: '+(error.message||'verifique o SQL no Supabase');console.error('CONCORD DM:',error)}
   finally{dmBusy=false;if(dmNeedsRefresh){dmNeedsRefresh=false;queueMicrotask(()=>dmLoad())}}
 }
 $('#dmForm').onsubmit=async event=>{
   event.preventDefault();
-  const input=$('#dmInput'),body=input.value.trim(),peer=dmPeer;
+  const input=$('#dmInput'),body=input.value.trim(),peer=dmPeer,account=socialUser;
   if(!body||!peer||!socialUser||!dmFriendIds.has(peer)||dmSending)return;
   dmSending=true;$('#dmSend').disabled=true;
   try{
-    const {error}=await concordSupabase.from('concord_direct_messages').insert({sender_id:socialUser,recipient_id:peer,body});
+    const {error}=await concordSupabase.from('concord_direct_messages').insert({sender_id:account,recipient_id:peer,body});
     if(error)throw error;
-    if(dmPeer===peer){
-      input.value='';
+    if(dmPeer===peer&&socialUser===account){
+      if(input.value.trim()===body)input.value='';
       const history=$('#dmHistory');
       if(history&&history.querySelector('.concord-dm-message')){
         const item=document.createElement('article');item.className='concord-dm-message mine';
@@ -2378,7 +2378,7 @@ $('#dmForm').onsubmit=async event=>{
       await dmLoad();
     }
   }catch(error){const message=error.message||'Confira a conexão e as permissões.';simple('Mensagem não enviada',message.includes('row-level security')?'O Supabase bloqueou o envio pela política de segurança (RLS). Verifique se a política de INSERT compara concord_direct_messages.sender_id e concord_direct_messages.recipient_id com uma amizade aceita. Detalhes: '+message:message);console.error('CONCORD: falha ao enviar mensagem privada',{code:error.code,message:error.message,details:error.details,hint:error.hint})}
-  finally{dmSending=false;$('#dmSend').disabled=!dmFriendIds.has(dmPeer)}
+  finally{dmSending=false;$('#dmSend').disabled=!dmOpen||!socialUser||!dmFriendIds.has(dmPeer)}
 };
 document.querySelectorAll('[data-channel]').forEach(btn=>btn.addEventListener('click',()=>{if(dmOpen)dmShow(false)}));
 dmTimer=setInterval(()=>{if(dmOpen&&document.visibilityState==='visible')dmLoad()},4000);
@@ -2432,7 +2432,7 @@ async function refreshSocial(){
     const dmLabel=document.createElement('div');dmLabel.className='concord-dm-label';dmLabel.textContent='CONVERSAS COM AMIGOS';dmList.append(dmLabel);
     if(!ids.length){const empty=document.createElement('div');empty.textContent='Aceite uma amizade para conversar.';dmList.append(empty)}
     ids.forEach(id=>{const row=document.createElement('div');row.className='concord-dm-friend-row';const button=document.createElement('button');button.type='button';button.className='concord-dm-friend';button.dataset.peerId=id;button.classList.toggle('active',dmOpen&&dmPeer===id);button.setAttribute('aria-current',dmOpen&&dmPeer===id?'true':'false');button.textContent=(online.has(id)?'🟢 ':'✉ ')+concordFriendDisplayName(id);button.setAttribute('aria-label','Abrir conversa privada com '+concordFriendDisplayName(id));button.onclick=()=>dmSelect(id);const profile=document.createElement('button');profile.type='button';profile.className='concord-dm-visit';profile.textContent='◉';profile.title='Visitar perfil';profile.onclick=()=>concordViewProfile(id);row.append(button,profile);dmList.append(row)});
-    if(dmOpen&&dmPeer&&!dmFriendIds.has(dmPeer)){dmProfileAction.hidden=true;dmPeer=null;$('#dmHistory').textContent='Esta amizade não está mais ativa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true}
+    if(dmOpen&&dmPeer&&!dmFriendIds.has(dmPeer)){dmProfileAction.hidden=true;dmPeer=null;$('#dmPeerLabel').textContent='Selecione um amigo';$('#dmHistory').textContent='Esta amizade não está mais ativa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true}
     const list=$('#concordFriends');list.replaceChildren();
     if(!friends.length){list.textContent='Nenhum amigo adicionado.'}
     for(const f of friends){
