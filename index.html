@@ -528,6 +528,22 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
 @media(min-width:761px){.app{min-width:0}.sidebar{min-width:0}.main{min-width:0}}
 @media(max-width:760px){.servers{gap:7px}.sidebar .concord-friend-details strong{font-size:12px}.main .topbar .sub{display:none}}
 
+
+/* CONCORD Voice Grid — responsive, original emerald participant stage */
+#concordVoiceGrid{display:none;flex-direction:column;gap:12px;min-height:0;height:100%;padding:14px;background:#08140f}
+#concordVoiceGrid.open{display:flex}
+#concordVoiceGrid .cvg-header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+#concordVoiceGrid .cvg-header strong{font-size:15px}
+#concordVoiceGrid .cvg-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));grid-auto-rows:minmax(170px,1fr);gap:9px;flex:1;min-height:0;overflow:auto}
+#concordVoiceGrid .cvg-tile{position:relative;border:1px solid #37684f;border-radius:13px;background:linear-gradient(145deg,#163b2b,#0b1d15);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;overflow:hidden;min-height:170px}
+#concordVoiceGrid .cvg-avatar{height:62px;width:62px;border-radius:50%;display:grid;place-items:center;background:#246e4d;font-size:24px;font-weight:750}
+#concordVoiceGrid .cvg-tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#030907}
+#concordVoiceGrid .cvg-name{position:absolute;bottom:10px;left:10px;background:#05130edb;border-radius:7px;padding:5px 9px;font-size:12px;max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#concordVoiceGrid .cvg-live{position:absolute;top:10px;left:10px;background:#185e3c;padding:5px 9px;border-radius:6px;font-size:11px}
+#concordVoiceGrid button{border:1px solid #3d7858;border-radius:8px;background:#1a4530;padding:8px 12px}
+#concordVoiceGrid button:hover{background:#286548}
+@media(max-width:760px){#concordVoiceGrid{padding:8px}#concordVoiceGrid .cvg-tiles{grid-auto-rows:minmax(160px,1fr)}}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2640,6 +2656,46 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   if(search){search.title='Buscar canais (Ctrl + K)';search.setAttribute('aria-keyshortcuts','Control+K')}
   const profile=sidebar.querySelector('.user .concord-user-identity');
   if(profile)profile.style.cursor='pointer';
+})();
+</script>
+<script>
+(() => {
+ const main=document.querySelector('.main'),messages=document.getElementById('messages'),dock=document.getElementById('concordVoiceDock');
+ if(!main||!messages||!dock||document.getElementById('concordVoiceGrid'))return;
+ const grid=document.createElement('section');grid.id='concordVoiceGrid';grid.setAttribute('aria-label','Participantes da sala de voz');
+ const header=document.createElement('div');header.className='cvg-header';
+ const title=document.createElement('strong');title.textContent='◉ Sala de voz • CONCORD';
+ const close=document.createElement('button');close.type='button';close.textContent='Voltar ao chat';
+ close.onclick=()=>{grid.classList.remove('open');messages.style.display='';};
+ header.append(title,close);
+ const tiles=document.createElement('div');tiles.className='cvg-tiles';grid.append(header,tiles);main.insertBefore(grid,messages);
+ const open=()=>{if(!document.getElementById('joinCall')?.disabled)return;messages.style.display='none';grid.classList.add('open');render()};
+ const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=open;view.title='Ver participantes em grade'}
+ function render(){
+  if(!grid.classList.contains('open'))return;
+  const room=typeof joinedRoom!=='undefined'?joinedRoom:null;
+  const members=typeof roomRoster!=='undefined'?(roomRoster[room]||[]):[];
+  title.textContent='◉ '+(room||'Sala de voz')+' • '+members.length+' participante(s)';
+  tiles.replaceChildren();
+  if(!members.length){const p=document.createElement('p');p.textContent='Aguardando participantes nesta sala.';tiles.append(p);return}
+  members.forEach(member=>{
+   const tile=document.createElement('div');tile.className='cvg-tile';
+   const avatar=document.createElement('div');avatar.className='cvg-avatar';avatar.textContent=String(member.name||'?').slice(0,1).toUpperCase();
+   const name=document.createElement('span');name.className='cvg-name';name.textContent=(member.name||'Participante')+(member.isMe?' (você)':'');
+   tile.append(avatar,name);
+   const live=member.isMe?(typeof stream!=='undefined'?stream:null):(typeof concordLiveStreams!=='undefined'?concordLiveStreams.get(member.id):null);
+   if(live?.getVideoTracks().some(t=>t.readyState==='live')){
+    const video=document.createElement('video');video.autoplay=true;video.playsInline=true;video.muted=true;video.srcObject=live;tile.prepend(video);
+    video.play().catch(()=>{});
+    const badge=document.createElement('span');badge.className='cvg-live';badge.textContent='● AO VIVO';tile.append(badge);
+   }
+   tiles.append(tile);
+  });
+ }
+ const observer=new MutationObserver(()=>{if(!document.getElementById('joinCall')?.disabled&&grid.classList.contains('open'))close.click()});
+ observer.observe(document.getElementById('joinCall'),{attributes:true,attributeFilter:['disabled']});
+ const interval=setInterval(()=>{if(grid.classList.contains('open')&&document.visibilityState==='visible')render()},2500);
+ window.addEventListener('pagehide',()=>clearInterval(interval),{once:true});
 })();
 </script>
 </body></html>                              
