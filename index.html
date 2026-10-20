@@ -2454,7 +2454,7 @@ function concordDmFavorite(id){
  refreshSocial();
 }
 const concordDmFilter=document.createElement('input');
-concordDmFilter.id='concordDmQuickSearch';concordDmFilter.type='search';
+concordDmFilter.id='concordDmQuickSearch';concordDmFilter.type='search';concordDmFilter.hidden=true;
 concordDmFilter.placeholder='Buscar conversas';concordDmFilter.setAttribute('aria-label','Buscar conversas com amigos');
 concordDmFilter.autocomplete='off';
 dmFriends.before(concordDmFilter);
