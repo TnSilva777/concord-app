@@ -1644,9 +1644,9 @@ function renderConcordLocalVoiceMembers(container,room){
   if(!members.length){const empty=document.createElement('small');empty.textContent='Ninguém conectado';box.append(empty)}
   else for(const member of members){
     const row=document.createElement('div');row.className='concord-local-voice-person';
-    const avatar=document.createElement('span');avatar.className='mini-avatar';avatar.textContent=String(member.initial||'?').slice(0,2);
+    const avatar=document.createElement('span');avatar.className='mini-avatar';avatar.textContent=String(member.initial||'?').slice(0,2);if(member.speaking||(member.isMe&&concordIsLocallySpeaking)){avatar.classList.add('speaking');row.classList.add('concord-member-speaking')};
     if(member.isMe)setConcordAvatar(avatar,concordData.profile);else concordVoiceAvatar(avatar,member);
-    const name=document.createElement('span');name.textContent=member.isMe?String(concordData.profile?.name||member.name||'Participante').trim():String(member.name||'Participante');
+    const name=document.createElement('span');name.textContent=member.isMe?String(concordData.profile?.name||member.name||'Participante').trim():String((member.userId&&concordFriendNames.get(member.userId))||member.name||'Participante');
     const status=document.createElement('span');status.textContent=member.isMe?(micEnabled?'🎙':'🔇'):'🎧';
     row.append(avatar,name,status);
     const live=concordLiveBadge(member);
@@ -3483,4 +3483,8 @@ body.concord-home-view .app>.sidebar .user{margin-top:auto;flex-shrink:0}
 .room-member .mini-avatar.speaking,.roster-person .avatar.speaking,.user .avatar.speaking{outline:3px solid #3cff8d!important;outline-offset:3px!important;box-shadow:0 0 0 6px #18ed8540,0 0 24px #35ffa5a8!important;animation:concordSpeakingGlow .75s ease-in-out infinite alternate!important}
 @keyframes concordSpeakingGlow{from{filter:brightness(1)}to{filter:brightness(1.22)}}
 @media(prefers-reduced-motion:reduce){.room-member .mini-avatar.speaking,.roster-person .avatar.speaking,.user .avatar.speaking{animation:none!important}}
+</style><style>
+.concord-local-voice-person.concord-member-speaking{background:rgba(37,203,113,.12);border-radius:8px}
+.concord-local-voice-person .mini-avatar.speaking{outline:2px solid #54ffa7;outline-offset:2px;box-shadow:0 0 0 5px #27ff8560,0 0 18px #26ff88!important;animation:concordSpeakingGlow .75s ease-in-out infinite alternate}
+@media(prefers-reduced-motion:reduce){.concord-local-voice-person .mini-avatar.speaking{animation:none}}
 </style></body></html>                              
