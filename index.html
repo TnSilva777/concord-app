@@ -592,6 +592,19 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
 .concord-dm-friend:focus-visible,.concord-dm-visit:focus-visible{outline:2px solid #6ee4a9;outline-offset:1px}
 @media(max-width:760px){.concord-dm-header{padding:10px!important}.concord-dm-history{padding:12px 8px!important}.concord-dm-message{max-width:90%}.concord-dm-form{padding:8px!important}}
 @media(prefers-reduced-motion:reduce){.concord-dm-history{scroll-behavior:auto}.concord-dm-friend-row{transition:none}}
+
+/* Private messages: discoverable search and quick-copy actions */
+#concordDmSearchBar{display:flex;align-items:center;gap:8px;padding:9px 15px;background:#122a20;border-bottom:1px solid #2d533f}
+#concordDmSearchBar input{flex:1;min-width:0;border:1px solid #386b50;background:#0e2018;color:#eafff1;border-radius:8px;padding:9px 11px;font-size:12px}
+#concordDmSearchBar input:focus-visible{outline:2px solid #64dca1;outline-offset:1px}
+#concordDmSearchBar button{border:1px solid #386b50;border-radius:8px;padding:8px 10px;background:#204b35;color:#eafff1}
+#concordDmSearchCount{font-size:11px;color:#9bd6b5;white-space:nowrap}
+.concord-dm-message{padding-right:34px!important}
+.concord-dm-copy{position:absolute;top:6px;right:6px;border:1px solid #416e53;border-radius:6px;background:#183b2c;color:#c4f4d9;opacity:0;padding:4px 6px;font-size:11px;cursor:pointer}
+.concord-dm-message:hover .concord-dm-copy,.concord-dm-copy:focus-visible{opacity:1}
+.concord-dm-message[hidden]{display:none!important}
+@media(hover:none){.concord-dm-copy{opacity:1}}
+@media(max-width:760px){#concordDmSearchBar{padding:7px;gap:5px}#concordDmSearchBar button{padding:8px}.concord-dm-copy{opacity:1}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2781,6 +2794,48 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  const history=document.getElementById('dmHistory');
  if(history){history.setAttribute('aria-label','Histórico de mensagens privadas');history.setAttribute('role','log')}
  update();
+})();
+</script>
+<script>
+/* Client-side search in loaded private messages; never alters server data */
+(() => {
+ const history=document.getElementById('dmHistory'),header=document.querySelector('.concord-dm-header');
+ if(!history||!header||document.getElementById('concordDmSearchBar'))return;
+ const bar=document.createElement('div');bar.id='concordDmSearchBar';bar.hidden=true;
+ const input=document.createElement('input');input.type='search';input.placeholder='Buscar nas mensagens carregadas...';input.setAttribute('aria-label','Buscar nesta conversa');
+ const count=document.createElement('span');count.id='concordDmSearchCount';
+ const clear=document.createElement('button');clear.type='button';clear.textContent='Limpar';
+ bar.append(input,count,clear);header.insertAdjacentElement('afterend',bar);
+ const toggle=document.createElement('button');toggle.type='button';toggle.textContent='⌕ Buscar';toggle.title='Pesquisar nas últimas mensagens carregadas';header.append(toggle);
+ const apply=()=>{
+  const query=input.value.trim().toLocaleLowerCase('pt-BR');
+  let total=0,matched=0;
+  for(const msg of history.querySelectorAll('.concord-dm-message')){
+   total++;
+   const text=msg.querySelector('p')?.textContent||'';
+   const visible=!query||text.toLocaleLowerCase('pt-BR').includes(query);
+   msg.hidden=!visible;if(visible)matched++;
+  }
+  count.textContent=query?matched+' de '+total:'';
+ };
+ toggle.onclick=()=>{bar.hidden=!bar.hidden;if(!bar.hidden)input.focus();else{input.value='';apply()}};
+ clear.onclick=()=>{input.value='';apply();input.focus()};
+ input.addEventListener('input',apply);
+ input.addEventListener('keydown',e=>{if(e.key==='Escape'){input.value='';apply();bar.hidden=true;toggle.focus()}});
+ const addCopyButtons=()=>{
+  for(const msg of history.querySelectorAll('.concord-dm-message:not([data-concord-copy])')){
+   msg.dataset.concordCopy='1';
+   const p=msg.querySelector('p');if(!p)continue;
+   const btn=document.createElement('button');btn.type='button';btn.className='concord-dm-copy';btn.textContent='⧉';btn.title='Copiar mensagem';btn.setAttribute('aria-label','Copiar mensagem');
+   btn.onclick=async()=>{try{await navigator.clipboard.writeText(p.textContent||'');btn.textContent='✓';setTimeout(()=>{if(btn.isConnected)btn.textContent='⧉'},1400)}catch{btn.textContent='!'}};
+   msg.append(btn);
+  }
+  apply();
+ };
+ let pending=false;
+ const observer=new MutationObserver(()=>{if(pending)return;pending=true;queueMicrotask(()=>{pending=false;addCopyButtons()})});
+ observer.observe(history,{childList:true});
+ addCopyButtons();
 })();
 </script>
 </body></html>                              
