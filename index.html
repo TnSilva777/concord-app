@@ -467,6 +467,13 @@ body.concord-custom-server-view #concordInlineStage[hidden]{display:none!importa
 /* Hide duplicate headset in upper voice dock; keep profile audio control */
 #concordVoiceDockSound{display:none!important}
 #concordVoiceDock .voice-dock-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+
+/* Compact profile actions aligned toward the right */
+.sidebar .user>.concord-user-controls{justify-content:flex-end!important;gap:3px!important;padding-left:0;margin-left:auto!important}
+.sidebar .user>.concord-user-controls .gear{width:27px!important;height:28px!important;min-width:27px!important;min-height:28px!important;flex:0 0 27px!important;font-size:14px!important;border-radius:7px!important}
+.sidebar .user>.concord-user-controls .gear svg{width:16px!important;height:16px!important}
+.sidebar .user{padding:9px 8px!important;row-gap:5px!important}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
