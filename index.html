@@ -507,6 +507,27 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
 .sidebar .concord-user-identity{min-width:0}
 @media(min-width:761px){.sidebar{width:100%;min-width:0}}
 
+
+/* CONCORD desktop refinement — Discord-inspired usability, emerald identity */
+:root{--concord-hover:#214634;--concord-focus:#65e6ac}
+.servers{overflow-y:auto;overflow-x:hidden;scrollbar-width:none;gap:10px}
+.servers::-webkit-scrollbar{display:none}
+.servers .server{flex-shrink:0;position:relative}
+.servers .server.active:before{content:"";position:absolute;left:-10px;top:20%;height:60%;width:4px;background:#70edb0;border-radius:0 5px 5px 0}
+.sidebar{display:flex;flex-direction:column;min-height:0}
+.sidebar .search{flex-shrink:0;text-align:left}
+.sidebar .channel,.sidebar .voice-room{transition:background-color .15s ease,color .15s ease}
+.sidebar .channel:focus-visible,.sidebar .voice-room:focus-visible,.servers .server:focus-visible{outline:2px solid var(--concord-focus);outline-offset:-2px}
+.sidebar .channel.active{background:#24513b;color:#f0fff5;font-weight:700}
+.sidebar .concord-friend:hover,.sidebar .concord-dm-friend-row:hover{background:#ffffff09}
+.main{min-width:0;min-height:0;display:flex;flex-direction:column}
+.main .topbar{position:relative;z-index:2;box-shadow:0 1px 0 #2b4d3b}
+.main .messages{min-height:0;flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#315e48 transparent}
+.main .composebox{flex-shrink:0}
+.sidebar .user,.concord-voice-dock{flex-shrink:0}
+@media(min-width:761px){.app{min-width:0}.sidebar{min-width:0}.main{min-width:0}}
+@media(max-width:760px){.servers{gap:7px}.sidebar .concord-friend-details strong{font-size:12px}.main .topbar .sub{display:none}}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2607,6 +2628,18 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   const apply=()=>{stage.style.setProperty('--concord-stream-height',range.value+'vh');output.textContent=range.value+'%';localStorage.setItem('concord-stream-height',range.value)};
   range.oninput=apply;wrap.append(range,output);bar.prepend(wrap);apply();
  }
+})();
+</script>
+<script>
+(() => {
+  const sidebar=document.querySelector('.sidebar'),friends=document.getElementById('concordFriendsNav');
+  if(!sidebar||document.getElementById('concordNavTip'))return;
+  const tip=document.createElement('span');tip.id='concordNavTip';tip.textContent='CONCORD';tip.hidden=true;sidebar.append(tip);
+  if(friends){friends.title='Amigos e mensagens privadas';friends.setAttribute('aria-label','Abrir amigos e mensagens privadas')}
+  const search=document.getElementById('searchBtn');
+  if(search){search.title='Buscar canais (Ctrl + K)';search.setAttribute('aria-keyshortcuts','Control+K')}
+  const profile=sidebar.querySelector('.user .concord-user-identity');
+  if(profile)profile.style.cursor='pointer';
 })();
 </script>
 </body></html>                              
