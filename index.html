@@ -3373,4 +3373,32 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
 </style><style>
 /* CONCORD clean: apenas a lista de amigos serve para abrir conversas. */
 #dmFriends,#concordDmQuickSearch{display:none!important}
-</style></body></html>                              
+</style><style>
+/* CONCORD: painel Amigos ocupa todo o espaço vertical disponível, sem duplicar conversas. */
+body.concord-home-view .app>.sidebar{min-height:0!important;overflow:hidden}
+body.concord-home-view .app>.sidebar .concord-social:not([hidden]){
+ display:flex!important;flex-direction:column;flex:1 1 auto;min-height:0;
+ margin:6px 0 0!important;padding:12px 0 8px!important;overflow:hidden;
+ border-bottom:0!important
+}
+body.concord-home-view .app>.sidebar .concord-social>.section,
+body.concord-home-view .app>.sidebar .concord-friends-toolbar{flex:0 0 auto}
+body.concord-home-view .app>.sidebar #concordFriends{
+ flex:1 1 auto;min-height:0;max-height:none!important;overflow-y:auto!important;
+ overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#3c7b56 transparent;
+ padding:9px 12px 24px!important
+}
+body.concord-home-view .app>.sidebar #concordFriends .concord-friend{
+ min-height:56px;margin:3px 0;padding:8px 9px;gap:10px;border-radius:10px
+}
+body.concord-home-view .app>.sidebar #concordFriends .concord-friend-details{min-width:0}
+body.concord-home-view .app>.sidebar #concordFriends .concord-friend-details strong{
+ display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
+body.concord-home-view .app>.sidebar #concordFriendsEmptyFilter{flex:0 0 auto}
+body.concord-home-view .app>.sidebar .user{margin-top:auto;flex-shrink:0}
+@media(max-width:760px){
+ body.concord-home-view .app>.sidebar #concordFriends{padding-bottom:16px!important}
+}
+</style>
+</body></html>                              
