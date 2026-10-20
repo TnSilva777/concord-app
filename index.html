@@ -427,6 +427,17 @@ body.concord-custom-server-view #concordInlineStage[hidden]{display:none!importa
 .concord-voice-dock .voice-dock-top button{width:35px;flex-shrink:0}
 .sidebar:has(.concord-voice-dock.connected) .user{flex-shrink:0}
 
+
+/* Discord-inspired profile identity: keep the chosen name visible */
+.sidebar .user{display:grid;grid-template-columns:36px minmax(0,1fr);grid-template-areas:"avatar identity" "controls controls";align-items:center;gap:7px 10px;padding:11px 10px;min-width:0}
+.sidebar .user>.avatar{grid-area:avatar}
+.sidebar .user>.concord-user-identity{grid-area:identity;min-width:0;width:100%;display:block!important;visibility:visible!important}
+.sidebar .user>.concord-user-identity b{display:block!important;font-size:13px;font-weight:750;color:#f0fff5;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar .user>.concord-user-identity small{font-size:10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar .user>.concord-user-controls{grid-area:controls;display:flex;justify-content:space-between;gap:3px;width:100%;min-width:0;margin:0}
+.sidebar .user>.concord-user-controls .gear{margin:0;flex:0 1 34px;min-width:28px}
+@media(min-width:340px){.sidebar .user{grid-template-columns:36px minmax(0,1fr);}}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
