@@ -204,4 +204,34 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   });
 })();
 </script>
+<script>
+// Correções de sessão e atualização: ações extras sem substituir os controles existentes.
+(() => {
+  const auth = document.getElementById('concordAuth');
+  const user = document.querySelector('.user');
+  if (!auth || !user || !window.concordSupabase && typeof concordSupabase === 'undefined') return;
+  const client = typeof concordSupabase !== 'undefined' ? concordSupabase : window.concordSupabase;
+  const logout = document.createElement('button');
+  logout.type = 'button';
+  logout.className = 'gear';
+  logout.textContent = 'Sair';
+  logout.title = 'Sair da conta';
+  logout.style.cssText = 'font-size:12px;padding:7px;white-space:nowrap';
+  logout.onclick = async () => {
+    logout.disabled = true;
+    try {
+      const { error } = await client.auth.signOut();
+      if (error) throw error;
+      auth.style.display = 'flex';
+      document.getElementById('authPassword').value = '';
+    } catch (error) {
+      alert('Não foi possível sair: ' + (error.message || 'tente novamente'));
+    } finally { logout.disabled = false; }
+  };
+  user.appendChild(logout);
+  client.auth.onAuthStateChange((_event, session) => {
+    if (!session) auth.style.display = 'flex';
+  });
+})();
+</script>
 </body></html>                              
