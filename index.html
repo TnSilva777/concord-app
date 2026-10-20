@@ -2532,7 +2532,7 @@ function concordDmStartReply(msg){
   if(!dmPeer||!msg)return;
   const form=document.getElementById('dmForm');
   const name=msg.sender_id===socialUser?'Você':concordFriendDisplayName(msg.sender_id);
-  concordDmReply={peer:dmPeer,name,quote:String(msg.body||'').replace(/\\s+/g,' ').slice(0,110)};
+  concordDmReply={peer:dmPeer,name,quote:String(msg.body||'').replace(/\s+/g,' ').slice(0,110)};
   let preview=document.getElementById('concordDmReplyPreview');
   if(!preview){preview=document.createElement('div');preview.id='concordDmReplyPreview';form.parentNode.insertBefore(preview,form)}
   preview.replaceChildren();
