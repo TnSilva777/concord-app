@@ -2160,6 +2160,47 @@ async function voiceSignalReceived(packet){
     }
   }catch(error){console.warn('Sinalizacao de voz',error);voiceStatus('Erro na conexão de voz: '+error.message)}
 }
+// Voice lobby shares only chosen display name and active room, never audio or email.
+// This allows participants to appear in room lists before others join the same call.
+let concordVoiceLobby=null;
+const concordVoiceLobbyRooms=new Set();
+function concordSyncVoiceLobby(){
+ if(!concordVoiceLobby)return;
+ const state=concordVoiceLobby.presenceState();
+ const groups=new Map();
+ for(const entry of Object.values(state).flat()){
+   if(!entry?.id||!entry.room||entry.id===voicePeerId)continue;
+   const name=String((entry.userId&&concordFriendNames.get(entry.userId))||entry.name||'Participante').trim().slice(0,28)||'Participante';
+   if(!groups.has(entry.room))groups.set(entry.room,[]);
+   if(!groups.get(entry.room).some(member=>member.id===entry.id))groups.get(entry.room).push({id:entry.id,userId:entry.userId||null,name,initial:name[0].toUpperCase(),isMe:false,sharing:!!entry.sharing});
+ }
+ for(const room of new Set([...concordVoiceLobbyRooms,...groups.keys()])){
+   if(room===joinedRoom)continue;
+   roomRoster[room]=groups.get(room)||[];
+ }
+ concordVoiceLobbyRooms.clear();
+ for(const room of groups.keys())concordVoiceLobbyRooms.add(room);
+ renderRooms();
+ if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();
+}
+async function concordJoinVoiceLobby(userId){
+ if(concordVoiceLobby)return;
+ const channel=concordSupabase.channel('concord-voice-lobby-v1',{config:{presence:{key:voicePeerId}}});
+ concordVoiceLobby=channel;
+ channel.on('presence',{event:'sync'},concordSyncVoiceLobby).subscribe(async status=>{
+   if(status==='SUBSCRIBED'&&concordVoiceLobby===channel&&callJoined&&joinedRoom){
+     await channel.track({id:voicePeerId,userId,room:joinedRoom,name:voicePeerName(),sharing:!!stream}).catch(console.warn);
+   }
+ });
+}
+function concordLeaveVoiceLobby(){
+ const channel=concordVoiceLobby;concordVoiceLobby=null;
+ if(channel)concordSupabase.removeChannel(channel).catch(console.warn);
+ for(const room of concordVoiceLobbyRooms)if(room!==joinedRoom)roomRoster[room]=[];
+ concordVoiceLobbyRooms.clear();
+ renderRooms();
+ if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();
+}
 async function startVoiceNetwork(){
   if(voiceStarting||voiceSignal||!callJoined||!joinedRoom)return;
   voiceStarting=true;
@@ -2167,6 +2208,7 @@ async function startVoiceNetwork(){
     const {data:{session}}=await concordSupabase.auth.getSession();
     if(!session)throw Error('Entre na sua conta para usar a chamada.');
     if(!callJoined)return;
+    await concordJoinVoiceLobby(session.user.id);
     const topic='concord-voice-test-'+joinedRoom.toLowerCase().replace(/[^a-z0-9]/g,'-');
     const channel=concordSupabase.channel(topic,{config:{presence:{key:voicePeerId}}});
     voiceSignal=channel;
@@ -2185,6 +2227,7 @@ async function startVoiceNetwork(){
   finally{voiceStarting=false}
 }
 function stopVoiceNetwork(){
+  concordLeaveVoiceLobby();
   if(stream)stopShare();
   concordWatching=null;
   concordLiveStreams.clear();
