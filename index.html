@@ -318,6 +318,22 @@ body.concord-custom-server-view #concordServerPanel{padding:0 7px 14px;backgroun
 #concordDiagnosticsButton:hover{background:#305b40}
 #concordDiagnosticsButton:disabled{opacity:.65;cursor:wait}
 #simpleText{white-space:pre-line;overflow-wrap:anywhere;line-height:1.65}
+
+.concord-friends-toolbar{padding:9px 10px 7px;display:grid;gap:9px}
+.concord-friends-tabs{display:flex;gap:4px;flex-wrap:wrap}
+.concord-friends-tabs button{border-radius:6px;background:transparent;padding:7px 8px;color:#b5cbbd;font-size:11px;font-weight:700}
+.concord-friends-tabs button.active{background:#275c41;color:#f0fff5}
+.concord-friends-toolbar input{min-width:0;width:100%;border:1px solid #3b5d47;border-radius:7px;background:#102019;color:#eafff1;padding:9px 10px;font-size:12px;outline:none}
+.concord-friends-toolbar input:focus{border-color:#55c78b}
+.concord-friend{display:flex;align-items:center;gap:8px;padding:9px 7px!important;margin:3px 5px!important;border-radius:8px;min-width:0}
+.concord-friend:hover{background:#294434}
+.concord-friend[hidden],#concordFriendsEmptyFilter[hidden]{display:none!important}
+.concord-friend-avatar{display:grid;place-items:center;flex:0 0 32px;width:32px;height:32px;border-radius:50%;background:#31664b;color:#eafff1;font-size:11px;font-weight:800}
+.concord-friend-details{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.concord-friend-details strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.concord-friend-details small{font-size:10px;color:#9cbaa6}
+.concord-friend button{flex-shrink:0}
+.concord-friends-empty-filter{padding:12px;color:#a9c4b1;font-size:12px;text-align:center}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -1261,6 +1277,34 @@ socialPanel.hidden=true;
 const sidebarSearch=$('#searchBtn');
 if(sidebarSearch)sidebarSearch.parentNode.insertBefore(socialPanel,sidebarSearch);
 let socialUser=null,socialTimer=null,socialBusy=false,socialRefreshQueued=false;
+let concordFriendsFilter='all',concordFriendsSearch='';
+const concordFriendsToolbar=document.createElement('div');
+concordFriendsToolbar.className='concord-friends-toolbar';
+const concordFriendsTabs=document.createElement('div');concordFriendsTabs.className='concord-friends-tabs';
+for(const [value,label] of [['all','Todos'],['online','Online'],['pending','Pendentes']]){
+  const tab=document.createElement('button');tab.type='button';tab.textContent=label;tab.dataset.filter=value;
+  tab.onclick=()=>{concordFriendsFilter=value;concordApplyFriendsFilter()};
+  concordFriendsTabs.append(tab);
+}
+const concordFriendsSearchInput=document.createElement('input');
+concordFriendsSearchInput.type='search';concordFriendsSearchInput.placeholder='Buscar amigos';concordFriendsSearchInput.setAttribute('aria-label','Buscar amigos');
+concordFriendsSearchInput.oninput=()=>{concordFriendsSearch=concordFriendsSearchInput.value.trim().toLowerCase();concordApplyFriendsFilter()};
+concordFriendsToolbar.append(concordFriendsTabs,concordFriendsSearchInput);
+socialPanel.insertBefore(concordFriendsToolbar,$('#concordFriends'));
+function concordApplyFriendsFilter(){
+  const rows=[...socialPanel.querySelectorAll('.concord-friend')];
+  let shown=0;
+  for(const row of rows){
+    const match=(concordFriendsFilter==='all'||concordFriendsFilter===row.dataset.friendStatus||(concordFriendsFilter==='online'&&row.dataset.friendStatus==='online'))&&row.dataset.friendName.includes(concordFriendsSearch);
+    row.hidden=!match;if(match)shown++;
+  }
+  concordFriendsTabs.querySelectorAll('button').forEach(tab=>{const active=tab.dataset.filter===concordFriendsFilter;tab.classList.toggle('active',active);tab.setAttribute('aria-pressed',String(active))});
+  let empty=$('#concordFriendsEmptyFilter');
+  if(!empty){empty=document.createElement('div');empty.id='concordFriendsEmptyFilter';empty.className='concord-friends-empty-filter';socialPanel.append(empty)}
+  empty.hidden=shown>0||!rows.length;
+  empty.textContent=concordFriendsSearch?'Nenhum amigo corresponde à busca.':concordFriendsFilter==='pending'?'Nenhum pedido pendente.':concordFriendsFilter==='online'?'Nenhum amigo online agora.':'Nenhum amigo encontrado.';
+}
+
 const concordDiagnosticsButton=document.createElement('button');
 concordDiagnosticsButton.type='button';
 concordDiagnosticsButton.id='concordDiagnosticsButton';
@@ -1420,14 +1464,25 @@ async function refreshSocial(){
     for(const f of friends){
       const other=f.requester_id===socialUser?f.recipient_id:f.requester_id;
       const row=document.createElement('div');row.className='concord-friend';
-      const label=document.createElement('span');label.textContent=(online.has(other)?'🟢 ':'⚪ ')+other.slice(0,8)+(f.status==='pending'?' · pendente':'');
-      label.title='ID: '+other;row.append(label);
+      row.dataset.friendStatus=f.status==='pending'?'pending':online.has(other)?'online':'offline';
+      row.dataset.friendName=('amigo '+other).toLowerCase();
+      const avatar=document.createElement('span');avatar.className='concord-friend-avatar';avatar.textContent=other.slice(0,2).toUpperCase();
+      const details=document.createElement('div');details.className='concord-friend-details';
+      const label=document.createElement('strong');label.textContent='Amigo '+other.slice(0,8);
+      label.title='ID: '+other;
+      const status=document.createElement('small');status.textContent=f.status==='pending'?'Pedido pendente':online.has(other)?'● Online':'○ Offline';
+      details.append(label,status);row.append(avatar,details);
+      if(f.status==='accepted'){
+        const message=document.createElement('button');message.textContent='✉';message.title='Enviar mensagem';message.setAttribute('aria-label','Conversar com '+label.textContent);
+        message.onclick=()=>dmSelect(other);row.append(message);
+      }
       if(f.status==='pending'&&f.recipient_id===socialUser){
         const accept=document.createElement('button');accept.textContent='Aceitar';accept.onclick=async()=>{const {error}=await concordSupabase.from('concord_friend_requests').update({status:'accepted'}).eq('id',f.id);if(error)alert(error.message);else refreshSocial()};row.append(accept);
       }
       const remove=document.createElement('button');remove.textContent='×';remove.title='Remover pedido ou amizade';remove.onclick=async()=>{if(!confirm('Remover esta amizade ou pedido?'))return;const {error}=await concordSupabase.from('concord_friend_requests').delete().eq('id',f.id);if(error)alert(error.message);else refreshSocial()};row.append(remove);
       list.append(row);
     }
+    concordApplyFriendsFilter();
     const {error:presenceError}=await concordSupabase.from('concord_presence').upsert({user_id:requestUser,last_seen:new Date().toISOString()});
     if(presenceError)console.warn('Presença indisponível',presenceError.message);
   }catch(error){
