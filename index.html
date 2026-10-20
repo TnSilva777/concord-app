@@ -405,6 +405,14 @@ body.concord-custom-server-view #concordInlineStage[hidden]{display:none!importa
 #concordInlineWaiting[hidden]{display:none}
 @media(max-width:760px){body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:260px}#concordInlineStage video{min-height:200px;max-height:55dvh}#concordInlineStage .concord-inline-bar{padding:9px}}
 
+
+/* Voice controls live only in the persistent bottom profile bar */
+#voiceModal #micToggle,#voiceModal #headphoneToggle,#voiceModal #callShare{display:none!important}
+.concord-user-controls #concordUserAudio{display:grid;place-items:center;min-width:30px;min-height:32px;border-radius:9px}
+.concord-user-controls #concordUserAudio[aria-pressed="true"]{background:#482a2a;color:#ffc0c0}
+.concord-user-controls #concordUserAudio[aria-pressed="false"]{color:#a4e9c3}
+.concord-user-controls .gear{min-width:30px;min-height:32px}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2340,6 +2348,35 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
       const first=results.querySelector('.qs-result');if(first){e.preventDefault();first.click()}
     }
   });
+})();
+</script>
+<script>
+(() => {
+  const controls=document.querySelector('.concord-user-controls');
+  const mic=document.getElementById('concordUserMic');
+  const share=document.getElementById('shareBtn');
+  const audioOriginal=document.getElementById('headphoneToggle');
+  if(!controls||!mic||!share||!audioOriginal||document.getElementById('concordUserAudio'))return;
+  const audio=document.createElement('button');
+  audio.id='concordUserAudio';audio.type='button';audio.className='gear';
+  audio.textContent='🎧';audio.title='Silenciar áudio recebido';audio.setAttribute('aria-label',audio.title);
+  audio.setAttribute('aria-pressed','false');
+  controls.insertBefore(audio,share);
+  const sync=()=>{
+    const connected=!!document.getElementById('joinCall')?.disabled;
+    const muted=audioOriginal.textContent.includes('🔇');
+    audio.textContent=muted?'🔇':'🎧';
+    audio.title=!connected?'Entre em uma chamada para controlar o áudio':muted?'Ativar áudio recebido':'Silenciar áudio recebido';
+    audio.setAttribute('aria-label',audio.title);
+    audio.setAttribute('aria-pressed',String(muted));
+    audio.disabled=!connected;
+    share.title='Compartilhar tela';
+    share.setAttribute('aria-label','Compartilhar tela');
+  };
+  audio.addEventListener('click',()=>{audioOriginal.click();sync()});
+  new MutationObserver(sync).observe(audioOriginal,{childList:true,characterData:true,subtree:true});
+  new MutationObserver(sync).observe(document.getElementById('joinCall'),{attributes:true,attributeFilter:['disabled']});
+  sync();
 })();
 </script>
 </body></html>                              
