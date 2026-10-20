@@ -605,6 +605,13 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
 .concord-dm-message[hidden]{display:none!important}
 @media(hover:none){.concord-dm-copy{opacity:1}}
 @media(max-width:760px){#concordDmSearchBar{padding:7px;gap:5px}#concordDmSearchBar button{padding:8px}.concord-dm-copy{opacity:1}}
+
+/* Stable call rendering and readable participant layout */
+#concordVoiceGrid .cvg-tiles{align-content:stretch}
+#concordVoiceGrid .cvg-tile{min-width:0}
+#concordVoiceGrid .cvg-name{right:auto;max-width:calc(100% - 100px);overflow:hidden;text-overflow:ellipsis}
+#concordVoiceGrid .cvg-live{font-size:9px!important;padding:2px 5px!important;max-width:64px!important}
+#concordVoiceGrid .cvg-tile video{object-fit:contain!important}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2727,7 +2734,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  const header=document.createElement('div');header.className='cvg-header';
  const title=document.createElement('strong');title.textContent='◉ Sala de voz • CONCORD';
  const close=document.createElement('button');close.type='button';close.textContent='Voltar ao chat';
- close.onclick=()=>{grid.classList.remove('open');messages.style.display='';};
+ close.onclick=()=>{grid.classList.remove('open');messages.style.display='';lastGridSignature='';};
  header.append(title,close);
  const tiles=document.createElement('div');tiles.className='cvg-tiles';grid.append(header,tiles);main.insertBefore(grid,messages);
  const open=()=>{if(!document.getElementById('joinCall')?.disabled)return;const stage=document.getElementById('concordInlineStage');if(stage)stage.hidden=true;messages.style.display='none';grid.classList.add('open');render()};
@@ -2735,11 +2742,19 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  const join=document.getElementById('joinCall');
  if(join)new MutationObserver(()=>{if(join.disabled&&typeof joinedRoom!=='undefined'&&joinedRoom)open()}).observe(join,{attributes:true,attributeFilter:['disabled']});
  if(join?.disabled)open();
+ let lastGridSignature='';
  function render(){
   if(!grid.classList.contains('open'))return;
   const room=typeof joinedRoom!=='undefined'?joinedRoom:null;
   const members=typeof roomRoster!=='undefined'?(roomRoster[room]||[]):[];
   title.textContent='◉ '+(room||'Sala de voz')+' • '+members.length+' participante(s)';
+  const signature=JSON.stringify([room,members.map(m=>{
+   const live=m.isMe?(typeof stream!=='undefined'?stream:null):(typeof concordLiveStreams!=='undefined'?concordLiveStreams.get(m.id):null);
+   return [m.id,m.name,m.isMe,live?.getVideoTracks().filter(t=>t.readyState==='live').map(t=>t.id)||[]];
+  })]);
+  if(signature===lastGridSignature)return;
+  lastGridSignature=signature;
+  if(document.fullscreenElement?.classList?.contains('cvg-tile'))return;
   const expanded=tiles.querySelector('.cvg-expanded')?.dataset.memberId||null;
   tiles.replaceChildren();
   if(!members.length){const p=document.createElement('p');p.textContent='Aguardando participantes nesta sala.';tiles.append(p);return}
