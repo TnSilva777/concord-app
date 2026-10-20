@@ -556,6 +556,12 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
 /* Compact live badge beside participant name in voice grid */
 #concordVoiceGrid .cvg-tile .cvg-live{top:auto!important;bottom:10px!important;left:auto!important;right:10px!important;padding:2px 5px!important;font-size:9px!important;line-height:1.2!important;border-radius:4px!important;letter-spacing:0!important;max-width:68px!important;white-space:nowrap}
 #concordVoiceGrid .cvg-tile .cvg-name{max-width:calc(100% - 100px)!important}
+
+/* One screen-share entry point in the connected voice dock */
+.sidebar .user #shareBtn{display:none!important}
+#concordVoiceGrid.open{display:flex!important;flex:1 1 auto!important;min-height:0!important}
+#concordVoiceGrid .cvg-tile video{z-index:0}
+#concordVoiceGrid .cvg-tile .cvg-name,#concordVoiceGrid .cvg-tile .cvg-live{z-index:2}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -918,7 +924,7 @@ async function beginShare(){if(stream){$('#shareStatus').textContent='Você já 
 stream=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:preset.width},height:{ideal:preset.height},frameRate:{ideal:preset.frameRate,max:preset.frameRate}},audio:concordShareAudioEnabled?{echoCancellation:false,noiseSuppression:false,autoGainControl:false}:false,systemAudio:concordShareAudioEnabled?'include':'exclude',windowAudio:concordShareAudioEnabled?'system':'exclude',surfaceSwitching:'include'});
 stream.getVideoTracks()[0]?.applyConstraints({frameRate:{ideal:preset.frameRate,max:preset.frameRate}}).catch(()=>{});const video=$('#screenPreview');video.srcObject=stream;video.style.display='block';$('#stopShare').style.display='inline-block';if(document.body.classList.contains('concord-custom-server-view')){
   $('#shareModal').classList.remove('show');
-  concordOpenInlineStage(null);
+  $('#concordVoiceDockView')?.click();
 }
 if(concordShareAudioEnabled&&!stream.getAudioTracks().length){
   concordAudioHelp.textContent='⚠ O navegador não enviou nenhuma faixa de áudio. Pare a transmissão, escolha uma aba do Chrome/Edge e ative “Compartilhar áudio da aba”, ou escolha a tela inteira com áudio do sistema quando essa opção existir.';
@@ -1050,7 +1056,7 @@ function concordLiveBadge(member){
   if(member.isMe&&!stream)return null;
   const button=document.createElement('button');button.type='button';button.className='concord-live-button';button.dataset.livePeer=member.id;
   button.textContent=!member.isMe&&!concordLiveStreams.has(member.id)?'◌ CONECTANDO':'● AO VIVO';button.title='Assistir à transmissão de '+member.name;button.setAttribute('aria-label','Assistir à transmissão ao vivo de '+member.name);
-  button.onclick=e=>{e.stopPropagation();if(document.body.classList.contains('concord-custom-server-view')){concordOpenInlineStage(member.isMe?null:member.id)}else if(member.isMe){$('#voiceModal').classList.add('show');$('#callScreenPreview').srcObject=stream;$('#callScreenPreview').style.display='block'}else concordShowLive(member.id)};
+  button.onclick=e=>{e.stopPropagation();if(document.body.classList.contains('concord-custom-server-view')){$('#concordVoiceDockView')?.click()}else if(member.isMe){$('#voiceModal').classList.add('show');$('#callScreenPreview').srcObject=stream;$('#callScreenPreview').style.display='block'}else concordShowLive(member.id)};
   return button;
 }
 function renderCallRoster(){const list=$('#callRosterList');if(!list)return;list.innerHTML='';const members=roomRoster[joinedRoom||activeRoom]||[];$('#participantCount').textContent=members.length;if(!members.length){list.innerHTML='<div class="room-empty" style="padding:12px 7px">Ninguém entrou nesta sala ainda.</div>';return}members.forEach(m=>{const row=document.createElement('div');row.className='roster-person'+(m.isMe?' me':'');const av=document.createElement('div');av.className='avatar '+(m.cls||'');av.textContent=m.initial||'?';if(m.isMe&&typeof concordData!=='undefined')setConcordAvatar(av,concordData.profile);const meta=document.createElement('div');meta.className='person-meta';const name=document.createElement('b');name.textContent=m.name+(m.isMe?' (você)':'');const sub=document.createElement('small');sub.textContent=m.isMe?(micEnabled?'Microfone ligado':'Microfone mutado'):'Na sala';meta.append(name,sub);const live=concordLiveBadge(m);if(live)meta.append(live);const state=document.createElement('span');state.className='person-state';state.textContent=m.isMe?(micEnabled?'🎙':'🔇'):'●';row.append(av,meta,state);list.append(row)})}
@@ -2681,7 +2687,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  close.onclick=()=>{grid.classList.remove('open');messages.style.display='';};
  header.append(title,close);
  const tiles=document.createElement('div');tiles.className='cvg-tiles';grid.append(header,tiles);main.insertBefore(grid,messages);
- const open=()=>{if(!document.getElementById('joinCall')?.disabled)return;messages.style.display='none';grid.classList.add('open');render()};
+ const open=()=>{if(!document.getElementById('joinCall')?.disabled)return;const stage=document.getElementById('concordInlineStage');if(stage)stage.hidden=true;messages.style.display='none';grid.classList.add('open');render()};
  const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=open;view.title='Ver participantes em grade'}
  const join=document.getElementById('joinCall');
  if(join)new MutationObserver(()=>{if(join.disabled&&typeof joinedRoom!=='undefined'&&joinedRoom)open()}).observe(join,{attributes:true,attributeFilter:['disabled']});
