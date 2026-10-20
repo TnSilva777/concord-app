@@ -2069,9 +2069,10 @@ function voiceParticipants(){
   // A participant's chosen public name can arrive after presence sync.
   const unknownIds=[...new Set(members.filter(m=>m.userId&&!concordFriendNames.has(m.userId)&&!concordVoiceNameLookupAttempted.has(m.userId)).map(m=>m.userId))];
   if(unknownIds.length){unknownIds.forEach(id=>concordVoiceNameLookupAttempted.add(id));concordSupabase.from('concord_public_profiles').select('user_id,display_name').in('user_id',unknownIds).then(({data,error})=>{
-    if(error){console.warn('Nomes na chamada indisponíveis:',error.message);return}
+    if(error){unknownIds.forEach(id=>concordVoiceNameLookupAttempted.delete(id));console.warn('Nomes na chamada indisponíveis:',error.message);return}
     for(const p of data||[])if(p.display_name)concordFriendNames.set(p.user_id,String(p.display_name).trim().slice(0,28));
     if(voiceSignal&&joinedRoom)voiceParticipants();
+    if(concordVoiceLobby)concordSyncVoiceLobby();
   });}
   if(members.length>1)voiceStatus('Sala experimental: no máximo duas pessoas podem conversar por enquanto.');
   const other=members.slice(0,1);
@@ -2164,6 +2165,7 @@ async function voiceSignalReceived(packet){
 // This allows participants to appear in room lists before others join the same call.
 let concordVoiceLobby=null;
 const concordVoiceLobbyRooms=new Set();
+let concordVoiceLobbyLastRoom=null;
 function concordSyncVoiceLobby(){
  if(!concordVoiceLobby)return;
  const state=concordVoiceLobby.presenceState();
@@ -2178,6 +2180,8 @@ function concordSyncVoiceLobby(){
    if(room===joinedRoom)continue;
    roomRoster[room]=groups.get(room)||[];
  }
+ // A lobby presence update must never overwrite the active call roster.
+ if(joinedRoom&&callJoined)renderCallRoster();
  concordVoiceLobbyRooms.clear();
  for(const room of groups.keys())concordVoiceLobbyRooms.add(room);
  renderRooms();
