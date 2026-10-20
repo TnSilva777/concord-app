@@ -969,7 +969,7 @@ function renderRooms(){
   });
   renderCallRoster();
 }
-function chooseRoom(room){if(callJoined&&joinedRoom&&joinedRoom!==room){simple('Você já está em uma call','Saia da sala '+joinedRoom+' antes de entrar em '+room+'.');return}activeRoom=room;renderRooms();$('#callSubtitle').textContent='Sala '+room;$('#voiceModal').classList.add('show');if(callJoined){$('#voiceStatus').textContent='Você está conectado à sala '+room+'.';renderCallRoster()}}
+function chooseRoom(room){if(callJoined&&joinedRoom&&joinedRoom!==room){simple('Você já está em uma call','Saia da sala '+joinedRoom+' antes de entrar em '+room+'.');return}activeRoom=room;renderRooms();$('#callSubtitle').textContent='Sala '+room;$('#voiceModal').classList.remove('show');if(callJoined){$('#voiceStatus').textContent='Você está conectado à sala '+room+'.';renderCallRoster()}else{joinCall()}}
 
 document.querySelectorAll('.voice-room').forEach(btn=>btn.addEventListener('click',()=>chooseRoom(btn.dataset.room)));
 function syncLocalPresence(){for(const room of Object.keys(roomRoster)){roomRoster[room]=roomRoster[room].filter(m=>!m.isMe)}if(callJoined&&joinedRoom){if(!roomRoster[joinedRoom])roomRoster[joinedRoom]=[];roomRoster[joinedRoom].push({name:concordData.profile?.name||'Você',initial:(concordData.profile?.name||'V').slice(0,1).toUpperCase(),cls:'',game:false,isMe:true})}renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}
