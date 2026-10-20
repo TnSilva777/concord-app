@@ -2404,6 +2404,29 @@ concordSocialSync.onclick=async()=>{
  finally{concordSocialSync.disabled=false;concordSocialSync.textContent='↻ Atualizar amigos'}
 };
 concordFriendsToolbar.append(concordSocialSync);
+const concordProfileSync=document.createElement('button');
+concordProfileSync.type='button';
+concordProfileSync.className='concord-social-sync';
+concordProfileSync.textContent='↥ Sincronizar meu nome';
+concordProfileSync.setAttribute('aria-label','Enviar meu nome de perfil para os amigos');
+concordProfileSync.onclick=async()=>{
+ if(concordProfileSync.disabled||!socialUser)return;
+ concordProfileSync.disabled=true;
+ concordProfileSync.textContent='Sincronizando…';
+ try{
+   const saved=await concordPublishPublicProfile();
+   concordProfileSync.textContent=saved?'✓ Nome sincronizado':'⚠ Nome não sincronizado';
+   concordProfileSync.title=saved?'Seu nome público está salvo no Supabase.':'Verifique seu nome em Configurações e a tabela concord_public_profiles no Supabase.';
+   if(saved)await refreshSocial();
+ }catch(error){
+   console.warn('Falha ao sincronizar nome:',error);
+   concordProfileSync.textContent='⚠ Falha ao sincronizar';
+ }finally{
+   concordProfileSync.disabled=false;
+   setTimeout(()=>{if(concordProfileSync.isConnected)concordProfileSync.textContent='↥ Sincronizar meu nome'},4500);
+ }
+};
+concordFriendsToolbar.append(concordProfileSync);
 function concordApplyFriendsFilter(){
   const rows=[...socialPanel.querySelectorAll('.concord-friend')];
   let shown=0;
@@ -2606,7 +2629,7 @@ async function concordRefreshFriendAvatars(ids){
 }
 function concordFriendDisplayName(id){return concordFriendNames.get(id)||'Nome indisponível'}
 async function concordPublishPublicProfile(){
-  if(!concordProfileUser)return;
+  if(!concordProfileUser)return false;
   const name=String(concordData.profile.name||'').trim().slice(0,28);
   if(!name||name==='Você')return false;
   const {error}=await concordSupabase.from('concord_public_profiles').upsert({user_id:concordProfileUser,display_name:name,updated_at:new Date().toISOString()},{onConflict:'user_id'});
