@@ -354,6 +354,19 @@ body.concord-custom-server-view #concordServerPanel{padding:0 7px 14px;backgroun
 #dmInput:focus-visible{outline:2px solid #64dba2;outline-offset:2px}
 @media(max-width:720px){.concord-dm-message{max-width:92%;padding:10px 12px}.concord-dm-form{gap:6px}.concord-dm-form input{font-size:16px}}
 
+
+/* CONCORD HUD follow-up: keyboard and mobile resilience */
+#concordQuickSearch .qs-result:focus-visible{outline:2px solid #70e9b1;outline-offset:-2px}
+#concordQuickSearch .qs-panel{overscroll-behavior:contain}
+#concordQuickSearch input::placeholder{color:#90b5a0}
+@media(max-width:760px){
+  #concordQuickSearch{padding:7vh 12px 16px}
+  #concordQuickSearch .qs-panel{max-height:83dvh}
+  .topbar{gap:8px;min-width:0}
+  .top-actions{flex-shrink:0}
+  .composebox input{min-width:0}
+}
+
 /* CONCORD HUD usability update: visual polish without changing community logic */
 :root{color-scheme:dark}
 button{transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease}
@@ -2296,6 +2309,9 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   document.addEventListener('keydown',e=>{
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();overlay.classList.contains('open')?close():open()}
     if(e.key==='Escape'&&overlay.classList.contains('open'))close();
+    if(e.key==='Enter'&&overlay.classList.contains('open')&&document.activeElement===input){
+      const first=results.querySelector('.qs-result');if(first){e.preventDefault();first.click()}
+    }
   });
 })();
 </script>
