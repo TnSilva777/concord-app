@@ -626,6 +626,17 @@ const concordServerPanel=document.createElement('div');
 concordServerPanel.id='concordServerPanel';
 const concordSidebar=$('.sidebar');
 concordSidebar.insertBefore(concordServerPanel,concordSidebar.querySelector('.user'));
+function openConcordVoiceInvite(){
+  try{
+    const invite=new URLSearchParams(location.hash.slice(1)).get('voz');
+    if(!invite||!/^srv-c\\d+-ch\\d+$/.test(invite))return;
+    if(!Object.prototype.hasOwnProperty.call(roomRoster,invite))roomRoster[invite]=[];
+    chooseRoom(invite);
+    voiceStatus('Convite de voz recebido. Clique em Entrar na call para conversar.');
+  }catch(error){console.warn('Convite de voz inválido',error)}
+}
+window.addEventListener('hashchange',openConcordVoiceInvite);
+openConcordVoiceInvite();
 function renderCommunityChannels(){
   const community=concordData.communities.find(item=>item.id===concordSelectedCommunity);
   concordServerPanel.replaceChildren();
@@ -670,7 +681,13 @@ function renderCommunityChannels(){
           try{const saved=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(saved))saved.slice(-100).forEach(appendChatMessage)}catch(error){console.warn('Mensagens locais indisponíveis',error)}
           input.focus();
         }
-        if(kind==='voice')simple('Sala de voz local','Esta sala está salva no navegador. Para realizar chamadas nela com outros membros, precisamos conectá-la ao sistema de servidores no Supabase.');
+        if(kind==='voice'){
+          const voiceKey='srv-'+concordSelectedCommunity+'-'+room.id;
+          if(!Object.prototype.hasOwnProperty.call(roomRoster,voiceKey))roomRoster[voiceKey]=[];
+          chooseRoom(voiceKey);
+          $('#callSubtitle').textContent='Sala '+room.name+' · '+community.name;
+          voiceStatus('Entre na chamada para conectar o microfone. Convide alguém com o link da sala; o servidor ainda não é compartilhado entre contas.');
+        }
       };
       const rename=document.createElement('button');rename.type='button';rename.textContent='✎';rename.title='Renomear sala';
       rename.onclick=()=>{
