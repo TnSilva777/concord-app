@@ -1669,7 +1669,7 @@ function concordViewProfile(userId){
  const banner=document.createElement('div');banner.className='concord-profile-banner';banner.style.background=own?(profile.color||'#16865e'):'#28644a';
  const avatar=document.createElement('div');avatar.className='avatar concord-profile-card-avatar';
  if(own)setConcordAvatar(avatar,profile);else avatar.textContent=String(userId||'?').slice(0,2).toUpperCase();
- const name=document.createElement('h3');name.textContent=own?(profile.name||'Você'):'Amigo '+userId.slice(0,8);
+ const name=document.createElement('h3');name.textContent=own?(profile.name||'Você'):concordFriendDisplayName(userId);
  const status=document.createElement('p');status.textContent=own?(profile.status||'● Online'):'Dados públicos não sincronizados';
  const about=document.createElement('div');about.className='concord-profile-about';
  const heading=document.createElement('strong');heading.textContent='SOBRE MIM';
@@ -1677,6 +1677,14 @@ function concordViewProfile(userId){
  about.append(heading,bio);card.append(banner,avatar,name,status,about);body.append(card);
  const foot=modal.querySelector('.footbuttons');foot.replaceChildren();
  const close=document.createElement('button');close.className='pill';close.textContent='Fechar';close.onclick=()=>modal.classList.remove('show');foot.append(close);
+ if(own&&socialUser){
+  const idArea=document.createElement('div');idArea.className='concord-profile-about';
+  const idHeading=document.createElement('strong');idHeading.textContent='MEU ID DE USUÁRIO';
+  const idValue=document.createElement('p');idValue.textContent=socialUser;idValue.style.cssText='overflow-wrap:anywhere;font-size:12px;user-select:all';
+  const copy=document.createElement('button');copy.type='button';copy.className='pill';copy.textContent='Copiar meu ID';
+  copy.onclick=async()=>{try{await navigator.clipboard.writeText(socialUser);copy.textContent='✓ ID copiado'}catch{prompt('Copie seu ID:',socialUser)}};
+  idArea.append(idHeading,idValue,copy);body.append(idArea);
+ }
  if(own){const edit=document.createElement('button');edit.className='primary';edit.textContent='✎ Editar perfil';edit.onclick=openProfileEditor;foot.append(edit)}
  else if(dmFriendIds.has(userId)){const msg=document.createElement('button');msg.className='primary';msg.textContent='✉ Mensagem';msg.onclick=()=>{modal.classList.remove('show');dmSelect(userId)};foot.append(msg)}
  modal.classList.add('show');
@@ -2227,7 +2235,7 @@ async function refreshSocial(){
     const dmList=$('#dmFriends');dmList.replaceChildren();
     const dmLabel=document.createElement('div');dmLabel.className='concord-dm-label';dmLabel.textContent='CONVERSAS COM AMIGOS';dmList.append(dmLabel);
     if(!ids.length){const empty=document.createElement('div');empty.textContent='Aceite uma amizade para conversar.';dmList.append(empty)}
-    ids.forEach(id=>{const row=document.createElement('div');row.className='concord-dm-friend-row';const button=document.createElement('button');button.type='button';button.className='concord-dm-friend';button.textContent=(online.has(id)?'🟢 ':'✉ ')+concordFriendDisplayName(id);button.setAttribute('aria-label','Abrir conversa privada com amigo '+id.slice(0,8));button.onclick=()=>dmSelect(id);const profile=document.createElement('button');profile.type='button';profile.className='concord-dm-visit';profile.textContent='◉';profile.title='Visitar perfil';profile.onclick=()=>concordViewProfile(id);row.append(button,profile);dmList.append(row)});
+    ids.forEach(id=>{const row=document.createElement('div');row.className='concord-dm-friend-row';const button=document.createElement('button');button.type='button';button.className='concord-dm-friend';button.textContent=(online.has(id)?'🟢 ':'✉ ')+concordFriendDisplayName(id);button.setAttribute('aria-label','Abrir conversa privada com '+concordFriendDisplayName(id));button.onclick=()=>dmSelect(id);const profile=document.createElement('button');profile.type='button';profile.className='concord-dm-visit';profile.textContent='◉';profile.title='Visitar perfil';profile.onclick=()=>concordViewProfile(id);row.append(button,profile);dmList.append(row)});
     if(dmOpen&&dmPeer&&!dmFriendIds.has(dmPeer)){dmPeer=null;$('#dmHistory').textContent='Esta amizade não está mais ativa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true}
     const list=$('#concordFriends');list.replaceChildren();
     if(!friends.length){list.textContent='Nenhum amigo adicionado.'}
@@ -2235,11 +2243,11 @@ async function refreshSocial(){
       const other=f.requester_id===socialUser?f.recipient_id:f.requester_id;
       const row=document.createElement('div');row.className='concord-friend';
       row.dataset.friendStatus=f.status==='pending'?'pending':online.has(other)?'online':'offline';
-      row.dataset.friendName=(concordFriendDisplayName(other)+' '+other).toLowerCase();
+      row.dataset.friendName=concordFriendDisplayName(other).toLowerCase();
       const avatar=document.createElement('span');avatar.className='concord-friend-avatar';avatar.textContent=other.slice(0,2).toUpperCase();
       const details=document.createElement('div');details.className='concord-friend-details';
       const label=document.createElement('strong');label.textContent=concordFriendDisplayName(other);
-      label.title='ID: '+other;
+      label.title=concordFriendDisplayName(other);
       const status=document.createElement('small');status.textContent=f.status==='pending'?'Pedido pendente':online.has(other)?'● Online':'○ Offline';
       details.append(label,status);row.append(avatar,details);
       const visit=document.createElement('button');visit.type='button';visit.textContent='◉';visit.title='Visitar perfil';visit.setAttribute('aria-label','Visitar perfil de '+label.textContent);visit.onclick=()=>concordViewProfile(other);row.append(visit);
@@ -2279,7 +2287,7 @@ $('#concordAddFriend').onclick=async()=>{
   if(error)simple('Erro ao enviar pedido',error.message);else{simple('Pedido enviado','Seu amigo pode aceitar no painel Amigos.');refreshSocial()}
 };
 const copyId=document.createElement('button');copyId.className='concord-copy-id';copyId.textContent='Copiar meu ID';copyId.onclick=async()=>{if(!socialUser)return;try{await navigator.clipboard.writeText(socialUser);simple('ID copiado','Envie esse ID somente para quem você deseja adicionar.')}catch{prompt('Copie seu ID:',socialUser)}};
-socialPanel.append(copyId);
+// O ID da conta fica acessível somente no próprio perfil, não na lista de amigos.
 async function initConcordSocial(session){
   const id=session?.user?.id||null;
   if(id===socialUser)return;
