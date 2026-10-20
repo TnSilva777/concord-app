@@ -552,6 +552,10 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
 #concordVoiceGrid .cvg-tile.cvg-expanded video{object-fit:contain}
 #concordVoiceGrid .cvg-tile.cvg-expanded .cvg-zoom{top:15px;right:15px}
 
+
+/* Compact live badge beside participant name in voice grid */
+#concordVoiceGrid .cvg-tile .cvg-live{top:auto!important;bottom:10px!important;left:auto!important;right:10px!important;padding:2px 5px!important;font-size:9px!important;line-height:1.2!important;border-radius:4px!important;letter-spacing:0!important;max-width:68px!important;white-space:nowrap}
+#concordVoiceGrid .cvg-tile .cvg-name{max-width:calc(100% - 100px)!important}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
