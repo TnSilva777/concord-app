@@ -766,13 +766,18 @@ const concordShareAudioLabel=document.createElement('label');concordShareAudioLa
 const concordShareAudioInput=document.createElement('input');concordShareAudioInput.type='checkbox';concordShareAudioInput.checked=true;concordShareAudioInput.onchange=()=>{concordShareAudioEnabled=concordShareAudioInput.checked};
 concordShareAudioLabel.append(concordShareAudioInput,document.createTextNode('Compartilhar áudio da aba/sistema (quando disponível)'));
 $('#shareStatus').parentElement.insertBefore(concordShareAudioLabel,$('#shareStatus'));
+const concordAudioHelp=document.createElement('small');
+concordAudioHelp.style.cssText='display:block;color:#a7d3b7;line-height:1.5;margin-bottom:10px';
+concordAudioHelp.textContent='Para transmitir o som do jogo ou vídeo, selecione uma aba com áudio ou habilite “Compartilhar áudio do sistema” no Chrome/Edge. Algumas janelas e sistemas não permitem capturar áudio.';
+concordShareAudioLabel.after(concordAudioHelp);
+
 async function beginShare(){if(stream){$('#shareStatus').textContent='Você já está compartilhando a tela. Encerre a transmissão atual antes de iniciar outra.';return}if(!callJoined){$('#shareStatus').textContent='Entre em uma sala de voz antes de compartilhar sua tela.';return}if(!navigator.mediaDevices?.getDisplayMedia){$('#shareStatus').textContent='Seu navegador não oferece compartilhamento de tela. Tente uma versão atualizada do Chrome ou Edge em um computador.';return}try{const preset=concordShareQuality==='performance'?{width:1280,height:720,frameRate:30}:concordShareQuality==='quality'?{width:1920,height:1080,frameRate:60}:{width:1920,height:1080,frameRate:30};
 stream=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:preset.width},height:{ideal:preset.height},frameRate:{ideal:preset.frameRate,max:preset.frameRate}},audio:concordShareAudioEnabled});
 stream.getVideoTracks()[0]?.applyConstraints({frameRate:{ideal:preset.frameRate,max:preset.frameRate}}).catch(()=>{});const video=$('#screenPreview');video.srcObject=stream;video.style.display='block';$('#stopShare').style.display='inline-block';if(document.body.classList.contains('concord-custom-server-view')){
   $('#shareModal').classList.remove('show');
   concordOpenInlineStage(null);
 }
-$('#shareStatus').textContent=stream.getAudioTracks().length?'Transmitindo vídeo e áudio capturado. Seus amigos podem clicar em AO VIVO.':'Transmitindo vídeo sem áudio da tela. No seletor do navegador, marque compartilhar áudio (quando disponível).';if(voiceSignal){voiceSignal.track({id:voicePeerId,name:voicePeerName(),sharing:true}).catch(console.warn);for(const [id,peer] of voicePeers){if(peer.signalingState==='stable'){peer.addTrack(stream.getVideoTracks()[0],stream);for(const audioTrack of stream.getAudioTracks())peer.addTrack(audioTrack,stream);peer.createOffer().then(o=>peer.setLocalDescription(o)).then(()=>voiceSend(id,'offer',peer.localDescription.toJSON())).catch(console.warn)}else{voiceStatus('Aguarde a chamada conectar antes de iniciar a transmissão.');}}}renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();const stageVideo=$('#callScreenPreview');stageVideo.srcObject=stream;stageVideo.style.display='block';$('#callStageMessage').style.display='none';$('#stageBadge').style.display='block';$('#callSubtitle').textContent='Captura de tela ativa';stream.getVideoTracks()[0].addEventListener('ended',stopShare)}catch(err){$('#shareStatus').textContent=err.name==='NotAllowedError'?'Compartilhamento cancelado. Você pode tentar novamente quando quiser.':'Não foi possível iniciar o compartilhamento: '+(err.message||'verifique as permissões do navegador.')}}
+$('#shareStatus').textContent=stream.getAudioTracks().length?'Transmitindo vídeo e áudio capturado. O áudio será enviado pela chamada de voz.':'Atenção: vídeo sem áudio do sistema. Reinicie o compartilhamento e marque “Compartilhar áudio” no seletor do navegador (quando disponível).';if(voiceSignal){voiceSignal.track({id:voicePeerId,name:voicePeerName(),sharing:true}).catch(console.warn);for(const [id,peer] of voicePeers){if(peer.signalingState==='stable'){peer.addTrack(stream.getVideoTracks()[0],stream);for(const audioTrack of stream.getAudioTracks())peer.addTrack(audioTrack,stream);peer.createOffer().then(o=>peer.setLocalDescription(o)).then(()=>voiceSend(id,'offer',peer.localDescription.toJSON())).catch(console.warn)}else{voiceStatus('Aguarde a chamada conectar antes de iniciar a transmissão.');}}}renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();const stageVideo=$('#callScreenPreview');stageVideo.srcObject=stream;stageVideo.style.display='block';$('#callStageMessage').style.display='none';$('#stageBadge').style.display='block';$('#callSubtitle').textContent='Captura de tela ativa';stream.getVideoTracks()[0].addEventListener('ended',stopShare)}catch(err){$('#shareStatus').textContent=err.name==='NotAllowedError'?'Compartilhamento cancelado. Você pode tentar novamente quando quiser.':'Não foi possível iniciar o compartilhamento: '+(err.message||'verifique as permissões do navegador.')}}
 function stopShare(){if(voiceSignal)voiceSignal.track({id:voicePeerId,name:voicePeerName(),sharing:false}).catch(console.warn);for(const [id,peer] of voicePeers){const senders=peer.getSenders().filter(s=>s.track&&stream?.getTracks().includes(s.track));if(senders.length){for(const sender of senders)peer.removeTrack(sender);if(peer.signalingState==='stable')peer.createOffer().then(o=>peer.setLocalDescription(o)).then(()=>voiceSend(id,'offer',peer.localDescription.toJSON())).catch(console.warn)}}if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('#screenPreview').srcObject=null;$('#screenPreview').style.display='none';if(!concordWatching){$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block';$('#stageBadge').style.display='none';$('#callSubtitle').textContent=callJoined?'Microfone local ativo':'Pronto para conectar'}concordUpdateFullscreen();$('#stopShare').style.display='none';$('#shareStatus').textContent='Transmissão encerrada.';renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}document.querySelectorAll('[data-share]').forEach(b=>b.onclick=beginShare);$('#stopShare').onclick=stopShare;
 let micStream=null,micContext=null,micAnalyser=null,micFrame=null,micEnabled=true,callJoined=false;function openVoice(){$('#voiceModal').classList.add('show')}$('#voiceBtn').onclick=$('#mobileVoice').onclick=openVoice;$('#closeVoice').onclick=()=>$('#voiceModal').classList.remove('show');async function joinCall(){if(callJoined)return;$('#voiceStatus').textContent='Solicitando permissão do microfone…';if(!navigator.mediaDevices?.getUserMedia){$('#voiceStatus').textContent='Este navegador não permite acessar o microfone aqui. Abra o Concord em Chrome/Edge atualizado usando localhost ou HTTPS.';return}try{micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});callJoined=true;micEnabled=true;concordUpdateUserMic();$('#callState').textContent='Áudio local ativo';$('#callState').style.color='#42dca4';$('#callSubtitle').textContent='Você entrou na sala';$('#voiceStatus').textContent='Você entrou na sala e o microfone está funcionando neste dispositivo. A lista à esquerda mostra participantes conectados nesta sessão. Para ouvir outras pessoas em outros dispositivos, é necessário conectar um servidor de chamadas.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Microfone ligado';if($('#youRosterState'))$('#youRosterState').textContent='🎙';$('#audioStatus').textContent='Microfone ligado';$('#joinCall').textContent='Conectado';$('#joinCall').disabled=true;$('#micToggle').disabled=false;$('#headphoneToggle').disabled=false;$('#callShare').disabled=false;$('#micToggle').classList.add('on');try{micContext=new(window.AudioContext||window.webkitAudioContext)();const src=micContext.createMediaStreamSource(micStream);micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=256;src.connect(micAnalyser);const data=new Uint8Array(micAnalyser.frequencyBinCount);const meter=()=>{if(!micAnalyser)return;micAnalyser.getByteFrequencyData(data);const avg=data.reduce((a,b)=>a+b,0)/data.length;$('#micMeter').style.width=Math.min(100,avg*1.8)+'%';setLocalSpeaking(micEnabled&&avg>12);micFrame=requestAnimationFrame(meter)};meter()}catch(e){} }catch(err){$('#voiceStatus').textContent=err.name==='NotAllowedError'?'Permissão do microfone negada. Clique no cadeado ao lado do endereço do site, permita o microfone e tente novamente.':'Não foi possível acessar o microfone. Verifique se ele está conectado e se outro aplicativo não o está bloqueando.'}}function concordUpdateUserMic(){
   const b=$('#concordUserMic');if(!b)return;
@@ -1688,6 +1693,24 @@ const voicePeerId=crypto.randomUUID();
 let voiceSignal=null,voicePeers=new Map(),voiceAudio=new Map(),voiceStarting=false;
 const voicePendingIce=new Map();
 let remoteAudioMuted=false;
+const concordAudioUnlock=document.createElement('button');
+concordAudioUnlock.type='button';
+concordAudioUnlock.id='concordAudioUnlock';
+concordAudioUnlock.textContent='🔊 Ativar som da transmissão';
+concordAudioUnlock.title='Permitir a reprodução do áudio remoto no navegador';
+concordAudioUnlock.hidden=true;
+concordAudioUnlock.style.cssText='padding:8px 12px;border:1px solid #387d56;border-radius:9px;background:#1b5338;color:#fff;margin:8px 0';
+concordAudioUnlock.onclick=async()=>{
+  if(remoteAudioMuted){remoteAudioMuted=false;const control=$('#headphoneToggle');if(control)control.textContent='🎧';}
+  const tracks=[...voiceAudio.values()];
+  if(!tracks.length){voiceStatus('Nenhum áudio remoto recebido ainda. Aguarde a conexão do outro participante.');return}
+  const results=await Promise.allSettled(tracks.map(async audio=>{audio.muted=false;await audio.play()}));
+  if(results.some(item=>item.status==='rejected'))voiceStatus('O navegador ainda bloqueia o som. Confira as permissões de áudio da página.');
+  else{concordAudioUnlock.hidden=true;voiceStatus('Reprodução de áudio remoto ativada.')}
+};
+const concordAudioBar=$('#voiceStatus');
+if(concordAudioBar)concordAudioBar.parentNode.insertBefore(concordAudioUnlock,concordAudioBar);
+
 async function voiceFlushIce(id){const peer=voicePeers.get(id);if(!peer?.remoteDescription)return;const pending=voicePendingIce.get(id)||[];voicePendingIce.delete(id);for(const candidate of pending){try{await peer.addIceCandidate(new RTCIceCandidate(candidate))}catch(error){console.warn('Candidato ICE rejeitado',error)}}}
 const voiceConnectionBadge=document.createElement('div');
 voiceConnectionBadge.className='concord-connection-badge';
@@ -1758,7 +1781,10 @@ async function voiceConnect(id,initiator){
     if(!audio){audio=document.createElement('audio');audio.autoplay=true;audio.playsInline=true;audio.muted=remoteAudioMuted;audio.style.display='none';document.body.append(audio);voiceAudio.set(audioKey,audio)}
     audio.srcObject=new MediaStream([e.track]);
     e.track.addEventListener('ended',()=>{audio.remove();voiceAudio.delete(audioKey)},{once:true});
-    audio.play().catch(()=>voiceStatus('Clique na página para permitir a reprodução do áudio.'));
+    audio.play().catch(()=>{
+      voiceStatus('Áudio bloqueado pelo navegador. Clique em Ativar som na barra da transmissão.');
+      concordAudioUnlock.hidden=false;
+    });
     voiceStatus('Áudio remoto recebido. Vocês já podem conversar.');
   };
   peer.onconnectionstatechange=()=>{
@@ -1843,7 +1869,7 @@ function stopVoiceNetwork(){
   const channel=voiceSignal;voiceSignal=null;
   if(channel)concordSupabase.removeChannel(channel).catch(console.warn);
   for(const peer of voicePeers.values())peer.close();
-  voicePeers.clear();voicePendingIce.clear();for(const audio of voiceAudio.values())audio.remove();voiceAudio.clear();
+  voicePeers.clear();voicePendingIce.clear();for(const audio of voiceAudio.values())audio.remove();voiceAudio.clear();concordAudioUnlock.hidden=true;
   if(joinedRoom){roomRoster[joinedRoom]=[];renderRooms();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}
 }
 const localJoinCall=joinCall;
@@ -1858,7 +1884,8 @@ $('#leaveCall').onclick=leaveCall;
 $('#headphoneToggle').onclick=()=>{
   if(!callJoined)return;
   remoteAudioMuted=!remoteAudioMuted;
-  for(const audio of voiceAudio.values())audio.muted=remoteAudioMuted;
+  for(const audio of voiceAudio.values()){audio.muted=remoteAudioMuted;if(!remoteAudioMuted)audio.play().catch(()=>{concordAudioUnlock.hidden=false})}
+  concordAudioUnlock.hidden=remoteAudioMuted;
   $('#headphoneToggle').textContent=remoteAudioMuted?'🔇':'🎧';
   voiceStatus(remoteAudioMuted?'Áudio dos outros participantes silenciado.':'Áudio dos outros participantes ativado.');
 };
