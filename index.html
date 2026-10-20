@@ -413,6 +413,20 @@ body.concord-custom-server-view #concordInlineStage[hidden]{display:none!importa
 .concord-user-controls #concordUserAudio[aria-pressed="false"]{color:#a4e9c3}
 .concord-user-controls .gear{min-width:30px;min-height:32px}
 
+
+/* Connected voice card inspired by the compact Discord-style reference */
+.concord-voice-dock{margin:0 8px 8px;padding:10px;border:1px solid #2b5b45;border-radius:12px;background:linear-gradient(135deg,#163528,#10241b);display:none;gap:9px}
+.concord-voice-dock.connected{display:grid}
+.concord-voice-dock .voice-dock-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.concord-voice-dock .voice-dock-label{font-weight:750;font-size:13px;color:#6ae2a4}
+.concord-voice-dock .voice-dock-room{display:block;font-size:11px;color:#a8c8b5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:155px}
+.concord-voice-dock .voice-dock-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.concord-voice-dock button{border:1px solid #36694e;background:#214433;color:#e8fff0;border-radius:8px;min-height:34px;font-size:16px}
+.concord-voice-dock button:hover{background:#2b6247}
+.concord-voice-dock .voice-dock-disconnect{color:#ffb0b5;border-color:#7a4548}
+.concord-voice-dock .voice-dock-top button{width:35px;flex-shrink:0}
+.sidebar:has(.concord-voice-dock.connected) .user{flex-shrink:0}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2427,6 +2441,37 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   new MutationObserver(sync).observe(audioOriginal,{childList:true,characterData:true,subtree:true});
   new MutationObserver(sync).observe(document.getElementById('joinCall'),{attributes:true,attributeFilter:['disabled']});
   sync();
+})();
+</script>
+<script>
+(() => {
+ const sidebar=document.querySelector('.sidebar'),user=sidebar?.querySelector('.user');
+ if(!sidebar||!user||document.getElementById('concordVoiceDock'))return;
+ const dock=document.createElement('section');dock.id='concordVoiceDock';dock.className='concord-voice-dock';
+ dock.setAttribute('aria-label','Conexão de voz');
+ dock.innerHTML='<div class="voice-dock-top"><div><div class="voice-dock-label">◉ Voz conectada</div><span class="voice-dock-room" id="concordVoiceDockRoom">Sala de voz</span></div><button type="button" class="voice-dock-disconnect" id="concordVoiceDockLeave" title="Desconectar da sala" aria-label="Desconectar da sala">☎</button></div><div class="voice-dock-actions"><button type="button" id="concordVoiceDockScreen" title="Compartilhar tela" aria-label="Compartilhar tela">▣</button><button type="button" id="concordVoiceDockView" title="Abrir sala de voz" aria-label="Abrir sala de voz">▤</button><button type="button" id="concordVoiceDockInvite" title="Copiar convite da sala" aria-label="Copiar convite da sala">✧</button><button type="button" id="concordVoiceDockSound" title="Ativar ou silenciar áudio recebido" aria-label="Ativar ou silenciar áudio recebido">🎧</button></div>';
+ sidebar.insertBefore(dock,user);
+ const $id=id=>document.getElementById(id);
+ $id('concordVoiceDockLeave').onclick=()=>{if($id('leaveCall')&&!$id('joinCall')?.disabled)return;$id('leaveCall')?.click()};
+ $id('concordVoiceDockScreen').onclick=()=>$id('shareBtn')?.click();
+ $id('concordVoiceDockView').onclick=()=>$id('voiceBtn')?.click();
+ $id('concordVoiceDockInvite').onclick=()=>{
+   const b=$id('copyRoomInvite')||$id('inviteBtn');
+   if(b)b.click();else navigator.clipboard?.writeText(location.href).catch(()=>{});
+ };
+ $id('concordVoiceDockSound').onclick=()=>$id('concordUserAudio')?.click();
+ const refresh=()=>{
+   const connected=!!$id('joinCall')?.disabled;
+   dock.classList.toggle('connected',connected);
+   if(!connected)return;
+   const room=typeof joinedRoom!=='undefined'?joinedRoom:null;
+   $id('concordVoiceDockRoom').textContent=room||'Sala de voz';
+   const muted=$id('concordUserAudio')?.getAttribute('aria-pressed')==='true';
+   $id('concordVoiceDockSound').textContent=muted?'🔇':'🎧';
+ };
+ new MutationObserver(refresh).observe($id('joinCall'),{attributes:true,attributeFilter:['disabled']});
+ const audio=$id('concordUserAudio');if(audio)new MutationObserver(refresh).observe(audio,{attributes:true,attributeFilter:['aria-pressed']});
+ refresh();
 })();
 </script>
 </body></html>                              
