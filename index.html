@@ -769,24 +769,35 @@ async function concordSaveServersToCloud(id){
 async function concordLoadServersFromCloud(id){
   clearTimeout(concordCloudBackupTimer);
   concordCloudBackupUser=id||null;concordCloudBackupReady=false;
-  if(!id)return;
+  if(!id){concordData.communities=[];renderCommunities();return}
   try{
     const scoped=JSON.parse(localStorage.getItem(concordServerAccountKey(id))||'null');
-    if(Array.isArray(scoped))concordData.communities=scoped;
+    if(Array.isArray(scoped)){
+      const mergedLocal=new Map(scoped.map(item=>[item.id,item]));
+      for(const item of concordData.communities){if(!mergedLocal.has(item.id))mergedLocal.set(item.id,item)}
+      concordData.communities=[...mergedLocal.values()];
+    }
     renderCommunities();
     const {data,error}=await concordSupabase.from('concord_server_backups').select('communities').eq('user_id',id).maybeSingle();
     if(id!==concordCloudBackupUser)return;
     if(error)throw error;
     const remote=Array.isArray(data?.communities)?data.communities.filter(item=>item&&typeof item.id==='string'&&typeof item.name==='string'&&Array.isArray(item.channels)):[];
-    const merged=new Map(concordData.communities.map(item=>[item.id,item]));
-    // O backup remoto prevalece para IDs existentes; itens apenas locais são preservados.
-    for(const item of remote)merged.set(item.id,item);
+    const merged=new Map(remote.map(item=>[item.id,item]));
+    // Preservar alterações locais realizadas enquanto o backup remoto carregava.
+    for(const item of concordData.communities){
+      const previous=merged.get(item.id);
+      if(!previous){merged.set(item.id,item);continue}
+      const channels=new Map((previous.channels||[]).map(room=>[room.id,room]));
+      for(const room of item.channels||[]){if(!channels.has(room.id))channels.set(room.id,room)}
+      merged.set(item.id,{...previous,channels:[...channels.values()]});
+    }
     concordData.communities=[...merged.values()];
     localStorage.setItem(CONCORD_STORE,JSON.stringify(concordData));
     localStorage.setItem(concordServerAccountKey(id),JSON.stringify(concordData.communities));
     concordCloudBackupReady=true;
     renderCommunities();
     if(concordSelectedCommunity)renderCommunityChannels();
+    // Enviar para a nuvem apenas após a leitura ter sido concluída com sucesso.
     await concordSaveServersToCloud(id);
   }catch(error){
     console.warn('Backup Supabase indisponível:',error.message);
