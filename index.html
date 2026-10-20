@@ -740,7 +740,60 @@ document.querySelectorAll('.room-member').forEach(btn=>btn.addEventListener('dbl
 const CONCORD_STORE='concord-local-v2';
 let concordData={profile:{name:'Thauwan',avatar:'T',color:'#16865e'},communities:[]};
 try{const saved=JSON.parse(localStorage.getItem(CONCORD_STORE)||'null');if(saved&&typeof saved==='object')concordData={...concordData,...saved,profile:{...concordData.profile,...(saved.profile||{})},communities:Array.isArray(saved.communities)?saved.communities:[]}}catch(e){}
-function saveConcordData(){try{localStorage.setItem(CONCORD_STORE,JSON.stringify(concordData));return true}catch(e){console.warn('Perfil não salvo',e);return false}}
+let concordCloudBackupUser=null,concordCloudBackupReady=false,concordCloudBackupTimer=null;
+function concordServerAccountKey(id){return 'concord-server-account-v1:'+id}
+function saveConcordData(){
+  try{
+    localStorage.setItem(CONCORD_STORE,JSON.stringify(concordData));
+    if(concordCloudBackupUser){
+      localStorage.setItem(concordServerAccountKey(concordCloudBackupUser),JSON.stringify(concordData.communities));
+      if(concordCloudBackupReady){
+        clearTimeout(concordCloudBackupTimer);
+        concordCloudBackupTimer=setTimeout(()=>concordSaveServersToCloud(concordCloudBackupUser),1200);
+      }
+    }
+    return true;
+  }catch(e){console.warn('Dados locais não salvos',e);return false}
+}
+async function concordSaveServersToCloud(id){
+  if(!id||id!==concordCloudBackupUser||!concordCloudBackupReady)return;
+  const communities=concordData.communities.map(item=>({
+    id:item.id,name:item.name,icon:item.icon,description:item.description,createdAt:item.createdAt,
+    channels:item.channels||[],lastTextRoom:item.lastTextRoom
+  }));
+  try{
+    const {error}=await concordSupabase.from('concord_server_backups').upsert({user_id:id,communities,updated_at:new Date().toISOString()},{onConflict:'user_id'});
+    if(error)throw error;
+  }catch(error){console.warn('Backup de servidores não sincronizado:',error.message)}
+}
+async function concordLoadServersFromCloud(id){
+  clearTimeout(concordCloudBackupTimer);
+  concordCloudBackupUser=id||null;concordCloudBackupReady=false;
+  if(!id)return;
+  try{
+    const scoped=JSON.parse(localStorage.getItem(concordServerAccountKey(id))||'null');
+    if(Array.isArray(scoped))concordData.communities=scoped;
+    renderCommunities();
+    const {data,error}=await concordSupabase.from('concord_server_backups').select('communities').eq('user_id',id).maybeSingle();
+    if(id!==concordCloudBackupUser)return;
+    if(error)throw error;
+    const remote=Array.isArray(data?.communities)?data.communities.filter(item=>item&&typeof item.id==='string'&&typeof item.name==='string'&&Array.isArray(item.channels)):[];
+    const merged=new Map(concordData.communities.map(item=>[item.id,item]));
+    // O backup remoto prevalece para IDs existentes; itens apenas locais são preservados.
+    for(const item of remote)merged.set(item.id,item);
+    concordData.communities=[...merged.values()];
+    localStorage.setItem(CONCORD_STORE,JSON.stringify(concordData));
+    localStorage.setItem(concordServerAccountKey(id),JSON.stringify(concordData.communities));
+    concordCloudBackupReady=true;
+    renderCommunities();
+    if(concordSelectedCommunity)renderCommunityChannels();
+    await concordSaveServersToCloud(id);
+  }catch(error){
+    console.warn('Backup Supabase indisponível:',error.message);
+    // Não sobrescrever dados remotos quando a tabela não existe ou está indisponível.
+    showConcordToast('Backup local ativo','Para sincronizar servidores entre versões, execute supabase/concord-server-backups.sql no Supabase.');
+  }
+}
 function concordExportServers(){
 const payload={version:1,exportedAt:new Date().toISOString(),communities:concordData.communities};
 const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
@@ -1705,7 +1758,7 @@ async function initConcordSocial(session){
     const proposed=String(auth?.user_metadata?.display_name||auth?.user_metadata?.full_name||auth?.user_metadata?.name||auth?.email?.split('@')[0]||'').trim().slice(0,28);
     if(proposed){concordData.profile.name=proposed;concordData.profile.avatar=proposed[0].toUpperCase();saveConcordProfileForUser();updateProfileUI()}
   }
-  if(id)syncConcordAvatarFromCloud(id);socialUser=id;voiceRoomsUser=id;initPublicChat(session);clearInterval(socialTimer);socialTimer=null;
+  if(id)syncConcordAvatarFromCloud(id);socialUser=id;voiceRoomsUser=id;initPublicChat(session);concordLoadServersFromCloud(id).catch(console.warn);clearInterval(socialTimer);socialTimer=null;
   if(!id){dmShow(true);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
   dmShow(true);
   await Promise.all([refreshSocial(),refreshSharedVoiceRooms()]);
