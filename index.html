@@ -693,15 +693,17 @@ function concordProfileKey(id){return 'concord-profile-account-v1:'+id}
 function restoreConcordProfileForUser(id){
   concordProfileUser=id;
   const token=++concordProfileLoad;
-  const defaultProfile={name:'Você',avatar:'V',color:'#16865e',photo:''};
+  const defaultProfile={name:'Você',avatar:'V',color:'#16865e',photo:'',status:'',bio:''};
   if(!id){concordData.profile={...defaultProfile};updateProfileUI();return}
   try{
     const saved=JSON.parse(localStorage.getItem(concordProfileKey(id))||'null');
     if(saved&&typeof saved==='object'&&saved.profile&&typeof saved.profile==='object'){
       concordData.profile={...defaultProfile,...saved.profile};updateProfileUI();return;
     }
-    // Perfis são exclusivos de cada conta; nunca importar dados genéricos de outro login.
-    concordData.profile={...defaultProfile};
+    // Migrar o perfil local anterior somente quando pertencer à mesma conta.
+    const legacy=concordData.profile;
+    const legacyOwner=localStorage.getItem('concord-legacy-profile-owner');
+    concordData.profile=legacyOwner===id&&legacy&&typeof legacy==='object'?{...defaultProfile,...legacy}:{...defaultProfile};
     localStorage.setItem(concordProfileKey(id),JSON.stringify({profile:concordData.profile}));
   }catch(error){console.warn('Não foi possível restaurar perfil',error);concordData.profile=defaultProfile}
   if(token===concordProfileLoad)updateProfileUI();
@@ -1119,6 +1121,7 @@ function openProfileEditor(){
       if(id!==concordProfileUser){photoError.textContent='A conta mudou durante o salvamento. Abra o perfil novamente.';return}
       concordData.profile={name:n,status:statusInput.value.trim().slice(0,50),bio:bioInput.value.trim().slice(0,160),avatar:avatarInput.value.trim()||n.slice(0,1).toUpperCase(),color:colorInput.value,photo:selectedPhoto,cloudPhoto};
       if(!saveConcordProfileForUser()){concordData.profile=previous;photoError.textContent='Não foi possível salvar o perfil neste navegador.';return}
+      saveConcordData();
       updateProfileUI();if(typeof renderRooms==='function')renderRooms();modal.classList.remove('show');simple('Perfil atualizado',notice);
     }finally{save.disabled=false;save.textContent='Salvar perfil'}
   };
@@ -1551,7 +1554,8 @@ async function initConcordSocial(session){
   if(id===socialUser)return;
   socialRefreshQueued=false;
   dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#dmHistory').textContent='Selecione um amigo na lista à esquerda.';
-  restoreConcordProfileForUser(id);if(id)syncConcordAvatarFromCloud(id);socialUser=id;voiceRoomsUser=id;initPublicChat(session);clearInterval(socialTimer);socialTimer=null;
+  if(id!==concordProfileUser)restoreConcordProfileForUser(id);
+  if(id)syncConcordAvatarFromCloud(id);socialUser=id;voiceRoomsUser=id;initPublicChat(session);clearInterval(socialTimer);socialTimer=null;
   if(!id){dmShow(true);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
   dmShow(true);
   await Promise.all([refreshSocial(),refreshSharedVoiceRooms()]);
