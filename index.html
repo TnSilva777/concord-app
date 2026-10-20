@@ -544,6 +544,14 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
 #concordVoiceGrid button:hover{background:#286548}
 @media(max-width:760px){#concordVoiceGrid{padding:8px}#concordVoiceGrid .cvg-tiles{grid-auto-rows:minmax(160px,1fr)}}
 
+
+/* Participant tiles: independent screen shares with an in-tile zoom control */
+#concordVoiceGrid .cvg-tile{isolation:isolate}
+#concordVoiceGrid .cvg-zoom{position:absolute;right:10px;top:10px;z-index:3;background:#10271ee8;border:1px solid #66b98b;color:#fff;padding:6px 10px;border-radius:7px;cursor:pointer}
+#concordVoiceGrid .cvg-tile.cvg-expanded{position:fixed;inset:4vh 4vw;z-index:9999;width:92vw;height:92vh;max-height:92vh;box-shadow:0 0 0 100vmax #000c;border-color:#79e4a7}
+#concordVoiceGrid .cvg-tile.cvg-expanded video{object-fit:contain}
+#concordVoiceGrid .cvg-tile.cvg-expanded .cvg-zoom{top:15px;right:15px}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2671,15 +2679,20 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  const tiles=document.createElement('div');tiles.className='cvg-tiles';grid.append(header,tiles);main.insertBefore(grid,messages);
  const open=()=>{if(!document.getElementById('joinCall')?.disabled)return;messages.style.display='none';grid.classList.add('open');render()};
  const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=open;view.title='Ver participantes em grade'}
+ const join=document.getElementById('joinCall');
+ if(join)new MutationObserver(()=>{if(join.disabled&&typeof joinedRoom!=='undefined'&&joinedRoom)open()}).observe(join,{attributes:true,attributeFilter:['disabled']});
+ if(join?.disabled)open();
  function render(){
   if(!grid.classList.contains('open'))return;
   const room=typeof joinedRoom!=='undefined'?joinedRoom:null;
   const members=typeof roomRoster!=='undefined'?(roomRoster[room]||[]):[];
   title.textContent='◉ '+(room||'Sala de voz')+' • '+members.length+' participante(s)';
+  const expanded=tiles.querySelector('.cvg-expanded')?.dataset.memberId||null;
   tiles.replaceChildren();
   if(!members.length){const p=document.createElement('p');p.textContent='Aguardando participantes nesta sala.';tiles.append(p);return}
   members.forEach(member=>{
-   const tile=document.createElement('div');tile.className='cvg-tile';
+   const tile=document.createElement('div');tile.className='cvg-tile';tile.dataset.memberId=String(member.id||'');
+   if(expanded===tile.dataset.memberId)tile.classList.add('cvg-expanded');
    const avatar=document.createElement('div');avatar.className='cvg-avatar';avatar.textContent=String(member.name||'?').slice(0,1).toUpperCase();
    const name=document.createElement('span');name.className='cvg-name';name.textContent=(member.name||'Participante')+(member.isMe?' (você)':'');
    tile.append(avatar,name);
@@ -2688,6 +2701,10 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
     const video=document.createElement('video');video.autoplay=true;video.playsInline=true;video.muted=true;video.srcObject=live;tile.prepend(video);
     video.play().catch(()=>{});
     const badge=document.createElement('span');badge.className='cvg-live';badge.textContent='● AO VIVO';tile.append(badge);
+    const zoom=document.createElement('button');zoom.type='button';zoom.className='cvg-zoom';zoom.textContent=tile.classList.contains('cvg-expanded')?'↙ Reduzir':'⛶ Ampliar';
+    zoom.setAttribute('aria-label',tile.classList.contains('cvg-expanded')?'Voltar à grade':'Ampliar transmissão');
+    zoom.onclick=()=>{const was=tile.classList.toggle('cvg-expanded');zoom.textContent=was?'↙ Reduzir':'⛶ Ampliar';zoom.setAttribute('aria-label',was?'Voltar à grade':'Ampliar transmissão')};
+    tile.append(zoom);
    }
    tiles.append(tile);
   });
