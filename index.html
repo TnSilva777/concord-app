@@ -2270,6 +2270,7 @@ function concordSyncVoiceLobby(){
  for(const room of groups.keys())concordVoiceLobbyRooms.add(room);
  renderRooms();
  if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();
+ concordQueueVoiceAvatars([...groups.values()].flat());
 }
 async function concordJoinVoiceLobby(userId){
  if(concordVoiceLobby)return;
@@ -2550,6 +2551,7 @@ document.addEventListener('visibilitychange',()=>{
 
 const concordFriendNames=new Map();
 const concordFriendAvatars=new Map();window.concordVoiceAvatarsReady=true;
+let concordVoiceAvatarVersion=0;
 function concordFriendAvatarUrl(id){
  if(!id||!concordSupabase)return '';
  const {data}=concordSupabase.storage.from('concord-avatars').getPublicUrl(id+'/avatar.jpg');
@@ -2569,7 +2571,7 @@ const concordAvatarCheckedAt=new Map();
 async function concordRefreshFriendAvatars(ids){
  const account=socialUser;
  const now=Date.now();
- const pending=[...new Set(ids)].filter(id=>!concordAvatarCheckedAt.has(id)||now-concordAvatarCheckedAt.get(id)>120000);
+ const pending=[...new Set(ids)].filter(id=>typeof id==='string'&&id&&!(!concordAvatarCheckedAt.has(id)?false:now-concordAvatarCheckedAt.get(id)<=60000));
  for(let offset=0;offset<pending.length;offset+=6){
  await Promise.all(pending.slice(offset,offset+6).map(async id=>{
    concordAvatarCheckedAt.set(id,now);
@@ -2593,6 +2595,7 @@ async function concordRefreshFriendAvatars(ids){
  }
  if(account!==socialUser)return;
  document.querySelectorAll('[data-concord-friend-avatar]').forEach(el=>concordApplyFriendAvatar(el,el.dataset.concordFriendAvatar));
+ concordVoiceAvatarVersion++;
 }
 function concordFriendDisplayName(id){return concordFriendNames.get(id)||'Nome indisponível'}
 async function concordPublishPublicProfile(){
@@ -3080,7 +3083,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   title.textContent='◉ '+(room||'Sala de voz')+' • '+members.length+' participante(s)';
   const signature=JSON.stringify([room,members.map(m=>{
    const live=m.isMe?(typeof stream!=='undefined'?stream:null):(typeof concordLiveStreams!=='undefined'?concordLiveStreams.get(m.id):null);
-   return [m.id,m.name,m.isMe,live?.getVideoTracks().filter(t=>t.readyState==='live').map(t=>t.id)||[]];
+   return [m.id,m.name,m.isMe,m.userId,typeof concordVoiceAvatarVersion!=='undefined'?concordVoiceAvatarVersion:0,live?.getVideoTracks().filter(t=>t.readyState==='live').map(t=>t.id)||[]];
   })]);
   if(signature===lastGridSignature)return;
   if(document.fullscreenElement?.classList?.contains('cvg-tile'))return;
