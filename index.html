@@ -842,11 +842,11 @@ function refreshConcordLocalVoiceMembers(){
   }
 }
 function concordInviteCommunity(community){
-  const snapshot={v:1,name:String(community.name||'Servidor').slice(0,40),icon:String(community.icon||'🎮').slice(0,4),description:String(community.description||'').slice(0,180),channels:(community.channels||[]).slice(0,40).map(item=>({name:String(item.name||'').slice(0,32),type:item.type==='voice'?'voice':'text'}))};
+  const snapshot={v:2,id:community.id,name:String(community.name||'Servidor').slice(0,40),icon:String(community.icon||'🎮').slice(0,4),description:String(community.description||'').slice(0,180),channels:(community.channels||[]).slice(0,40).map(item=>({id:item.id,name:String(item.name||'').slice(0,32),type:item.type==='voice'?'voice':'text'}))};
   const encoded=btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(snapshot)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   const link=location.origin+location.pathname+'#servidor='+encoded;
   if(link.length>6000){simple('Convite muito grande','Este servidor tem canais demais para um link de modelo.');return}
-  const message='Este convite importa uma cópia da estrutura do servidor. Mensagens, membros e permissões ainda não são compartilhados.';
+  const message='Convite copiado. As salas de voz terão o mesmo identificador para vocês se conectarem; mudanças futuras de canais ainda não sincronizam automaticamente.';
   if(navigator.clipboard?.writeText)navigator.clipboard.writeText(link).then(()=>showConcordToast('Convite copiado',message)).catch(()=>prompt('Copie o link do convite:',link));
   else prompt('Copie o link do convite:',link);
 }
@@ -857,14 +857,15 @@ function concordReceiveCommunityInvite(){
     if(encoded.length>6000)throw Error('Convite muito grande');
     const binary=atob(encoded.replace(/-/g,'+').replace(/_/g,'/'));
     const data=JSON.parse(new TextDecoder().decode(Uint8Array.from(binary,c=>c.charCodeAt(0))));
-    if(data.v!==1||typeof data.name!=='string'||!data.name.trim()||!Array.isArray(data.channels)||data.channels.length>40)throw Error('Convite inválido');
+    if(![1,2].includes(data.v)||typeof data.name!=='string'||!data.name.trim()||!Array.isArray(data.channels)||data.channels.length>40)throw Error('Convite inválido');
     const name=data.name.trim().slice(0,40);
-    if(!confirm('Importar uma cópia do servidor "'+name+'"? Este convite copia apenas os canais; não adiciona você aos membros nem sincroniza mensagens.'))return;
-    const channels=data.channels.filter(item=>item&&typeof item.name==='string'&&item.name.trim()&&['text','voice'].includes(item.type)).map((item,index)=>({id:'ch'+Date.now()+'-'+index,name:item.name.trim().slice(0,32),type:item.type}));
-    const imported={id:'c'+Date.now(),name,icon:String(data.icon||'🎮').slice(0,4),description:String(data.description||'').slice(0,180),channels,createdAt:new Date().toISOString()};
+    if(!confirm('Entrar na estrutura do servidor "'+name+'"? As salas de voz poderão conectar vocês, mas canais novos e mensagens ainda não são sincronizados automaticamente.'))return;
+    const channels=data.channels.filter(item=>item&&typeof item.name==='string'&&item.name.trim()&&['text','voice'].includes(item.type)).map((item,index)=>({id:data.v===2&&/^ch[0-9]+(?:-[0-9]+)?$/.test(item.id||'')?item.id:'ch'+Date.now()+'-'+index,name:item.name.trim().slice(0,32),type:item.type}));
+    const imported={id:data.v===2&&/^c[0-9]+$/.test(data.id||'')?data.id:'c'+Date.now(),name,icon:String(data.icon||'🎮').slice(0,4),description:String(data.description||'').slice(0,180),channels,createdAt:new Date().toISOString()};
+    if(concordData.communities.some(item=>item.id===imported.id)){simple('Servidor já adicionado','Você já tem este servidor neste navegador.');location.hash='';return}
     concordData.communities.push(imported);
     if(!saveConcordData()){concordData.communities.pop();simple('Falha ao importar','Não foi possível salvar o servidor neste navegador.');return}
-    renderCommunities();showConcordToast('Servidor importado','Cópia local criada. Compartilhamento em tempo real ainda não disponível.');
+    renderCommunities();showConcordToast('Servidor adicionado','As salas de voz deste convite usam os mesmos IDs. Para novas salas, será preciso importar um convite atualizado.');
     location.hash='';
   }catch(error){simple('Convite inválido','Não foi possível ler este convite de servidor.')}
 }
@@ -950,7 +951,7 @@ function renderCommunityChannels(){
           if(!Object.prototype.hasOwnProperty.call(roomRoster,voiceKey))roomRoster[voiceKey]=[];
           chooseRoom(voiceKey);
           $('#callSubtitle').textContent='Sala '+room.name+' · '+community.name;
-          voiceStatus('Entre na chamada para conectar o microfone. Convide alguém com o link da sala; o servidor ainda não é compartilhado entre contas.');
+          voiceStatus('Entre na chamada para conectar o microfone. O amigo precisa importar o convite do mesmo servidor e entrar nesta sala.');
         }
       };
       const rename=document.createElement('button');rename.type='button';rename.textContent='✎';rename.title='Renomear sala';
@@ -1007,7 +1008,7 @@ function renderCommunities(){
     b.textContent=community.icon||community.name.slice(0,1).toUpperCase();
     b.onclick=()=>{
       document.querySelectorAll('.server').forEach(x=>x.classList.remove('active'));b.classList.add('active');
-      $('#channelTitle').textContent=community.name;$('.topbar .sub').textContent=' — Comunidade local';
+      $('#channelTitle').textContent=community.name;$('.topbar .sub').textContent=' — Servidor (canais locais)';
       const welcome=$('#messages .welcome');
       if(welcome){welcome.querySelector('h1').textContent='Bem-vindo à '+community.name;welcome.querySelector('p').textContent='Comunidade salva neste navegador. Salas e mensagens próprias compartilhadas ainda não estão disponíveis.'}
       if(dmOpen)dmShow(false);
