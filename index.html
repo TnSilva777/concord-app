@@ -744,11 +744,40 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
  .app>.sidebar{box-shadow:10px 0 32px rgba(0,0,0,.35)}
 }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js'"></script>
+<script>
+// Show actionable feedback when a script crashes instead of leaving apparently dead controls.
+(function(){
+ let shown=false;
+ function report(message){
+  if(shown)return;shown=true;
+  const show=()=>{
+   if(document.getElementById('concordRuntimeNotice'))return;
+   const el=document.createElement('div');el.id='concordRuntimeNotice';
+   el.setAttribute('role','alert');
+   el.style.cssText='position:fixed;bottom:16px;right:16px;z-index:2147483647;max-width:min(440px,calc(100vw - 32px));padding:14px 16px;border:1px solid #eaa05a;border-radius:12px;background:#261b13;color:#fff;font:14px system-ui;box-shadow:0 12px 36px #0009';
+   const title=document.createElement('strong');title.textContent='O CONCORD encontrou um erro.';
+   const detail=document.createElement('p');detail.textContent=message;detail.style.margin='8px 0';
+   const retry=document.createElement('button');retry.textContent='Recarregar';retry.style.cssText='padding:8px 12px;border-radius:8px;background:#16865e;color:white;cursor:pointer';retry.onclick=()=>location.reload();
+   el.append(title,detail,retry);document.body.append(el);
+  };
+  if(document.body)show();else document.addEventListener('DOMContentLoaded',show,{once:true});
+ }
+ window.addEventListener('error',event=>{
+  const message=String(event.message||'Falha ao carregar um recurso.');
+  if(/script error/i.test(message)||/supabase|referenceerror|syntaxerror|typeerror/i.test(message))report('Não foi possível iniciar uma parte do aplicativo. Recarregue a página. Se continuar, envie uma captura desta mensagem.');
+ });
+ window.addEventListener('unhandledrejection',event=>{
+  const message=String(event.reason?.message||event.reason||'');
+  if(/supabase is not defined|createClient|failed to fetch/i.test(message))report('Falha de conexão com os serviços do aplicativo. Confira a internet e recarregue.');
+ });
+})();
+</script>
 <script>
   const SUPABASE_URL = 'https://mthrcsfxyzswcaokzrvq.supabase.co';
   const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Exw_Enp0BOJGTJmI06djsw_uqlEKEKT';
 
+  if(!window.supabase?.createClient)throw new Error('Supabase não carregou: verifique a conexão ou o bloqueador de scripts.');
   const concordSupabase = window.supabase.createClient(
     SUPABASE_URL,
     SUPABASE_PUBLISHABLE_KEY
