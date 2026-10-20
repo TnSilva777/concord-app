@@ -2165,7 +2165,6 @@ async function voiceSignalReceived(packet){
 // This allows participants to appear in room lists before others join the same call.
 let concordVoiceLobby=null;
 const concordVoiceLobbyRooms=new Set();
-let concordVoiceLobbyLastRoom=null;
 function concordSyncVoiceLobby(){
  if(!concordVoiceLobby)return;
  const state=concordVoiceLobby.presenceState();
@@ -2483,6 +2482,8 @@ async function refreshSocial(){
         }
       }else if(publicError)console.warn('Nomes públicos indisponíveis:',publicError.message);
     }
+    if(typeof voiceSignal!=='undefined'&&voiceSignal&&joinedRoom)voiceParticipants();
+    if(typeof concordVoiceLobby!=='undefined'&&concordVoiceLobby)concordSyncVoiceLobby();
     if(dmOpen&&dmPeer&&$('#dmPeerLabel'))$('#dmPeerLabel').textContent=concordFriendDisplayName(dmPeer);
     // Update sender labels in already-rendered messages when public names arrive.
     const history=$('#dmHistory');
