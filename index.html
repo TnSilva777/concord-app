@@ -2700,6 +2700,18 @@ async function refreshSocial(){
       list.append(row);
     }
     concordApplyFriendsFilter();
+    // Explain missing names instead of silently displaying broken-looking profiles.
+    let missingNotice=document.getElementById('concordMissingNamesNotice');
+    if(!missingNotice){
+      missingNotice=document.createElement('p');
+      missingNotice.id='concordMissingNamesNotice';
+      missingNotice.setAttribute('role','status');
+      missingNotice.style.cssText='margin:8px 10px;padding:9px;border:1px solid #755d35;border-radius:8px;background:#332818;color:#f5dfae;font-size:12px;line-height:1.4';
+      socialPanel.insertBefore(missingNotice,document.getElementById('concordFriends'));
+    }
+    const missingCount=visibleIds.filter(id=>!concordFriendNames.has(id)).length;
+    missingNotice.hidden=missingCount===0;
+    if(missingCount)missingNotice.textContent=missingCount+' perfil(is) sem nome público. Peça para essas pessoas salvarem o nome no perfil. Se continuar, é necessário aplicar a migração concord-public-profiles.sql no Supabase.';
     // Refresh all visible avatars after both friends lists have been rebuilt.
     document.querySelectorAll('[data-concord-friend-avatar]').forEach(el=>concordApplyFriendAvatar(el,el.dataset.concordFriendAvatar));
     const {error:presenceError}=await concordSupabase.from('concord_presence').upsert({user_id:requestUser,last_seen:new Date().toISOString()});
