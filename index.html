@@ -414,7 +414,17 @@ body.concord-custom-server-view #concordServerPanel{padding:0 7px 14px;backgroun
 #concordHud .concord-hud-delete{background:#783a40;border:1px solid #a95962;margin-right:auto}
 @media(max-width:600px){#concordHud{align-items:end;padding:8px}#concordHud section{width:100%;padding:20px;border-radius:20px 20px 10px 10px;max-height:88dvh}#concordHud .concord-hud-input{font-size:16px}}
 </style>
-</head><body>
+<style>
+#messages{position:relative}
+#concordInlineStage[hidden],#concordInlineVideo[hidden],#concordInlineWaiting[hidden]{display:none!important}
+#concordInlineStage{position:absolute;inset:12px 18px 12px;z-index:8;background:#091711;border:1px solid #315944;border-radius:16px;box-shadow:0 18px 60px #0009;display:flex;flex-direction:column;overflow:hidden}
+.concord-inline-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;background:#14291f;color:#c8f5db;flex-wrap:wrap}
+.concord-inline-bar>div{display:flex;gap:8px}
+.concord-inline-bar button{padding:8px 12px;border:1px solid #406a54;background:#1a3b2b;border-radius:9px}
+#concordInlineVideo{flex:1;width:100%;min-height:0;object-fit:contain;background:#030806}
+#concordInlineWaiting{margin:auto;color:#b8d9c7;text-align:center;padding:20px}
+@media(max-width:650px){#concordInlineStage{inset:8px}.concord-inline-bar{padding:9px}.concord-inline-bar button{padding:7px}}
+</style></head><body>
 <div class="app"><aside class="servers"><div class="logo concord-brand-mark" aria-label="Logo CONCORD" title="CONCORD">C</div><button type="button" class="server" id="concordFriendsNav" title="Amigos e conversas privadas" aria-label="Abrir amigos e conversas privadas">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
 <aside class="sidebar"><div class="brand"><strong>CONCORD</strong><small>SUA COMUNIDADE. SEU ESPAÇO.</small></div><button class="search" id="searchBtn">⌕ &nbsp; Buscar canais</button><div class="section">CONCORD OFICIAL</div><button class="channel active" data-channel="geral"><span>#</span> geral</button><button class="channel" data-channel="regras"><span>#</span> regras</button><button class="channel" data-channel="anuncios"><span>#</span> anúncios</button><div class="section">COMUNIDADES</div><button class="channel" data-channel="jogos"><span>#</span> jogos</button><button class="channel" data-channel="tecnologia"><span>#</span> tecnologia</button><button class="channel" data-channel="memes"><span>#</span> memes</button><div class="section">CANAIS DE VOZ</div><button class="channel" id="voiceBtn"><span>◖</span> Sala de voz <span class="online"></span></button><div class="section voice-section-title">SALAS DE VOZ <button id="addVoiceRoom" title="Criar sala de voz">＋</button></div>
 <div class="voice-room-list" id="voiceRoomList">
@@ -644,6 +654,28 @@ concordFullscreen.onclick=async()=>{
 };
 document.addEventListener('fullscreenchange',concordUpdateFullscreen);
 new MutationObserver(concordUpdateFullscreen).observe($('#callScreenPreview'),{attributes:true,attributeFilter:['style']});
+const concordInlineStage=document.createElement('section');
+concordInlineStage.id='concordInlineStage';
+concordInlineStage.hidden=true;
+concordInlineStage.innerHTML='<div class="concord-inline-bar"><strong>● Transmissão ao vivo</strong><div><button type="button" id="concordInlineFullscreen" title="Tela cheia">⛶ Tela cheia</button><button type="button" id="concordInlineClose" title="Fechar transmissão">✕ Fechar</button></div></div><video id="concordInlineVideo" autoplay playsinline muted></video><p id="concordInlineWaiting">Aguardando a transmissão começar…</p>';
+$('#messages').append(concordInlineStage);
+$('#concordInlineClose').onclick=()=>{concordInlineStage.hidden=true;$('#concordInlineVideo').srcObject=null;concordWatching=null};
+$('#concordInlineFullscreen').onclick=()=>{const video=$('#concordInlineVideo');if(video.srcObject&&video.requestFullscreen)video.requestFullscreen().catch(console.warn)};
+function concordSyncInlineStage(){
+  if(concordInlineStage.hidden)return;
+  const live=concordWatching?concordLiveStreams.get(concordWatching):stream;
+  const video=$('#concordInlineVideo');
+  const available=!!live?.getVideoTracks().some(track=>track.readyState==='live');
+  if(available){if(video.srcObject!==live)video.srcObject=live;video.hidden=false;$('#concordInlineWaiting').hidden=true;video.play().catch(()=>{})}
+  else {video.srcObject=null;video.hidden=true;$('#concordInlineWaiting').hidden=false}
+}
+function concordOpenInlineStage(id){
+  concordWatching=id;
+  concordInlineStage.hidden=false;
+  concordInlineStage.querySelector('strong').textContent='● Transmissão ao vivo';
+  concordSyncInlineStage();
+  $('#messages').scrollTop=0;
+}
 const concordLiveStreams=new Map();
 let concordWatching=null;
 function concordShowLive(id){
@@ -660,7 +692,7 @@ function concordLiveBadge(member){
   if(member.isMe&&!stream)return null;
   const button=document.createElement('button');button.type='button';button.className='concord-live-button';button.dataset.livePeer=member.id;
   button.textContent=!member.isMe&&!concordLiveStreams.has(member.id)?'◌ CONECTANDO':'● AO VIVO';button.title='Assistir à transmissão de '+member.name;button.setAttribute('aria-label','Assistir à transmissão ao vivo de '+member.name);
-  button.onclick=e=>{e.stopPropagation();if(member.isMe){$('#voiceModal').classList.add('show');$('#callScreenPreview').srcObject=stream;$('#callScreenPreview').style.display='block'}else concordShowLive(member.id)};
+  button.onclick=e=>{e.stopPropagation();if(document.body.classList.contains('concord-custom-server-view')){concordOpenInlineStage(member.isMe?null:member.id)}else if(member.isMe){$('#voiceModal').classList.add('show');$('#callScreenPreview').srcObject=stream;$('#callScreenPreview').style.display='block'}else concordShowLive(member.id)};
   return button;
 }
 function renderCallRoster(){const list=$('#callRosterList');if(!list)return;list.innerHTML='';const members=roomRoster[joinedRoom||activeRoom]||[];$('#participantCount').textContent=members.length;if(!members.length){list.innerHTML='<div class="room-empty" style="padding:12px 7px">Ninguém entrou nesta sala ainda.</div>';return}members.forEach(m=>{const row=document.createElement('div');row.className='roster-person'+(m.isMe?' me':'');const av=document.createElement('div');av.className='avatar '+(m.cls||'');av.textContent=m.initial||'?';if(m.isMe&&typeof concordData!=='undefined')setConcordAvatar(av,concordData.profile);const meta=document.createElement('div');meta.className='person-meta';const name=document.createElement('b');name.textContent=m.name+(m.isMe?' (você)':'');const sub=document.createElement('small');sub.textContent=m.isMe?(micEnabled?'Microfone ligado':'Microfone mutado'):'Na sala';meta.append(name,sub);const live=concordLiveBadge(m);if(live)meta.append(live);const state=document.createElement('span');state.className='person-state';state.textContent=m.isMe?(micEnabled?'🎙':'🔇'):'●';row.append(av,meta,state);list.append(row)})}
@@ -1119,6 +1151,7 @@ close();renderCommunityChannels();[...concordServerPanel.querySelectorAll('.conc
         const welcome=$('#messages .welcome');
         if(welcome){welcome.querySelector('h1').textContent=room.name;welcome.querySelector('p').textContent=kind==='text'?'Este canal pertence ao servidor. Suas mensagens ficam salvas neste navegador.':'Entre na chamada para conversar. O servidor ainda não sincroniza membros entre contas.'}
         $('#messageList').replaceChildren();
+        concordInlineStage.hidden=true;$('#concordInlineVideo').srcObject=null;
         $('#messages').hidden=false;
         concordSelectedTextRoom=kind==='text'?room.id:null;
         if(kind==='text'){community.lastTextRoom=room.id;saveConcordData()}
@@ -1434,9 +1467,10 @@ async function voiceConnect(id,initiator){
     if(e.track.kind==='video'){
       const live=new MediaStream([e.track]);concordLiveStreams.set(id,live);
       if(concordWatching===id){const player=$('#callScreenPreview');player.srcObject=live;player.muted=true;player.style.display='block';$('#callStageMessage').style.display='none';$('#stageBadge').style.display='block';$('#callSubtitle').textContent='Assistindo transmissão ao vivo';player.play().catch(()=>voiceStatus('Clique no vídeo para iniciar a reprodução.'))}
+      concordSyncInlineStage();
       e.track.onmute=()=>{if(concordWatching===id){$('#callSubtitle').textContent='Transmissão pausada ou reconectando';voiceStatus('O vídeo do amigo foi interrompido. Aguardando retorno…')}};
       e.track.onunmute=()=>{if(concordWatching===id){const player=$('#callScreenPreview');player.srcObject=live;player.style.display='block';$('#callStageMessage').style.display='none';$('#callSubtitle').textContent='Assistindo transmissão ao vivo';player.play().catch(()=>{})}};
-      e.track.onended=()=>{concordLiveStreams.delete(id);if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block'}renderRooms()};
+      e.track.onended=()=>{concordLiveStreams.delete(id);concordSyncInlineStage();if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block'}renderRooms()};
       renderRooms();return;
     }
     const audioKey=id+':'+e.track.id;
