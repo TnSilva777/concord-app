@@ -765,11 +765,11 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
  }
  window.addEventListener('error',event=>{
   const message=String(event.message||'Falha ao carregar um recurso.');
-  if(/script error/i.test(message)||/supabase|referenceerror|syntaxerror|typeerror/i.test(message))report('Não foi possível iniciar uma parte do aplicativo. Recarregue a página. Se continuar, envie uma captura desta mensagem.');
+  if(event.target instanceof HTMLScriptElement||/script error/i.test(message)||/supabase|referenceerror|syntaxerror|typeerror|unexpected|already been declared|is not defined|cannot read/i.test(message))report('Detalhes: '+message+' | linha '+(event.lineno||'?')+':'+(event.colno||'?')+'. Envie uma captura deste aviso.');
  });
  window.addEventListener('unhandledrejection',event=>{
   const message=String(event.reason?.message||event.reason||'');
-  if(/supabase is not defined|createClient|failed to fetch/i.test(message))report('Falha de conexão com os serviços do aplicativo. Confira a internet e recarregue.');
+  if(/supabase|createClient|failed to fetch|cannot read|is not defined/i.test(message))report('Falha assíncrona: '+message.slice(0,240));
  });
 })();
 </script>
