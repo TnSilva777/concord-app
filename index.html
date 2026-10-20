@@ -2608,7 +2608,7 @@ function concordFriendDisplayName(id){return concordFriendNames.get(id)||'Nome i
 async function concordPublishPublicProfile(){
   if(!concordProfileUser)return;
   const name=String(concordData.profile.name||'').trim().slice(0,28);
-  if(!name||name==='Você')return;
+  if(!name||name==='Você')return false;
   const {error}=await concordSupabase.from('concord_public_profiles').upsert({user_id:concordProfileUser,display_name:name,updated_at:new Date().toISOString()},{onConflict:'user_id'});
   if(error){
     console.warn('Perfil público ainda não sincronizado:',error.message);
@@ -2641,8 +2641,7 @@ async function refreshSocial(){
     for(const id of [...concordFriendAvatars.keys()])if(!visibleIds.includes(id)){concordFriendAvatars.delete(id);concordAvatarCheckedAt.delete(id)}
     // Defer image requests until names and friendship rows have rendered.
     queueMicrotask(()=>{if(requestUser===socialUser)concordRefreshFriendAvatars(visibleIds).catch(console.warn)});
-    // Names are fetched fresh so profile edits on other accounts are reflected.
-    for(const id of visibleIds)concordFriendNames.delete(id);
+    // Preserve last known names during temporary network/RLS failures to avoid flicker.
     for(const id of [...concordFriendNames.keys()])if(!visibleIds.includes(id))concordFriendNames.delete(id);
     if(visibleIds.length){
       const {data:publicProfiles,error:publicError}=await concordSupabase.from('concord_public_profiles').select('user_id,display_name').in('user_id',visibleIds);
