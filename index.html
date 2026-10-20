@@ -685,6 +685,22 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
  body .app>.main>#concordDmPane .concord-dm-form{flex-shrink:0!important}
  #concordMobileNavToggle{display:inline-flex!important}
 }
+
+/* Mobile usability: ensure chat content is readable and touch controls are reachable */
+@media(max-width:760px){
+ .app>.main>.topbar>div{min-width:0}
+ .app>.main>.topbar #channelTitle{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ #concordDmPane .concord-dm-header{display:flex!important;align-items:center!important;flex-wrap:wrap!important;gap:8px!important;padding:10px 8px!important}
+ #concordDmPane .concord-dm-header strong{min-width:0;flex:1 1 130px;font-size:14px!important}
+ #concordDmPane .concord-dm-header #dmPeerLabel{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ #concordDmPane #dmHistory{padding:12px 8px!important;min-height:0!important}
+ #concordDmPane .concord-dm-message{max-width:92%!important}
+ #concordDmPane #dmForm{display:flex!important;align-items:center;gap:7px!important;padding:10px 6px calc(12px + env(safe-area-inset-bottom,0px))!important}
+ #concordDmPane #dmInput{min-width:0!important;flex:1!important;font-size:16px!important}
+ #concordDmPane #dmSend{flex:0 0 auto!important;min-height:42px}
+ .app>.sidebar .concord-friends-toolbar input{min-width:0;max-width:100%}
+ .app>.sidebar .concord-friend-row{min-width:0}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2951,12 +2967,17 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  const open=()=>{document.body.classList.add('concord-mobile-nav-open');toggle.setAttribute('aria-expanded','true');toggle.setAttribute('aria-label','Fechar canais e amigos')};
  toggle.addEventListener('click',()=>document.body.classList.contains('concord-mobile-nav-open')?close():open());
  backdrop.addEventListener('click',close);
- sidebar.addEventListener('click',event=>{if(event.target.closest('button.channel,.concord-server-room button,.concord-dm-friend,.concord-dm-nav'))close()});
+ sidebar.addEventListener('click',event=>{if(event.target.closest('button.channel,.concord-server-room button,.concord-dm-friend,.concord-dm-nav,#concordFriends button'))close()});
  document.querySelector('.app>.servers')?.addEventListener('click',event=>{
    if(window.innerWidth>760)return;
    if(event.target.closest('.server,#concordFriendsNav,.concord-community-item'))open();
  });
  document.addEventListener('keydown',event=>{if(event.key==='Escape')close()});
+ // Keep mobile navigation and chat from overlapping when switching views.
+ document.querySelector('.app>.main')?.addEventListener('click',event=>{
+   if(window.innerWidth<=760&&event.target.closest('#dmBack,.topbar button:not(#concordMobileNavToggle)'))close();
+ });
+ window.addEventListener('popstate',close);
  window.addEventListener('resize',()=>{if(window.innerWidth>760)close()});
 })();
 </script>
