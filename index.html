@@ -347,6 +347,12 @@ body.concord-custom-server-view #concordServerPanel{padding:0 7px 14px;backgroun
 .concord-dm-friend-row .concord-dm-friend{flex:1;min-width:0;margin:0;width:auto;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .concord-dm-visit{background:#234c36;border-radius:7px;padding:8px;color:#c9f7db}
 .concord-dm-visit:hover{background:#32734e}
+
+/* Chat privado: melhor leitura e foco em telas pequenas */
+#dmHistory .concord-dm-message{line-height:1.45}
+#dmHistory .concord-dm-message p{user-select:text}
+#dmInput:focus-visible{outline:2px solid #64dba2;outline-offset:2px}
+@media(max-width:720px){.concord-dm-message{max-width:92%;padding:10px 12px}.concord-dm-form{gap:6px}.concord-dm-form input{font-size:16px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -1434,17 +1440,27 @@ function dmSelect(id){
   $('#dmInput').focus();dmLoad();
 }
 function dmRender(rows){
-  const list=$('#dmHistory');list.replaceChildren();
+  const list=$('#dmHistory');
+  const previousIds=[...list.querySelectorAll('[data-message-id]')].map(el=>el.dataset.messageId);
+  const nextIds=rows.map(msg=>String(msg.id));
+  if(previousIds.length===nextIds.length&&previousIds.every((id,i)=>id===nextIds[i]))return;
+  const wasNearBottom=list.scrollHeight-list.scrollTop-list.clientHeight<100;
+  const oldScrollTop=list.scrollTop;
+  const oldScrollHeight=list.scrollHeight;
+  const firstRender=!previousIds.length;
+  list.replaceChildren();
   if(!rows.length){list.textContent='Nenhuma mensagem ainda. Envie a primeira!';return}
   rows.forEach(msg=>{
     const item=document.createElement('article');item.className='concord-dm-message';
+    item.dataset.messageId=String(msg.id);
     if(msg.sender_id===socialUser)item.classList.add('mine');
     const name=document.createElement('strong');name.textContent=msg.sender_id===socialUser?'Você':'Amigo';
     const time=document.createElement('time');time.textContent=new Date(msg.created_at).toLocaleString('pt-BR');
     const body=document.createElement('p');body.textContent=msg.body;
     item.append(name,time,body);list.append(item);
   });
-  list.scrollTop=list.scrollHeight;
+  if(firstRender||wasNearBottom)list.scrollTop=list.scrollHeight;
+  else list.scrollTop=oldScrollTop+Math.max(0,list.scrollHeight-oldScrollHeight);
 }
 async function dmLoad(){
   if(!dmOpen||!dmPeer||!socialUser)return;
