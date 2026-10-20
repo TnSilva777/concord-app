@@ -257,6 +257,62 @@ body.concord-custom-server-view #concordServerPanel{padding:0 8px 18px;scrollbar
 .concord-channel-filter:focus{border-color:#62d99a;box-shadow:0 0 0 2px #62d99a24}
 .concord-channel-filter::placeholder{color:#8ca999}
 .concord-server-room[hidden]{display:none!important}
+
+/* CONCORD: interface de comunidades inspirada no layout Discord, com identidade verde. */
+:root{--hud-radius:8px;--hud-hover:#293c33;--hud-active:#344e3f;--hud-focus:#65dca0}
+body{font-size:14px}
+.app{grid-template-columns:72px 256px minmax(0,1fr)}
+.servers{background:#0c1311;border-right:0;gap:10px;padding:14px 10px}
+.servers::after{content:"";width:30px;height:1px;background:#415448;order:0}
+.concord-brand-mark{border-radius:17px!important}
+.concord-community-item .server{border-radius:17px;width:47px;height:47px;font-size:21px;box-shadow:inset 0 1px 0 #ffffff12}
+.concord-community-item .server:hover,.concord-community-item .server.active{border-radius:14px}
+.concord-community-edit{width:20px;height:20px;font-size:11px;right:-2px;bottom:-3px}
+.sidebar{background:#17211c;border-right:1px solid #27392e}
+.brand{padding:17px 16px;background:#1b2821;border-bottom:1px solid #304137}
+.brand strong{font-size:17px;letter-spacing:.8px}
+.brand small{font-size:11px}
+.user{padding:11px;background:#111c17;min-height:63px}
+.user .avatar{width:34px;height:34px}
+.main{background:#1b2520}
+.topbar{height:56px;min-height:56px;padding:0 20px;background:#1b2520;border-bottom:1px solid #34453a}
+.topbar strong{font-size:15px}
+.topbar .sub{font-size:12px}
+.messages{padding:20px clamp(16px,3vw,36px)}
+.message{padding:7px 10px;margin:4px -10px;border-radius:6px;transition:background .14s}
+.message:hover{background:#ffffff08}
+.message .avatar{width:40px;height:40px}
+.msghead b{font-size:14px}
+.msgbody{font-size:14px;line-height:1.55}
+.welcome{background:transparent;border:0;border-bottom:1px solid #3b5042;border-radius:0;padding:26px 0 22px;box-shadow:none}
+.welcome h1{font-size:24px}
+.composer{padding:0 18px 18px}
+.composebox{border-radius:9px;background:#2a3b31;border:1px solid transparent;padding:8px 10px}
+.composebox:focus-within{border-color:#64b98b}
+.composebox input{font-size:14px}
+.hint{font-size:10px}
+body.concord-custom-server-view #concordServerPanel{padding:0 7px 14px;background:#17211c}
+.concord-server-heading{background:#1c2922;margin:0 -7px 7px;padding:15px 12px 12px;box-shadow:0 2px 5px #0003;border-bottom:1px solid #354b3c}
+.concord-server-heading strong{font-size:16px}
+.concord-server-actions{gap:6px}
+.concord-server-actions button{background:#263c30;border-color:#3c5946;font-weight:650}
+.concord-server-section{padding:8px 6px 5px;margin:8px 5px 2px;color:#a9bdb0;font-size:10px;letter-spacing:1px}
+.concord-server-room{min-height:36px;margin:2px 3px;border-radius:6px}
+.concord-server-room:hover{background:var(--hud-hover)}
+.concord-server-room.concord-room-selected{background:var(--hud-active)}
+.concord-server-room-name{font-size:13px!important}
+.concord-server-room button:focus-visible,.concord-server-actions button:focus-visible,.concord-community-item button:focus-visible{outline:2px solid var(--hud-focus);outline-offset:2px}
+.concord-local-voice-members{padding-left:15px}
+.concord-local-voice-person{background:transparent;border-left:0;color:#c0d6c6}
+.concord-server-description{background:#20352a;border-left-color:#63d79d}
+.concord-server-onboarding{border-color:#4d765a}
+#concordDmPane{background:#1b2520}
+.concord-dm-message{border-radius:7px}
+.dialog{border-radius:12px}
+.pill,.iconbtn{border-radius:7px}
+#concordToast{border-radius:10px}
+@media(max-width:1050px) and (min-width:761px){.app{grid-template-columns:64px 224px minmax(0,1fr)}}
+@media(max-width:760px){.app{grid-template-columns:58px minmax(0,1fr)}.topbar{padding:0 12px}.messages{padding:12px}.composer{padding:0 12px 12px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
