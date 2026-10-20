@@ -2426,6 +2426,7 @@ const dmFriends=document.createElement('div');dmFriends.id='dmFriends';dmFriends
 socialPanel.append(dmFriends);
 let dmOpen=false,dmPeer=null,dmRequest=0,dmBusy=false,dmFriendIds=new Set(),dmTimer=null,dmSending=false,dmNeedsRefresh=false;
 const concordDmDrafts=new Map();
+let concordDmReply=null;
 const dmHeaderAvatar=document.createElement('span');dmHeaderAvatar.id='concordDmHeaderAvatar';dmHeaderAvatar.className='concord-friend-avatar';dmHeaderAvatar.hidden=true;
 dmPane.querySelector('.concord-dm-header')?.insertBefore(dmHeaderAvatar,dmPane.querySelector('.concord-dm-header strong'));
 function dmShow(open){
@@ -2454,7 +2455,7 @@ function dmShow(open){
   dmFriends.hidden=!open;
   $('#concordFriendsNav').classList.toggle('active',open);
   $('#concordFriendsNav').setAttribute('aria-pressed',String(open));
-  if(!open){if(dmPeer)concordDmDrafts.set(dmPeer,$('#dmInput').value);dmHeaderAvatar.hidden=true;dmPeer=null;$('#dmPeerLabel').textContent='Selecione um amigo';$('#dmInput').disabled=true;$('#dmSend').disabled=true;renderChatHistory()}
+  if(!open){concordDmReply=null;document.getElementById('concordDmReplyPreview')?.remove();if(dmPeer)concordDmDrafts.set(dmPeer,$('#dmInput').value);dmHeaderAvatar.hidden=true;dmPeer=null;$('#dmPeerLabel').textContent='Selecione um amigo';$('#dmInput').disabled=true;$('#dmSend').disabled=true;renderChatHistory()}
 }
 
 $('#concordFriendsNav').onclick=()=>{dmShow(true);$('#concordAddFriend')?.focus();};
@@ -2464,6 +2465,7 @@ function dmSelect(id){
   if(dmOpen&&dmPeer===id){$('#dmInput').focus();return}
   if(dmPeer)concordDmDrafts.set(dmPeer,$('#dmInput').value);
   dmShow(true);dmPeer=id;
+  concordDmReply=null;document.getElementById('concordDmReplyPreview')?.remove();
   dmHeaderAvatar.hidden=false;dmHeaderAvatar.dataset.concordFriendAvatar=id;concordApplyFriendAvatar(dmHeaderAvatar,id);
   $('#dmInput').value=concordDmDrafts.get(id)||'';
   dmProfileAction.hidden=false;
@@ -2505,6 +2507,7 @@ function dmRender(rows){
     const inviteMatch=String(msg.body||'').match(/https?:\/\/[^\s]+#servidor=[A-Za-z0-9_-]+/);
     if(inviteMatch){try{const inviteUrl=new URL(inviteMatch[0]);if(inviteUrl.origin===location.origin&&inviteUrl.pathname===location.pathname){const inviteButton=document.createElement('a');inviteButton.href=inviteUrl.href;inviteButton.className='concord-dm-invite-action';inviteButton.textContent='🎮 Entrar no servidor';inviteButton.setAttribute('aria-label','Abrir convite para servidor');body.append(document.createElement('br'),inviteButton)}}catch{}}
     item.append(name,time,body);list.append(item);
+    const reply=document.createElement('button');reply.type='button';reply.className='concord-dm-reply';reply.textContent='↩';reply.title='Responder a esta mensagem';reply.setAttribute('aria-label','Responder a esta mensagem');reply.onclick=()=>concordDmStartReply(msg);item.append(reply);
   });
   if(firstRender||wasNearBottom)list.scrollTop=list.scrollHeight;
   else list.scrollTop=oldScrollTop+Math.max(0,list.scrollHeight-oldScrollHeight);
@@ -2525,16 +2528,32 @@ async function dmLoad(){
   }catch(error){if(dmOpen&&socialUser===account&&dmPeer===peer&&seq===dmRequest)$('#dmHistory').textContent='Mensagens privadas indisponíveis: '+(error.message||'verifique o SQL no Supabase');console.error('CONCORD DM:',error)}
   finally{dmBusy=false;if(dmNeedsRefresh){dmNeedsRefresh=false;if(dmOpen&&dmPeer&&socialUser)queueMicrotask(()=>dmLoad())}}
 }
+function concordDmStartReply(msg){
+  if(!dmPeer||!msg)return;
+  const form=document.getElementById('dmForm');
+  const name=msg.sender_id===socialUser?'Você':concordFriendDisplayName(msg.sender_id);
+  concordDmReply={peer:dmPeer,name,quote:String(msg.body||'').replace(/\\s+/g,' ').slice(0,110)};
+  let preview=document.getElementById('concordDmReplyPreview');
+  if(!preview){preview=document.createElement('div');preview.id='concordDmReplyPreview';form.parentNode.insertBefore(preview,form)}
+  preview.replaceChildren();
+  const label=document.createElement('span');label.textContent='↩ Respondendo a '+name+' · '+concordDmReply.quote;
+  const close=document.createElement('button');close.type='button';close.textContent='✕';close.title='Cancelar resposta';close.onclick=()=>{concordDmReply=null;preview.remove()};
+  preview.append(label,close);
+  document.getElementById('dmInput')?.focus();
+}
 $('#dmForm').onsubmit=async event=>{
   event.preventDefault();
-  const input=$('#dmInput'),body=input.value.trim(),peer=dmPeer,account=socialUser;
-  if(!body||!peer||!socialUser||!dmFriendIds.has(peer)||dmSending)return;
+  const input=$('#dmInput'),typed=input.value.trim(),peer=dmPeer,account=socialUser;
+  const reply=concordDmReply&&concordDmReply.peer===peer?concordDmReply:null;
+  const body=reply?'↪ '+reply.name+': '+reply.quote+'\n'+typed:typed;
+  if(!typed||!peer||!socialUser||!dmFriendIds.has(peer)||dmSending)return;
+  if(body.length>2000){simple('Mensagem muito longa','Reduza o texto ou a resposta citada antes de enviar.');return;}
   dmSending=true;$('#dmSend').disabled=true;
   try{
     const {error}=await concordSupabase.from('concord_direct_messages').insert({sender_id:account,recipient_id:peer,body});
     if(error)throw error;
     if(dmPeer===peer&&socialUser===account){
-      if(input.value.trim()===body){input.value='';concordDmDrafts.delete(peer);}
+      if(input.value.trim()===typed){input.value='';concordDmDrafts.delete(peer);concordDmReply=null;document.getElementById('concordDmReplyPreview')?.remove();}
       const history=$('#dmHistory');
       if(history&&history.querySelector('.concord-dm-message')){
         const item=document.createElement('article');item.className='concord-dm-message mine';
@@ -2984,7 +3003,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  if(!sidebar||!user||document.getElementById('concordVoiceDock'))return;
  const dock=document.createElement('section');dock.id='concordVoiceDock';dock.className='concord-voice-dock';
  dock.setAttribute('aria-label','Conexão de voz');
- dock.innerHTML='<div class="voice-dock-top"><div><div class="voice-dock-label">◉ Voz conectada</div><span class="voice-dock-room" id="concordVoiceDockRoom">Sala de voz</span></div><button type="button" class="voice-dock-disconnect" id="concordVoiceDockLeave" title="Desconectar da sala" aria-label="Desconectar da sala">☎</button></div><div class="voice-dock-actions"><button type="button" id="concordVoiceDockScreen" title="Compartilhar tela" aria-label="Compartilhar tela">▣</button><button type="button" id="concordVoiceDockView" title="Abrir sala de voz" aria-label="Abrir sala de voz">▤</button><button type="button" id="concordVoiceDockInvite" title="Copiar convite da sala" aria-label="Copiar convite da sala">✧</button><button type="button" id="concordVoiceDockSound" title="Ativar ou silenciar áudio recebido" aria-label="Ativar ou silenciar áudio recebido">🎧</button></div>';
+ dock.innerHTML='<div class="voice-dock-top"><div><div class="voice-dock-label">◉ Voz conectada</div><span class="voice-dock-room" id="concordVoiceDockRoom">Sala de voz</span></div><button type="button" class="voice-dock-disconnect" id="concordVoiceDockLeave" title="Desconectar da sala" aria-label="Desconectar da sala">☎</button></div><div class="voice-dock-actions"><button type="button" id="concordVoiceDockScreen" title="Compartilhar tela" aria-label="Compartilhar tela">🖥️</button><button type="button" id="concordVoiceDockView" title="Abrir sala de voz" aria-label="Abrir sala de voz">▤</button><button type="button" id="concordVoiceDockInvite" title="Copiar convite da sala" aria-label="Copiar convite da sala">✧</button><button type="button" id="concordVoiceDockSound" title="Ativar ou silenciar áudio recebido" aria-label="Ativar ou silenciar áudio recebido">🎧</button></div>';
  sidebar.insertBefore(dock,user);
  const $id=id=>document.getElementById(id);
  $id('concordVoiceDockLeave').onclick=()=>{if($id('leaveCall')&&!$id('joinCall')?.disabled)return;$id('leaveCall')?.click()};
@@ -3252,5 +3271,16 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
 #concordDmPane #dmForm{background:#13271d!important;border-top:1px solid #2b4b38!important;padding:12px 18px!important}
 #concordDmPane #dmInput{background:#203c2c!important;border:1px solid #396348!important;border-radius:12px!important}
 @media(max-width:760px){#concordDmPane #dmHistory{padding:10px!important}#concordDmPane .concord-dm-header{min-height:58px}#concordDmPane #dmForm{padding:10px 8px calc(10px + env(safe-area-inset-bottom,0px))!important}}
+</style>
+<style>
+/* Monitor e ações discretas nas mensagens diretas */
+#concordVoiceDockScreen{font-family:"Segoe UI Emoji",system-ui,sans-serif;font-size:19px!important}
+#concordDmPane .concord-dm-message{position:relative}
+#concordDmPane .concord-dm-reply{position:absolute;right:42px;top:6px;background:#244a34;color:#b4ecc9;border:1px solid #3d7051;border-radius:7px;padding:4px 8px;opacity:0}
+#concordDmPane .concord-dm-message:hover .concord-dm-reply,#concordDmPane .concord-dm-reply:focus-visible{opacity:1}
+#concordDmReplyPreview{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#1b392a;color:#c8efd8;padding:8px 16px;font-size:12px;border-left:3px solid #4fd38d}
+#concordDmReplyPreview span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#concordDmReplyPreview button{background:transparent;color:inherit;padding:3px 8px;border-radius:6px}
+@media(hover:none){#concordDmPane .concord-dm-reply{opacity:1}}
 </style>
 </body></html>                              
