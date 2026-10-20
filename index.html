@@ -625,6 +625,15 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
 #dmSend:not(:disabled){background:linear-gradient(135deg,#219b66,#126a48)!important;border-color:#3bc58a!important;box-shadow:0 3px 12px #06291b60}
 #dmSend:not(:disabled):hover{filter:brightness(1.12)}
 @media(max-width:650px){.concord-dm-friend-row{margin:2px 3px}.concord-dm-message{max-width:94%!important}#dmPeerLabel{max-width:55vw}}
+
+/* Accessible focus states, touch targets, reduced motion, and resilient DM layout */
+@media (prefers-reduced-motion:reduce){.concord-dm-friend-row,.concord-dm-message,.cvg-tile{transition:none!important;animation:none!important}}
+#dmHistory{overscroll-behavior:contain;overflow-wrap:anywhere}
+#dmHistory .concord-dm-message p{white-space:pre-wrap;overflow-wrap:anywhere}
+#dmForm input{min-width:0}
+.concord-dm-friend-row button{min-height:38px}
+@media(pointer:coarse){.concord-dm-friend-row button,.cvg-zoom,.cvg-fullscreen{min-height:44px;min-width:44px}}
+@media(max-width:600px){#dmHistory{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}#dmForm{padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2280,6 +2289,7 @@ function dmRender(rows){
   rows.forEach(msg=>{
     const item=document.createElement('article');item.className='concord-dm-message';
     item.dataset.messageId=String(msg.id);
+    item.dataset.senderId=String(msg.sender_id);
     if(msg.sender_id===socialUser)item.classList.add('mine');
     const name=document.createElement('strong');name.textContent=msg.sender_id===socialUser?'Você':concordFriendDisplayName(msg.sender_id);
     const time=document.createElement('time');time.textContent=new Date(msg.created_at).toLocaleString('pt-BR');
@@ -2369,6 +2379,15 @@ async function refreshSocial(){
       }else if(publicError)console.warn('Nomes públicos indisponíveis:',publicError.message);
     }
     if(dmOpen&&dmPeer&&$('#dmPeerLabel'))$('#dmPeerLabel').textContent=concordFriendDisplayName(dmPeer);
+    // Update sender labels in already-rendered messages when public names arrive.
+    const history=$('#dmHistory');
+    if(dmOpen&&dmPeer&&history){
+      for(const item of history.querySelectorAll('.concord-dm-message[data-sender-id]')){
+        const sender=item.dataset.senderId;
+        const label=item.querySelector('strong');
+        if(label&&sender!==socialUser)label.textContent=concordFriendDisplayName(sender);
+      }
+    }
     const dmList=$('#dmFriends');dmList.replaceChildren();
     const dmLabel=document.createElement('div');dmLabel.className='concord-dm-label';dmLabel.textContent='CONVERSAS COM AMIGOS';dmList.append(dmLabel);
     if(!ids.length){const empty=document.createElement('div');empty.textContent='Aceite uma amizade para conversar.';dmList.append(empty)}
@@ -2768,8 +2787,8 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
    return [m.id,m.name,m.isMe,live?.getVideoTracks().filter(t=>t.readyState==='live').map(t=>t.id)||[]];
   })]);
   if(signature===lastGridSignature)return;
-  lastGridSignature=signature;
   if(document.fullscreenElement?.classList?.contains('cvg-tile'))return;
+  lastGridSignature=signature;
   const expanded=tiles.querySelector('.cvg-expanded')?.dataset.memberId||null;
   tiles.replaceChildren();
   if(!members.length){const p=document.createElement('p');p.textContent='Aguardando participantes nesta sala.';tiles.append(p);return}
