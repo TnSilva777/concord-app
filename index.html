@@ -474,6 +474,22 @@ body.concord-custom-server-view #concordInlineStage[hidden]{display:none!importa
 .sidebar .user>.concord-user-controls .gear svg{width:16px!important;height:16px!important}
 .sidebar .user{padding:9px 8px!important;row-gap:5px!important}
 
+
+/* User adjustable CONCORD layout */
+@media(min-width:761px){
+ .app{grid-template-columns:72px minmax(185px,var(--concord-sidebar-width,260px)) minmax(250px,1fr)!important}
+ .sidebar{position:relative;min-width:0}
+ #concordSidebarResizer{position:absolute;right:0;top:0;bottom:0;width:7px;cursor:col-resize;z-index:100;background:transparent;touch-action:none}
+ #concordSidebarResizer:hover,#concordSidebarResizer:focus-visible{background:#49cf9170;outline:none}
+ body.concord-resizing{cursor:col-resize!important;user-select:none!important}
+}
+@media(max-width:760px){#concordSidebarResizer{display:none}}
+#concordInlineStage{--concord-stream-height:55vh}
+body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var(--concord-stream-height)!important;flex:0 0 auto!important}
+#concordStreamSizeControl{display:flex;align-items:center;gap:6px;color:#c5e9d4;font-size:12px}
+#concordStreamSizeControl input{width:95px;accent-color:#42dca4;cursor:pointer}
+#concordStreamSizeControl output{min-width:37px;text-align:right}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2537,6 +2553,34 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  const join=document.getElementById('joinCall');
  if(join)new MutationObserver(update).observe(join,{attributes:true,attributeFilter:['disabled']});
  update();
+})();
+</script>
+<script>
+(() => {
+ const sidebar=document.querySelector('.app>.sidebar');
+ if(sidebar&&!document.getElementById('concordSidebarResizer')){
+  const handle=document.createElement('div');handle.id='concordSidebarResizer';handle.tabIndex=0;handle.setAttribute('role','separator');handle.setAttribute('aria-orientation','vertical');handle.setAttribute('aria-label','Ajustar largura da barra lateral');
+  sidebar.append(handle);
+  const clamp=n=>Math.max(185,Math.min(Math.min(460,window.innerWidth-340),n));
+  const set=n=>{const v=clamp(n);document.documentElement.style.setProperty('--concord-sidebar-width',v+'px');handle.setAttribute('aria-valuenow',String(v));return v};
+  let saved=Number(localStorage.getItem('concord-sidebar-width'));set(Number.isFinite(saved)&&saved>=185?saved:260);
+  handle.onpointerdown=e=>{if(window.innerWidth<=760)return;e.preventDefault();handle.setPointerCapture(e.pointerId);document.body.classList.add('concord-resizing')};
+  handle.onpointermove=e=>{if(!handle.hasPointerCapture(e.pointerId))return;set(e.clientX-72)};
+  handle.onpointerup=e=>{if(handle.hasPointerCapture(e.pointerId))handle.releasePointerCapture(e.pointerId);document.body.classList.remove('concord-resizing');localStorage.setItem('concord-sidebar-width',parseInt(getComputedStyle(document.documentElement).getPropertyValue('--concord-sidebar-width')))};
+  handle.onpointercancel=()=>document.body.classList.remove('concord-resizing');
+  handle.onkeydown=e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();const current=Number.parseInt(getComputedStyle(document.documentElement).getPropertyValue('--concord-sidebar-width'))||260;localStorage.setItem('concord-sidebar-width',set(current+(e.key==='ArrowRight'?20:-20)))}};
+ }
+ const stage=document.getElementById('concordInlineStage');
+ if(stage&&!document.getElementById('concordStreamSizeControl')){
+  const bar=stage.querySelector('.concord-inline-bar>div');
+  if(!bar)return;
+  const wrap=document.createElement('label');wrap.id='concordStreamSizeControl';wrap.textContent='Tamanho';
+  const range=document.createElement('input');range.type='range';range.min='30';range.max='85';range.step='5';
+  const saved=Number(localStorage.getItem('concord-stream-height'));range.value=Number.isFinite(saved)&&saved>=30&&saved<=85?String(saved):'55';
+  const output=document.createElement('output');output.textContent=range.value+'%';
+  const apply=()=>{stage.style.setProperty('--concord-stream-height',range.value+'vh');output.textContent=range.value+'%';localStorage.setItem('concord-stream-height',range.value)};
+  range.oninput=apply;wrap.append(range,output);bar.prepend(wrap);apply();
+ }
 })();
 </script>
 </body></html>                              
