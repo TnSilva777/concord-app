@@ -2511,7 +2511,7 @@ const concordAvatarCheckedAt=new Map();
 async function concordRefreshFriendAvatars(ids){
  const account=socialUser;
  const now=Date.now();
- const pending=[...new Set(ids)].filter(id=>!concordAvatarCheckedAt.has(id)||now-concordAvatarCheckedAt.get(id)>120000);
+ const pending=[...new Set(ids)].filter(id=>!concordAvatarCheckedAt.has(id)||now-concordAvatarCheckedAt.get(id)>120000).slice(0,40);
  await Promise.all(pending.map(async id=>{
    concordAvatarCheckedAt.set(id,now);
    const url=concordFriendAvatarUrl(id);
@@ -2528,7 +2528,7 @@ async function concordRefreshFriendAvatars(ids){
      if(account!==socialUser)return;
      if(loaded)concordFriendAvatars.set(id,url+'?v='+Math.floor(now/120000));
      else concordFriendAvatars.delete(id);
-   }catch(error){console.warn('Foto do amigo indisponível:',error)}
+   }catch(error){if(account===socialUser)concordFriendAvatars.delete(id);console.warn('Foto do amigo indisponível:',error)}
  }));
  if(account!==socialUser)return;
  document.querySelectorAll('[data-concord-friend-avatar]').forEach(el=>concordApplyFriendAvatar(el,el.dataset.concordFriendAvatar));
