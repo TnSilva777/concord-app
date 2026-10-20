@@ -2466,6 +2466,20 @@ concordDmFilter.addEventListener('input',()=>{
 });
 let dmOpen=false,dmPeer=null,dmRequest=0,dmBusy=false,dmFriendIds=new Set(),dmTimer=null,dmSending=false,dmNeedsRefresh=false;
 const concordDmDrafts=new Map();
+function concordDmDraftKey(peer){return 'concord-draft-v1-'+String(socialUser||'')+'-'+String(peer||'')}
+function concordSaveDmDraft(peer,value){
+ if(!socialUser||!peer)return;
+ const text=String(value||'').slice(0,2000);
+ if(text)concordDmDrafts.set(peer,text);else concordDmDrafts.delete(peer);
+ try{if(text)sessionStorage.setItem(concordDmDraftKey(peer),text);else sessionStorage.removeItem(concordDmDraftKey(peer))}catch(error){console.warn('Rascunho temporário indisponível',error)}
+}
+function concordReadDmDraft(peer){
+ if(concordDmDrafts.has(peer))return concordDmDrafts.get(peer);
+ try{return sessionStorage.getItem(concordDmDraftKey(peer))||''}catch{return ''}
+}
+document.getElementById('dmInput')?.addEventListener('input',()=>{
+ if(dmPeer&&socialUser)concordSaveDmDraft(dmPeer,document.getElementById('dmInput').value);
+});
 let concordDmReply=null;
 const dmHeaderAvatar=document.createElement('span');dmHeaderAvatar.id='concordDmHeaderAvatar';dmHeaderAvatar.className='concord-friend-avatar';dmHeaderAvatar.hidden=true;
 dmPane.querySelector('.concord-dm-header')?.insertBefore(dmHeaderAvatar,dmPane.querySelector('.concord-dm-header strong'));
@@ -2495,7 +2509,7 @@ function dmShow(open){
   dmFriends.hidden=!open;concordDmFilter.hidden=!open;
   $('#concordFriendsNav').classList.toggle('active',open);
   $('#concordFriendsNav').setAttribute('aria-pressed',String(open));
-  if(!open){concordDmReply=null;document.getElementById('concordDmReplyPreview')?.remove();if(dmPeer)concordDmDrafts.set(dmPeer,$('#dmInput').value);dmHeaderAvatar.hidden=true;dmPeer=null;$('#dmPeerLabel').textContent='Selecione um amigo';$('#dmInput').disabled=true;$('#dmSend').disabled=true;renderChatHistory()}
+  if(!open){concordDmReply=null;document.getElementById('concordDmReplyPreview')?.remove();if(dmPeer)concordSaveDmDraft(dmPeer,$('#dmInput').value);dmHeaderAvatar.hidden=true;dmPeer=null;$('#dmPeerLabel').textContent='Selecione um amigo';$('#dmInput').disabled=true;$('#dmSend').disabled=true;renderChatHistory()}
 }
 
 $('#concordFriendsNav').onclick=()=>{dmShow(true);$('#concordAddFriend')?.focus();};
@@ -2503,11 +2517,11 @@ $('#dmBack').onclick=()=>dmShow(false);
 function dmSelect(id){
   if(!dmFriendIds.has(id))return;
   if(dmOpen&&dmPeer===id){$('#dmInput').focus();return}
-  if(dmPeer)concordDmDrafts.set(dmPeer,$('#dmInput').value);
+  if(dmPeer)concordSaveDmDraft(dmPeer,$('#dmInput').value);
   dmShow(true);dmPeer=id;
   concordDmReply=null;document.getElementById('concordDmReplyPreview')?.remove();
   dmHeaderAvatar.hidden=false;dmHeaderAvatar.dataset.concordFriendAvatar=id;concordApplyFriendAvatar(dmHeaderAvatar,id);
-  $('#dmInput').value=concordDmDrafts.get(id)||'';
+  $('#dmInput').value=concordReadDmDraft(id);
   dmProfileAction.hidden=false;
   $('#dmHistory').textContent='Carregando conversa…';
   document.querySelectorAll('.concord-dm-friend').forEach(btn=>{const selected=btn.dataset.peerId===id;btn.classList.toggle('active',selected);btn.setAttribute('aria-current',selected?'true':'false')});
@@ -2593,7 +2607,7 @@ $('#dmForm').onsubmit=async event=>{
     const {error}=await concordSupabase.from('concord_direct_messages').insert({sender_id:account,recipient_id:peer,body});
     if(error)throw error;
     if(dmPeer===peer&&socialUser===account){
-      if(input.value.trim()===typed){input.value='';concordDmDrafts.delete(peer);concordDmReply=null;document.getElementById('concordDmReplyPreview')?.remove();}
+      if(input.value.trim()===typed){input.value='';concordSaveDmDraft(peer,'');concordDmReply=null;document.getElementById('concordDmReplyPreview')?.remove();}
       const history=$('#dmHistory');
       if(history&&history.querySelector('.concord-dm-message')){
         const item=document.createElement('article');item.className='concord-dm-message mine';
