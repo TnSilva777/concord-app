@@ -675,6 +675,19 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
 }
 @media(min-width:761px){#concordMobileNavToggle,#concordMobileNavBackdrop{display:none!important}}
 @media(prefers-reduced-motion:reduce){.app>.sidebar{transition:none!important}}
+
+/* Mobile correction: force sidebar to behave as a drawer and keep DMs in the main panel */
+@media(max-width:760px){
+ body .app{display:grid!important;grid-template-columns:56px minmax(0,1fr)!important;grid-template-rows:minmax(0,1fr)!important}
+ body .app>.sidebar{grid-column:auto!important;grid-row:auto!important;display:flex!important;position:fixed!important;left:56px!important;top:0!important;bottom:0!important;width:min(300px,calc(100vw - 56px))!important;height:100dvh!important;max-height:100dvh!important;transform:translateX(calc(-100% - 56px))!important;visibility:hidden!important;pointer-events:none!important;z-index:42!important}
+ body.concord-mobile-nav-open .app>.sidebar{transform:translateX(0)!important;visibility:visible!important;pointer-events:auto!important}
+ body .app>.main{grid-column:2!important;grid-row:1!important;display:flex!important;flex-direction:column!important;min-width:0!important;min-height:0!important;height:100dvh!important}
+ body .app>.main>#concordDmPane:not([hidden]){display:flex!important;flex:1 1 auto!important;min-height:0!important;overflow:hidden!important;padding:8px!important}
+ body .app>.main>#concordDmPane .concord-dm-history{flex:1!important;min-height:0!important;overflow-y:auto!important}
+ body .app>.main>#concordDmPane .concord-dm-header{flex-shrink:0!important}
+ body .app>.main>#concordDmPane .concord-dm-form{flex-shrink:0!important}
+ #concordMobileNavToggle{display:inline-flex!important}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2512,7 +2525,7 @@ const copyId=document.createElement('button');copyId.className='concord-copy-id'
 // O ID da conta fica acessível somente no próprio perfil, não na lista de amigos.
 async function initConcordSocial(session){
   const id=session?.user?.id||null;
-  if(id===socialUser)return;
+  if(id===socialUser){if(id)concordPublishPublicProfile().catch(console.warn);return;}
   socialRefreshQueued=false;
   dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#dmHistory').textContent='Selecione um amigo na lista à esquerda.';
   if(id!==concordProfileUser)restoreConcordProfileForUser(id);
@@ -2583,6 +2596,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
       <h2 id="authHeading">Que bom ter você aqui!</h2>
       <p id="authTitle">Entre na sua conta para continuar.</p>
       <form id="concordAuthForm">
+        <label class="auth-field" for="authDisplayName" id="authDisplayNameField" hidden>Nome no CONCORD<input id="authDisplayName" type="text" maxlength="28" minlength="2" placeholder="Como seus amigos vão te ver" autocomplete="nickname"></label>
         <label class="auth-field" for="authEmail">E-mail<input id="authEmail" type="email" placeholder="voce@exemplo.com" autocomplete="email" required></label>
         <label class="auth-field" for="authPassword">Senha<input id="authPassword" type="password" placeholder="Sua senha" autocomplete="current-password" minlength="6" required></label>
         <button id="authSubmit" type="submit">Entrar no CONCORD →</button>
@@ -2604,6 +2618,9 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
 
   document.getElementById('authToggle').onclick = () => {
     registering = !registering;
+    const nameField=document.getElementById('authDisplayNameField');
+    nameField.hidden=!registering;
+    document.getElementById('authDisplayName').required=registering;
     document.getElementById('authTitle').textContent =
       registering ? 'Crie sua conta e venha fazer parte.' : 'Entre na sua conta para continuar.';
     document.getElementById('authHeading').textContent = registering ? 'Comece sua jornada! 🚀' : 'Que bom ter você aqui!';
@@ -2625,7 +2642,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
       const email = document.getElementById('authEmail').value.trim();
       const password = document.getElementById('authPassword').value;
       const { data, error } = registering
-        ? await concordSupabase.auth.signUp({ email, password })
+        ? await concordSupabase.auth.signUp({ email, password, options:{data:{display_name:document.getElementById('authDisplayName').value.trim().slice(0,28)}} })
         : await concordSupabase.auth.signInWithPassword({ email, password });
 
       if (error) throw error;
