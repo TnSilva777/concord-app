@@ -1281,7 +1281,7 @@ function concordQueueVoiceAvatars(members){
  const ids=[...new Set((members||[]).filter(m=>!m.isMe&&m.userId).map(m=>m.userId))];
  if(ids.length)concordRefreshFriendAvatars(ids).catch(error=>console.warn('Fotos da chamada indisponíveis:',error));
 }
-function renderCallRoster(){const list=$('#callRosterList');if(!list)return;list.innerHTML='';const members=roomRoster[joinedRoom||activeRoom]||[];$('#participantCount').textContent=members.length;if(!members.length){list.innerHTML='<div class="room-empty" style="padding:12px 7px">Ninguém entrou nesta sala ainda.</div>';return}members.forEach(m=>{const row=document.createElement('div');row.className='roster-person'+(m.isMe?' me':'');const av=document.createElement('div');av.className='avatar '+(m.cls||'');av.textContent=m.initial||'?';if(m.isMe&&typeof concordData!=='undefined')setConcordAvatar(av,concordData.profile);else concordVoiceAvatar(av,m);const meta=document.createElement('div');meta.className='person-meta';const name=document.createElement('b');name.textContent=m.name+(m.isMe?' (você)':'');const sub=document.createElement('small');sub.textContent=m.isMe?(micEnabled?'Microfone ligado':'Microfone mutado'):'Na sala';meta.append(name,sub);const live=concordLiveBadge(m);if(live)meta.append(live);const state=document.createElement('span');state.className='person-state';state.textContent=m.isMe?(micEnabled?'🎙':'🔇'):'●';row.append(av,meta,state);list.append(row)})}
+function renderCallRoster(){const list=$('#callRosterList');if(!list)return;list.innerHTML='';const members=roomRoster[joinedRoom||activeRoom]||[];$('#participantCount').textContent=members.length;if(!members.length){list.innerHTML='<div class="room-empty" style="padding:12px 7px">Ninguém entrou nesta sala ainda.</div>';return}members.forEach(m=>{const row=document.createElement('div');row.className='roster-person'+(m.isMe?' me':'');const av=document.createElement('div');av.className='avatar '+(m.cls||'');av.textContent=m.initial||'?';if(m.speaking||m.isMe&&concordIsLocallySpeaking)av.classList.add('speaking');if(m.isMe&&typeof concordData!=='undefined')setConcordAvatar(av,concordData.profile);else concordVoiceAvatar(av,m);const meta=document.createElement('div');meta.className='person-meta';const name=document.createElement('b');name.textContent=m.name+(m.isMe?' (você)':'');const sub=document.createElement('small');sub.textContent=m.isMe?(micEnabled?'Microfone ligado':'Microfone mutado'):'Na sala';meta.append(name,sub);const live=concordLiveBadge(m);if(live)meta.append(live);const state=document.createElement('span');state.className='person-state';state.textContent=m.isMe?(micEnabled?'🎙':'🔇'):'●';row.append(av,meta,state);list.append(row)})}
 function renderRooms(){
   document.querySelectorAll('.voice-room').forEach(btn=>{
     const room=btn.dataset.room;
@@ -1300,8 +1300,9 @@ function renderRooms(){
     people.forEach(member=>{
       const b=document.createElement('button');b.className='room-member';
       if(member.isMe)b.classList.add('you-in-room');
+      if(member.speaking||member.isMe&&concordIsLocallySpeaking)b.classList.add('concord-member-speaking');
       b.title='Abrir sala '+room+' · '+String(member.name||'Participante');
-      const avatar=document.createElement('span');avatar.className='mini-avatar';
+      const avatar=document.createElement('span');avatar.className='mini-avatar';if(member.speaking||member.isMe&&concordIsLocallySpeaking)avatar.classList.add('speaking');
       avatar.textContent=String(member.initial||'?').slice(0,2);
       if(member.isMe&&typeof concordData!=='undefined')setConcordAvatar(avatar,concordData.profile);else concordVoiceAvatar(avatar,member);
       const name=document.createElement('span');name.className='member-name';
@@ -2086,7 +2087,18 @@ $('#addServer').onclick=openCommunityCreator;$('#profileBtn').onclick=()=>{
   actions.querySelector('button')?.focus();
 };updateProfileUI();renderCommunities();concordReceiveCommunityInvite();
 // Anima o contorno da foto quando o microfone detecta voz (somente no dispositivo local).
-function setLocalSpeaking(on){document.querySelectorAll('.user .avatar,.roster-person.me .avatar,.room-member.you-in-room .mini-avatar').forEach(el=>el.classList.toggle('speaking',!!on));}
+let concordIsLocallySpeaking=false,concordVoiceSpeakingLast=0;
+function setLocalSpeaking(on){
+ on=!!on;document.querySelectorAll('.user .avatar,.roster-person.me .avatar,.room-member.you-in-room .mini-avatar').forEach(el=>el.classList.toggle('speaking',on));
+ if(on===concordIsLocallySpeaking)return;
+ concordIsLocallySpeaking=on;
+ document.querySelectorAll('.room-member.you-in-room').forEach(el=>el.classList.toggle('concord-member-speaking',on));
+ const now=Date.now();
+ if(concordVoiceLobby&&callJoined&&joinedRoom&&now-concordVoiceSpeakingLast>350){
+   concordVoiceSpeakingLast=now;
+   concordVoiceLobby.track({id:voicePeerId,userId:socialUser,room:joinedRoom,name:voicePeerName(),sharing:!!stream,speaking:on}).catch(console.warn);
+ }
+}
 
 // Chamadas experimentais de duas pessoas: WebRTC + sinalizacao Supabase Realtime.
 // Salas publicas de teste: nao use para conversas confidenciais ate adicionar autorizacao privada.
@@ -2146,10 +2158,10 @@ function voiceParticipants(){
   const state=voiceSignal.presenceState(),members=[];
   Object.values(state).flat().forEach(p=>{
     if(!p||!p.id||p.id===voicePeerId)return;
-    if(!members.some(m=>m.id===p.id)){const publicName=p.userId&&concordFriendNames.get(p.userId);const name=String(publicName||p.name||'Participante').trim().slice(0,28)||'Participante';members.push({id:p.id,userId:p.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!p.sharing})};
+    if(!members.some(m=>m.id===p.id)){const publicName=p.userId&&concordFriendNames.get(p.userId);const name=String(publicName||p.name||'Participante').trim().slice(0,28)||'Participante';members.push({id:p.id,userId:p.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!p.sharing,speaking:!!p.speaking})};
   });
   for(const [id,peer] of voicePeers)if(!members.some(m=>m.id===id)){peer.close();voicePeers.delete(id);for(const [key,audio] of voiceAudio){if(key.startsWith(id+':')){audio.remove();voiceAudio.delete(key)}}voicePendingIce.delete(id);concordLiveStreams.delete(id);if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none'}}
-  roomRoster[joinedRoom]=[{id:voicePeerId,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream},...members];
+  roomRoster[joinedRoom]=[{id:voicePeerId,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream,speaking:concordIsLocallySpeaking},...members];
   renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();concordQueueVoiceAvatars(members);
   // A participant's chosen public name can arrive after presence sync.
   const unknownIds=[...new Set(members.filter(m=>m.userId&&!concordFriendNames.has(m.userId)&&!concordVoiceNameLookupAttempted.has(m.userId)).map(m=>m.userId))];
@@ -2269,7 +2281,7 @@ function concordSyncVoiceLobby(){
    if(!entry?.id||!entry.room||entry.id===voicePeerId)continue;
    const name=String((entry.userId&&concordFriendNames.get(entry.userId))||entry.name||'Participante').trim().slice(0,28)||'Participante';
    if(!groups.has(entry.room))groups.set(entry.room,[]);
-   if(!groups.get(entry.room).some(member=>member.id===entry.id))groups.get(entry.room).push({id:entry.id,userId:entry.userId||null,name,initial:name[0].toUpperCase(),isMe:false,sharing:!!entry.sharing});
+   if(!groups.get(entry.room).some(member=>member.id===entry.id))groups.get(entry.room).push({id:entry.id,userId:entry.userId||null,name,initial:name[0].toUpperCase(),isMe:false,sharing:!!entry.sharing,speaking:!!entry.speaking});
  }
  for(const room of new Set([...concordVoiceLobbyRooms,...groups.keys()])){
    if(room===joinedRoom)continue;
@@ -2327,7 +2339,7 @@ async function startVoiceNetwork(){
   finally{voiceStarting=false}
 }
 function stopVoiceNetwork(){
-  concordLeaveVoiceLobby();
+  if(concordVoiceLobby)concordVoiceLobby.untrack().catch(console.warn);
   if(stream)stopShare();
   concordWatching=null;
   concordLiveStreams.clear();
@@ -2336,6 +2348,7 @@ function stopVoiceNetwork(){
   $('#callStageMessage').style.display='block';$('#stageBadge').style.display='none';
   remoteAudioMuted=false;
   if($('#headphoneToggle'))$('#headphoneToggle').textContent='🎧';
+  concordIsLocallySpeaking=false;
   const channel=voiceSignal;voiceSignal=null;
   if(channel)concordSupabase.removeChannel(channel).catch(console.warn);
   for(const peer of voicePeers.values())peer.close();
@@ -2853,8 +2866,9 @@ async function initConcordSocial(session){
     if(proposed){concordData.profile.name=proposed;concordData.profile.avatar=proposed[0].toUpperCase();saveConcordProfileForUser();updateProfileUI()}
   }
   if(id){syncConcordAvatarFromCloud(id)}socialUser=id;voiceRoomsUser=id;initPublicChat(session);concordLoadServersFromCloud(id).catch(console.warn);clearInterval(socialTimer);socialTimer=null;
-  if(!id){dmShow(true);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
+  if(!id){concordLeaveVoiceLobby();dmShow(true);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
   dmShow(true);
+  await concordJoinVoiceLobby(id).catch(error=>console.warn('Lobby de voz:',error));
   await concordPublishPublicProfile().catch(error=>console.warn('Falha ao publicar perfil:',error));
   // Convite discreto para escolher nome, apenas quando esta conta não tem perfil público.
   try{
@@ -3418,4 +3432,9 @@ body.concord-home-view .app>.sidebar .user{margin-top:auto;flex-shrink:0}
 <style>
 #concordChooseNameHint{margin:6px 12px 9px;padding:10px 11px;text-align:left;border-radius:9px;background:#1c4932;color:#c8f4da;border:1px solid #376b4b;font-size:12px}
 #concordChooseNameHint:hover,#concordChooseNameHint:focus-visible{background:#265d40}
+</style><style>
+/* Aura de voz CONCORD, visível no painel e na lista de participantes. */
+.room-member.concord-member-speaking{background:rgba(46,187,115,.13)!important;border-radius:10px}
+.room-member .mini-avatar.speaking,.roster-person .avatar.speaking{isolation:isolate;box-shadow:0 0 0 2px #55ed9f,0 0 16px #43d99a88}
+@media(prefers-reduced-motion:reduce){.room-member .mini-avatar.speaking::before,.room-member .mini-avatar.speaking::after,.roster-person .avatar.speaking::before,.roster-person .avatar.speaking::after{animation:none}}
 </style></body></html>                              
