@@ -439,8 +439,8 @@ body.concord-custom-server-view #concordServerPanel{padding:0 7px 14px;backgroun
 .concord-server-menu-wrap{position:relative;width:100%}
 .concord-server-heading .concord-server-menu-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 13px;background:#13241d;border:0;border-bottom:1px solid #365344;border-radius:0;color:#f2fff7;font-size:14px;font-weight:800;text-align:left}
 .concord-server-menu-trigger > span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.concord-server-menu-trigger > span:last-child{font-size:22px;font-weight:400;transition:transform .18s}
-.concord-server-menu-trigger[aria-expanded="true"] > span:last-child{transform:rotate(180deg)}
+.concord-server-menu-trigger > .concord-server-chevron{font-size:22px;font-weight:400;transition:transform .18s}
+.concord-server-menu-trigger[aria-expanded="true"] > .concord-server-chevron{transform:rotate(180deg)}
 .concord-server-heading .concord-server-menu-trigger:hover,.concord-server-heading .concord-server-menu-trigger[aria-expanded="true"]{background:#1b3b2b}
 .concord-server-dropdown[hidden]{display:none!important}
 .concord-server-dropdown{position:absolute;top:calc(100% + 4px);left:6px;right:6px;z-index:35;padding:7px;background:#1c2823;border:1px solid #405549;border-radius:12px;box-shadow:0 16px 36px #000a;display:flex;flex-direction:column;max-height:min(65vh,440px);overflow-y:auto}
@@ -493,6 +493,14 @@ body.concord-custom-server-view .concord-server-room .concord-server-room-name{t
 .concord-server-menu-trigger>.concord-server-identity .concord-server-identity-copy,
 .concord-server-menu-trigger>.concord-server-identity .concord-server-identity-copy>span{transform:none!important;transition:none!important}
 .concord-server-menu-trigger>.concord-server-chevron{flex-shrink:0;transform:rotate(0deg);transform-origin:center;transition:transform .18s}
+.concord-server-menu-trigger[aria-expanded="true"]>.concord-server-chevron{transform:rotate(180deg)}
+</style><style>
+/* Apenas a seta gira; o nome do servidor nunca deve sofrer rotação. */
+.concord-server-menu-trigger>.concord-server-identity,
+.concord-server-menu-trigger>.concord-server-identity *,
+.concord-server-menu-trigger[aria-expanded="true"]>.concord-server-identity,
+.concord-server-menu-trigger[aria-expanded="true"]>.concord-server-identity *{transform:none!important;writing-mode:horizontal-tb!important}
+.concord-server-menu-trigger>.concord-server-chevron{display:inline-block;transform:rotate(0deg);transform-origin:center}
 .concord-server-menu-trigger[aria-expanded="true"]>.concord-server-chevron{transform:rotate(180deg)}
 </style></head><body>
 <div class="app"><aside class="servers"><div class="logo concord-brand-mark" aria-label="Logo CONCORD" title="CONCORD">C</div><button type="button" class="server" id="concordFriendsNav" title="Amigos e conversas privadas" aria-label="Abrir amigos e conversas privadas">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
