@@ -743,6 +743,11 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
  .app>.main>.messages .welcome p{font-size:14px!important;line-height:1.5!important}
  .app>.sidebar{box-shadow:10px 0 32px rgba(0,0,0,.35)}
 }
+
+/* Manual friend sync and mobile-friendly controls. */
+.concord-social-sync{align-self:stretch;min-height:34px;padding:7px 10px;border:1px solid #315e47;border-radius:9px;background:#153d2b;color:#d4f9e3;font-size:12px}
+.concord-social-sync:disabled{opacity:.6;cursor:wait}
+@media(max-width:760px){.concord-social-sync{min-height:40px}.concord-friends-toolbar{gap:8px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js'"></script>
 <script>
@@ -2381,6 +2386,23 @@ concordFriendsSearchInput.type='search';concordFriendsSearchInput.placeholder='B
 concordFriendsSearchInput.oninput=()=>{concordFriendsSearch=concordFriendsSearchInput.value.trim().toLowerCase();concordApplyFriendsFilter()};
 concordFriendsToolbar.append(concordFriendsTabs,concordFriendsSearchInput);
 socialPanel.insertBefore(concordFriendsToolbar,$('#concordFriends'));
+// Manual sync helps recover from missed presence events or intermittent mobile connections.
+const concordSocialSync=document.createElement('button');
+concordSocialSync.type='button';
+concordSocialSync.className='concord-social-sync';
+concordSocialSync.textContent='↻ Atualizar amigos';
+concordSocialSync.setAttribute('aria-label','Atualizar lista de amigos e fotos');
+concordSocialSync.onclick=async()=>{
+ if(concordSocialSync.disabled||!socialUser)return;
+ concordSocialSync.disabled=true;concordSocialSync.textContent='Atualizando…';
+ try{
+  concordAvatarCheckedAt.clear();
+  await refreshSocial();
+  if(dmOpen&&dmPeer)await dmLoad();
+ }catch(error){console.warn('Falha na atualização manual:',error)}
+ finally{concordSocialSync.disabled=false;concordSocialSync.textContent='↻ Atualizar amigos'}
+};
+concordFriendsToolbar.append(concordSocialSync);
 function concordApplyFriendsFilter(){
   const rows=[...socialPanel.querySelectorAll('.concord-friend')];
   let shown=0;
