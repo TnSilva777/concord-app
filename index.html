@@ -2639,9 +2639,16 @@ async function concordPublishPublicProfile(){
     if(panel)panel.title='O nome público não foi sincronizado. Confira a migração concord-public-profiles.sql no Supabase.';
     return false;
   }
+  // Verify that the saved profile can actually be read back by the client.
+  const {data:verified,error:readError}=await concordSupabase.from('concord_public_profiles').select('display_name').eq('user_id',concordProfileUser).maybeSingle();
+  const confirmed=!readError&&verified?.display_name===name;
   const panel=document.getElementById('concordFriends');
-  if(panel)panel.removeAttribute('title');
-  return true;
+  if(panel){
+    if(confirmed)panel.removeAttribute('title');
+    else panel.title='O nome foi enviado, mas não foi possível confirmar sua leitura no Supabase. Verifique as políticas SELECT de concord_public_profiles.';
+  }
+  if(!confirmed)console.warn('Não foi possível confirmar a leitura do nome público:',readError?.message||'Registro ausente ou diferente');
+  return confirmed;
 }
 async function refreshSocial(){
   if(!socialUser)return;
