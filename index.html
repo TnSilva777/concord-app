@@ -2701,6 +2701,21 @@ async function concordPublishPublicProfile(){
   if(!confirmed)console.warn('Não foi possível confirmar a leitura do nome público:',readError?.message||'Registro ausente ou diferente');
   return confirmed;
 }
+function concordOpenFriendMenu(event,userId,canMessage,requestId){
+ document.getElementById('concordFriendContextMenu')?.remove();
+ const menu=document.createElement('div');menu.id='concordFriendContextMenu';menu.setAttribute('role','menu');
+ const action=(name,handler)=>{const button=document.createElement('button');button.type='button';button.textContent=name;button.setAttribute('role','menuitem');button.onclick=()=>{menu.remove();handler()};menu.append(button)};
+ if(canMessage)action('💬 Abrir conversa',()=>dmSelect(userId));
+ action('◉ Ver perfil',()=>concordViewProfile(userId));
+ if(canMessage)action(concordDmPreferences.favorites.has(userId)?'☆ Desfavoritar':'★ Favoritar',()=>concordDmFavorite(userId));
+ if(requestId)action('Remover amizade ou pedido',async()=>{if(!confirm('Remover esta amizade ou pedido?'))return;const {error}=await concordSupabase.from('concord_friend_requests').delete().eq('id',requestId);if(error)alert(error.message);else refreshSocial()});
+ menu.style.left=Math.max(8,Math.min(event.clientX,innerWidth-210))+'px';
+ menu.style.top=Math.max(8,Math.min(event.clientY,innerHeight-200))+'px';
+ document.body.append(menu);menu.querySelector('button')?.focus();
+ const dismiss=e=>{if(!menu.contains(e.target)){menu.remove();document.removeEventListener('pointerdown',dismiss)}};
+ setTimeout(()=>document.addEventListener('pointerdown',dismiss),0);
+ menu.onkeydown=e=>{if(e.key==='Escape'){menu.remove();document.removeEventListener('pointerdown',dismiss)}};
+}
 async function refreshSocial(){
   if(!socialUser)return;
   if(socialBusy){socialRefreshQueued=true;return}
@@ -2757,7 +2772,7 @@ async function refreshSocial(){
     const friendAvatar=document.createElement('span');friendAvatar.className='concord-friend-avatar';friendAvatar.dataset.concordFriendAvatar=id;concordApplyFriendAvatar(friendAvatar,id);
     const friendLabel=document.createElement('span');friendLabel.textContent=concordFriendDisplayName(id);
     const friendPresence=document.createElement('span');friendPresence.textContent=online.has(id)?'●':'○';friendPresence.style.color=online.has(id)?'#43d996':'#91a99b';
-    button.append(friendAvatar,friendLabel,friendPresence);button.setAttribute('aria-label','Abrir conversa privada com '+concordFriendDisplayName(id));button.onclick=()=>dmSelect(id);const profile=document.createElement('button');profile.type='button';profile.className='concord-dm-visit';profile.textContent='◉';profile.title='Visitar perfil';profile.onclick=()=>concordViewProfile(id);const favorite=document.createElement('button');favorite.type='button';favorite.className='concord-dm-favorite';favorite.textContent=concordDmPreferences.favorites.has(id)?'★':'☆';favorite.setAttribute('aria-pressed',String(concordDmPreferences.favorites.has(id)));favorite.title=concordDmPreferences.favorites.has(id)?'Remover dos favoritos':'Adicionar aos favoritos';favorite.setAttribute('aria-label',favorite.title);favorite.onclick=()=>concordDmFavorite(id);row.append(button,favorite,profile);dmList.append(row)});
+    button.append(friendAvatar,friendLabel,friendPresence);button.setAttribute('aria-label','Abrir conversa privada com '+concordFriendDisplayName(id));button.onclick=()=>dmSelect(id);const profile=document.createElement('button');profile.type='button';profile.className='concord-dm-visit';profile.textContent='◉';profile.title='Visitar perfil';profile.onclick=()=>concordViewProfile(id);const favorite=document.createElement('button');favorite.type='button';favorite.className='concord-dm-favorite';favorite.textContent=concordDmPreferences.favorites.has(id)?'★':'☆';favorite.setAttribute('aria-pressed',String(concordDmPreferences.favorites.has(id)));favorite.title=concordDmPreferences.favorites.has(id)?'Remover dos favoritos':'Adicionar aos favoritos';favorite.setAttribute('aria-label',favorite.title);favorite.onclick=()=>concordDmFavorite(id);row.append(button);dmList.append(row);row.oncontextmenu=e=>{e.preventDefault();concordOpenFriendMenu(e,id,true)}});
     if(dmOpen&&dmPeer&&!dmFriendIds.has(dmPeer)){dmProfileAction.hidden=true;dmPeer=null;$('#dmPeerLabel').textContent='Selecione um amigo';$('#dmHistory').textContent='Esta amizade não está mais ativa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true}
     const list=$('#concordFriends');list.replaceChildren();
     if(!friends.length){list.textContent='Nenhum amigo adicionado.'}
@@ -2772,15 +2787,16 @@ async function refreshSocial(){
       label.title=concordFriendDisplayName(other);
       const status=document.createElement('small');status.textContent=f.status==='pending'?'Pedido pendente':online.has(other)?'● Online':'○ Offline';
       details.append(label,status);row.append(avatar,details);
-      const visit=document.createElement('button');visit.type='button';visit.textContent='◉';visit.title='Visitar perfil';visit.setAttribute('aria-label','Visitar perfil de '+label.textContent);visit.onclick=()=>concordViewProfile(other);row.append(visit);
       if(f.status==='accepted'){
-        const message=document.createElement('button');message.textContent='✉';message.title='Enviar mensagem';message.setAttribute('aria-label','Conversar com '+label.textContent);
-        message.onclick=()=>dmSelect(other);row.append(message);
+        row.classList.add('concord-friend-open-chat');row.tabIndex=0;row.setAttribute('role','button');
+        row.title='Abrir conversa (botão direito: opções)';
+        row.onclick=()=>dmSelect(other);
+        row.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();dmSelect(other)}};
       }
       if(f.status==='pending'&&f.recipient_id===socialUser){
-        const accept=document.createElement('button');accept.textContent='Aceitar';accept.onclick=async()=>{const {error}=await concordSupabase.from('concord_friend_requests').update({status:'accepted'}).eq('id',f.id);if(error)alert(error.message);else refreshSocial()};row.append(accept);
+        const accept=document.createElement('button');accept.textContent='Aceitar';accept.onclick=async e=>{e.stopPropagation();const {error}=await concordSupabase.from('concord_friend_requests').update({status:'accepted'}).eq('id',f.id);if(error)alert(error.message);else refreshSocial()};row.append(accept);
       }
-      const remove=document.createElement('button');remove.textContent='×';remove.title='Remover pedido ou amizade';remove.onclick=async()=>{if(!confirm('Remover esta amizade ou pedido?'))return;const {error}=await concordSupabase.from('concord_friend_requests').delete().eq('id',f.id);if(error)alert(error.message);else refreshSocial()};row.append(remove);
+      row.oncontextmenu=e=>{e.preventDefault();concordOpenFriendMenu(e,other,f.status==='accepted',f.id)};
       list.append(row);
     }
     concordApplyFriendsFilter();
@@ -3345,4 +3361,12 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
 .concord-dm-favorite{flex-shrink:0;border:0;background:transparent;color:#a4c6b1;font-size:19px;min-width:28px;min-height:36px;border-radius:7px}
 .concord-dm-favorite[aria-pressed=true]{color:#e6cb79}
 .concord-dm-favorite:hover,.concord-dm-favorite:focus-visible{background:#28563b;outline:0}
+</style><style>
+#concordFriends .concord-friend-open-chat{cursor:pointer;border-radius:10px;transition:background .15s}
+#concordFriends .concord-friend-open-chat:hover,#concordFriends .concord-friend-open-chat:focus-visible{background:#23513a!important;outline:1px solid #3e8d61}
+#dmFriends .concord-dm-friend-row{padding-right:5px}
+#dmFriends .concord-dm-friend{width:100%;flex:1}
+#concordFriendContextMenu{position:fixed;z-index:9999;background:#16271e;border:1px solid #397351;border-radius:12px;padding:6px;box-shadow:0 12px 34px #0008;min-width:190px;display:grid;gap:2px}
+#concordFriendContextMenu button{background:transparent;color:#e3f8eb;padding:10px 12px;text-align:left;border-radius:7px;font-size:12px}
+#concordFriendContextMenu button:hover,#concordFriendContextMenu button:focus-visible{background:#2c6041}
 </style></body></html>                              
