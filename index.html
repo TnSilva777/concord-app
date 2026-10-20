@@ -2305,6 +2305,22 @@ $('#headphoneToggle').onclick=()=>{
   $('#headphoneToggle').textContent=remoteAudioMuted?'🔇':'🎧';
   voiceStatus(remoteAudioMuted?'Áudio dos outros participantes silenciado.':'Áudio dos outros participantes ativado.');
 };
+// Restore social data when the phone regains internet or the app returns to foreground.
+let concordReconnectBusy=false;
+async function concordReconnect(){
+ if(concordReconnectBusy||!navigator.onLine)return;
+ concordReconnectBusy=true;
+ try{
+   if(typeof socialUser!=='undefined'&&socialUser){
+     await refreshSocial();
+     if(typeof dmOpen!=='undefined'&&dmOpen&&dmPeer)dmLoad();
+   }
+   if(typeof callJoined!=='undefined'&&callJoined&&joinedRoom&&!voiceSignal)await startVoiceNetwork();
+ }catch(error){console.warn('CONCORD reconexão:',error)}
+ finally{concordReconnectBusy=false}
+}
+window.addEventListener('online',concordReconnect);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)concordReconnect()});
 window.addEventListener('pagehide',stopVoiceNetwork);
 try{
   const invite=new URLSearchParams(location.hash.slice(1)).get('voz');
