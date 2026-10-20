@@ -2382,6 +2382,12 @@ $('#dmForm').onsubmit=async event=>{
 };
 document.querySelectorAll('[data-channel]').forEach(btn=>btn.addEventListener('click',()=>{if(dmOpen)dmShow(false)}));
 dmTimer=setInterval(()=>{if(dmOpen&&document.visibilityState==='visible')dmLoad()},4000);
+// Returning to CONCORD should refresh friends and conversations immediately.
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible'||!socialUser)return;
+  refreshSocial();
+  if(dmOpen&&dmPeer)dmLoad();
+});
 
 const concordFriendNames=new Map();
 function concordFriendDisplayName(id){return concordFriendNames.get(id)||'Nome indisponível'}
@@ -2857,6 +2863,12 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  }
  const observer=new MutationObserver(()=>{if(!document.getElementById('joinCall')?.disabled&&grid.classList.contains('open'))close.click()});
  observer.observe(document.getElementById('joinCall'),{attributes:true,attributeFilter:['disabled']});
+ document.addEventListener('fullscreenchange',()=>{
+   if(!document.fullscreenElement&&grid.classList.contains('open')){
+     lastGridSignature='';
+     render();
+   }
+ });
  const interval=setInterval(()=>{if(grid.classList.contains('open')&&document.visibilityState==='visible')render()},2500);
  window.addEventListener('pagehide',()=>clearInterval(interval),{once:true});
 })();
