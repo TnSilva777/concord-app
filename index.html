@@ -502,6 +502,14 @@ body.concord-custom-server-view .concord-server-room .concord-server-room-name{t
 .concord-server-menu-trigger[aria-expanded="true"]>.concord-server-identity *{transform:none!important;writing-mode:horizontal-tb!important}
 .concord-server-menu-trigger>.concord-server-chevron{display:inline-block;transform:rotate(0deg);transform-origin:center}
 .concord-server-menu-trigger[aria-expanded="true"]>.concord-server-chevron{transform:rotate(180deg)}
+</style><style>
+.concord-friend-invite-overlay{position:fixed;inset:0;z-index:99998;display:grid;place-items:center;background:#000b;padding:20px}
+.concord-friend-invite-panel{width:min(420px,100%);max-height:80vh;overflow:auto;background:#12251b;border:1px solid #437a59;border-radius:16px;padding:22px;box-shadow:0 20px 60px #0009}
+.concord-friend-invite-panel h2{margin:0 0 8px;font-size:19px}
+.concord-friend-invite-panel p{font-size:13px;color:#b1c9b9;line-height:1.5}
+.concord-friend-invite-list{display:grid;gap:8px;margin:18px 0}
+.concord-friend-invite-list button,.concord-friend-invite-close{padding:11px 13px;border:1px solid #39664d;border-radius:9px;background:#204934;text-align:left}
+.concord-friend-invite-list button:hover,.concord-friend-invite-close:hover{background:#2d6547}
 </style></head><body>
 <div class="app"><aside class="servers"><div class="logo concord-brand-mark" aria-label="Logo CONCORD" title="CONCORD">C</div><button type="button" class="server" id="concordFriendsNav" title="Amigos e conversas privadas" aria-label="Abrir amigos e conversas privadas">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
 <aside class="sidebar"><div class="brand"><strong>CONCORD</strong><small>SUA COMUNIDADE. SEU ESPAÇO.</small></div><button class="search" id="searchBtn">⌕ &nbsp; Buscar canais</button><div class="section">CONCORD OFICIAL</div><button class="channel active" data-channel="geral"><span>#</span> geral</button><button class="channel" data-channel="regras"><span>#</span> regras</button><button class="channel" data-channel="anuncios"><span>#</span> anúncios</button><div class="section">COMUNIDADES</div><button class="channel" data-channel="jogos"><span>#</span> jogos</button><button class="channel" data-channel="tecnologia"><span>#</span> tecnologia</button><button class="channel" data-channel="memes"><span>#</span> memes</button><div class="section">CANAIS DE VOZ</div><button class="channel" id="voiceBtn"><span>◖</span> Sala de voz <span class="online"></span></button><div class="section voice-section-title">SALAS DE VOZ <button id="addVoiceRoom" title="Criar sala de voz">＋</button></div>
@@ -1150,6 +1158,25 @@ function refreshConcordLocalVoiceMembers(){
     row.classList.toggle('concord-local-voice-active',joinedRoom==='srv-'+concordSelectedCommunity+'-'+room.id);
   }
 }
+function concordInviteFriendsToCommunity(community){
+  if(!socialUser){simple('Entre na conta','Faça login para convidar seus amigos.');return}
+  if(!dmFriendIds.size){simple('Nenhum amigo disponível','Adicione amigos primeiro. Você também pode copiar o convite pelo menu do servidor.');return}
+  const modal=document.createElement('div');modal.className='concord-friend-invite-overlay';
+  const panel=document.createElement('section');panel.className='concord-friend-invite-panel';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');
+  const heading=document.createElement('h2');heading.textContent='Convidar amigos para '+community.name;
+  const detail=document.createElement('p');detail.textContent='Escolha um amigo para abrir a conversa privada e enviar o convite do servidor.';
+  const close=document.createElement('button');close.type='button';close.className='concord-friend-invite-close';close.textContent='Fechar';close.onclick=()=>modal.remove();
+  const friends=document.createElement('div');friends.className='concord-friend-invite-list';
+  for(const id of dmFriendIds){
+    const button=document.createElement('button');button.type='button';button.textContent='✉ Amigo '+id.slice(0,8);
+    button.onclick=()=>{modal.remove();concordInviteCommunity(community);dmSelect(id);showConcordToast('Convite copiado','Cole o link na conversa e envie para seu amigo.')};
+    friends.append(button);
+  }
+  panel.append(heading,detail,friends,close);modal.append(panel);document.body.append(modal);
+  modal.onclick=event=>{if(event.target===modal)modal.remove()};
+  modal.addEventListener('keydown',event=>{if(event.key==='Escape')modal.remove()});
+  friends.querySelector('button')?.focus();
+}
 function concordInviteCommunity(community){
   const snapshot={v:2,id:community.id,name:String(community.name||'Servidor').slice(0,40),icon:String(community.icon||'🎮').slice(0,4),description:String(community.description||'').slice(0,180),channels:(community.channels||[]).slice(0,40).map(item=>({id:item.id,name:String(item.name||'').slice(0,32),type:item.type==='voice'?'voice':'text'}))};
   const encoded=btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(snapshot)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
@@ -1235,6 +1262,7 @@ close();renderCommunityChannels();[...concordServerPanel.querySelectorAll('.conc
   };
   const addDivider=()=>{const divider=document.createElement('div');divider.className='concord-server-menu-divider';divider.setAttribute('role','separator');menu.append(divider)};
   addOption('Convidar para o servidor','♧',()=>invite.click());
+  addOption('Convidar amigo adicionado','✉',()=>concordInviteFriendsToCommunity(community));
   addDivider();
   if(canManage){addOption('Configurações do servidor','⚙',()=>settings.click());
   addOption('Criar canal ou sala de voz','⊕',()=>add.click());}
@@ -1504,6 +1532,13 @@ function openProfileEditor(){
       concordData.profile={name:n,status:statusInput.value.trim().slice(0,50),bio:bioInput.value.trim().slice(0,160),avatar:avatarInput.value.trim()||n.slice(0,1).toUpperCase(),color:colorInput.value,photo:selectedPhoto,cloudPhoto};
       if(!saveConcordProfileForUser()){concordData.profile=previous;photoError.textContent='Não foi possível salvar o perfil neste navegador.';return}
       saveConcordData();
+      if(id){
+        try{
+          const {error:profileError}=await concordSupabase.auth.updateUser({data:{display_name:n,concord_profile:{name:n,status:concordData.profile.status,bio:concordData.profile.bio,avatar:concordData.profile.avatar,color:concordData.profile.color}}});
+          if(profileError)throw profileError;
+          notice='Nome e perfil salvos na conta. '+notice;
+        }catch(error){console.warn('Não foi possível sincronizar o nome:',error);notice+=' O nome não foi sincronizado com a conta; tente salvar novamente.'}
+      }
       updateProfileUI();if(typeof renderRooms==='function')renderRooms();modal.classList.remove('show');simple('Perfil atualizado',notice);
     }finally{save.disabled=false;save.textContent='Salvar perfil'}
   };
@@ -1994,6 +2029,14 @@ async function initConcordSocial(session){
   socialRefreshQueued=false;
   dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#dmHistory').textContent='Selecione um amigo na lista à esquerda.';
   if(id!==concordProfileUser)restoreConcordProfileForUser(id);
+  if(id&&concordData.profile.name==='Você'){
+    const auth=session?.user;
+    const cloudProfile=auth?.user_metadata?.concord_profile;
+    if(cloudProfile&&typeof cloudProfile==='object'&&typeof cloudProfile.name==='string'&&cloudProfile.name.trim()){
+      concordData.profile={...concordData.profile,name:cloudProfile.name.trim().slice(0,28),status:String(cloudProfile.status||'').slice(0,50),bio:String(cloudProfile.bio||'').slice(0,160),avatar:String(cloudProfile.avatar||'').slice(0,4),color:/^#[0-9a-fA-F]{6}$/.test(cloudProfile.color||'')?cloudProfile.color:'#16865e'};
+      saveConcordProfileForUser();updateProfileUI();
+    }
+  }
   if(id&&concordData.profile.name==='Você'){
     const auth=session?.user;
     const proposed=String(auth?.user_metadata?.display_name||auth?.user_metadata?.full_name||auth?.user_metadata?.name||auth?.email?.split('@')[0]||'').trim().slice(0,28);
