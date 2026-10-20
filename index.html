@@ -370,6 +370,20 @@ body.concord-custom-server-view #concordServerPanel{padding:0 7px 14px;backgroun
 #concordHud button:hover{filter:brightness(1.15)}
 @media(max-width:600px){#concordHud{padding:10px!important;align-items:end!important}#concordHud section{width:100%!important;border-radius:18px 18px 8px 8px!important;padding:20px!important}#concordHud input,#concordHud select,#concordHud textarea{font-size:16px!important}}
 </style>
+<style>
+.concord-profile-menu-overlay{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.75);backdrop-filter:blur(5px)}
+.concord-profile-menu{width:min(400px,100%);background:#142d22;border:1px solid #397b5d;border-radius:16px;padding:24px;color:#eafff1;box-shadow:0 20px 70px #0008}
+.concord-profile-menu h2{margin:0 0 18px;font-size:20px}
+.concord-profile-menu-preview{display:flex;align-items:center;gap:14px;padding:14px;background:#0d2119;border-radius:12px;margin-bottom:18px}
+.concord-profile-menu-preview .avatar{width:52px;height:52px;flex-shrink:0}
+.concord-profile-menu-preview strong,.concord-profile-menu-preview small{display:block;overflow-wrap:anywhere}
+.concord-profile-menu-preview small{color:#a7c9b4;margin-top:4px}
+.concord-profile-menu-actions{display:grid;gap:10px}
+.concord-profile-menu-actions button{padding:13px;border:1px solid #377557;border-radius:10px;background:#1c513a;color:white;text-align:left;font-weight:600;cursor:pointer}
+.concord-profile-menu-actions button:hover{background:#267650}
+.concord-profile-menu-actions button:focus-visible{outline:2px solid #9aefbc;outline-offset:2px}
+@media(max-width:600px){.concord-profile-menu-overlay{align-items:flex-end;padding:8px}.concord-profile-menu{border-radius:18px 18px 8px 8px}}
+</style>
 </head><body>
 <div class="app"><aside class="servers"><div class="logo concord-brand-mark" aria-label="Logo CONCORD" title="CONCORD">C</div><button type="button" class="server" id="concordFriendsNav" title="Amigos e conversas privadas" aria-label="Abrir amigos e conversas privadas">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
 <aside class="sidebar"><div class="brand"><strong>CONCORD</strong><small>SUA COMUNIDADE. SEU ESPAÇO.</small></div><button class="search" id="searchBtn">⌕ &nbsp; Buscar canais</button><div class="section">CONCORD OFICIAL</div><button class="channel active" data-channel="geral"><span>#</span> geral</button><button class="channel" data-channel="regras"><span>#</span> regras</button><button class="channel" data-channel="anuncios"><span>#</span> anúncios</button><div class="section">COMUNIDADES</div><button class="channel" data-channel="jogos"><span>#</span> jogos</button><button class="channel" data-channel="tecnologia"><span>#</span> tecnologia</button><button class="channel" data-channel="memes"><span>#</span> memes</button><div class="section">CANAIS DE VOZ</div><button class="channel" id="voiceBtn"><span>◖</span> Sala de voz <span class="online"></span></button><div class="section voice-section-title">SALAS DE VOZ <button id="addVoiceRoom" title="Criar sala de voz">＋</button></div>
@@ -1161,8 +1175,27 @@ function openProfileEditor(){
   foot.append(cancel,save);previewAvatar();modal.classList.add('show');
 }
 $('#addServer').onclick=openCommunityCreator;$('#profileBtn').onclick=()=>{
- const choice=prompt('Perfil: 1 para visualizar ou 2 para personalizar','1');
- if(choice==='1')concordViewProfile();else if(choice==='2')openProfileEditor();
+  document.getElementById('concordProfileMenu')?.remove();
+  const overlay=document.createElement('div');overlay.id='concordProfileMenu';overlay.className='concord-profile-menu-overlay';
+  const panel=document.createElement('section');panel.className='concord-profile-menu';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label','Menu do perfil');
+  const heading=document.createElement('h2');heading.textContent='Meu perfil';
+  const preview=document.createElement('div');preview.className='concord-profile-menu-preview';
+  const avatar=document.createElement('div');avatar.className='avatar';setConcordAvatar(avatar,concordData.profile);
+  const identity=document.createElement('div');const name=document.createElement('strong');name.textContent=concordData.profile.name||'Você';
+  const status=document.createElement('small');status.textContent=concordData.profile.status||'Online';
+  identity.append(name,status);preview.append(avatar,identity);
+  const actions=document.createElement('div');actions.className='concord-profile-menu-actions';
+  const action=(label,handler)=>{
+    const button=document.createElement('button');button.type='button';button.textContent=label;
+    button.onclick=()=>{overlay.remove();handler()};actions.append(button);
+  };
+  action('◉ Visualizar perfil',()=>concordViewProfile());
+  action('✎ Editar perfil',()=>openProfileEditor());
+  action('Fechar',()=>{});
+  panel.append(heading,preview,actions);overlay.append(panel);document.body.append(overlay);
+  overlay.onclick=event=>{if(event.target===overlay)overlay.remove()};
+  overlay.onkeydown=event=>{if(event.key==='Escape'){event.preventDefault();overlay.remove()}};
+  actions.querySelector('button')?.focus();
 };updateProfileUI();renderCommunities();concordReceiveCommunityInvite();
 // Anima o contorno da foto quando o microfone detecta voz (somente no dispositivo local).
 function setLocalSpeaking(on){document.querySelectorAll('.user .avatar,.roster-person.me .avatar,.room-member.you-in-room .mini-avatar').forEach(el=>el.classList.toggle('speaking',!!on));}
