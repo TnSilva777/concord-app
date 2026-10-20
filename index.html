@@ -788,12 +788,12 @@ async function concordSaveServersToCloud(id){
 async function concordLoadServersFromCloud(id){
   clearTimeout(concordCloudBackupTimer);
   concordCloudBackupUser=id||null;concordCloudBackupReady=false;
-  if(!id){concordData.communities=[];renderCommunities();return}
+  if(!id){concordData.communities=[];concordSelectedCommunity=null;renderCommunities();return}
   try{
     const scoped=JSON.parse(localStorage.getItem(concordServerAccountKey(id))||'null');
     if(Array.isArray(scoped)){
       const mergedLocal=new Map(scoped.map(item=>[item.id,item]));
-      for(const item of concordData.communities){if(!mergedLocal.has(item.id))mergedLocal.set(item.id,item)}
+      // Não misturar servidores de outra conta com os servidores desta conta.
       concordData.communities=[...mergedLocal.values()];
     }
     renderCommunities();
@@ -1434,6 +1434,8 @@ async function voiceConnect(id,initiator){
     if(e.track.kind==='video'){
       const live=new MediaStream([e.track]);concordLiveStreams.set(id,live);
       if(concordWatching===id){const player=$('#callScreenPreview');player.srcObject=live;player.muted=true;player.style.display='block';$('#callStageMessage').style.display='none';$('#stageBadge').style.display='block';$('#callSubtitle').textContent='Assistindo transmissão ao vivo';player.play().catch(()=>voiceStatus('Clique no vídeo para iniciar a reprodução.'))}
+      e.track.onmute=()=>{if(concordWatching===id){$('#callSubtitle').textContent='Transmissão pausada ou reconectando';voiceStatus('O vídeo do amigo foi interrompido. Aguardando retorno…')}};
+      e.track.onunmute=()=>{if(concordWatching===id){const player=$('#callScreenPreview');player.srcObject=live;player.style.display='block';$('#callStageMessage').style.display='none';$('#callSubtitle').textContent='Assistindo transmissão ao vivo';player.play().catch(()=>{})}};
       e.track.onended=()=>{concordLiveStreams.delete(id);if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block'}renderRooms()};
       renderRooms();return;
     }
