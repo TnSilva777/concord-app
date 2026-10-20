@@ -353,6 +353,33 @@ body.concord-custom-server-view #concordServerPanel{padding:0 7px 14px;backgroun
 #dmHistory .concord-dm-message p{user-select:text}
 #dmInput:focus-visible{outline:2px solid #64dba2;outline-offset:2px}
 @media(max-width:720px){.concord-dm-message{max-width:92%;padding:10px 12px}.concord-dm-form{gap:6px}.concord-dm-form input{font-size:16px}}
+
+/* CONCORD HUD usability update: visual polish without changing community logic */
+:root{color-scheme:dark}
+button{transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #64dfab;outline-offset:2px}
+button:disabled{cursor:not-allowed;opacity:.55}
+.servers{overflow-y:auto;scrollbar-width:thin;scrollbar-color:#35694f transparent}
+.sidebar{min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#35694f transparent}
+.channel,.voice-room{min-height:35px}
+.channel.active,.voice-room.active{box-shadow:inset 3px 0 #43c48d}
+.topbar{min-width:0;flex-shrink:0;backdrop-filter:blur(10px)}
+.topbar strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.messages{overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#35694f transparent}
+.message{border-radius:10px;transition:background .15s}
+.message:hover{background:#ffffff06}
+.composebox{transition:border-color .18s,box-shadow .18s}
+.composebox:focus-within{border-color:#43c48d;box-shadow:0 0 0 3px #43c48d1c}
+.dialog{max-height:calc(100dvh - 28px);overflow-y:auto}
+.modal{backdrop-filter:blur(4px)}
+#concordQuickSearch{position:fixed;inset:0;z-index:90000;background:#020906c9;display:none;align-items:flex-start;justify-content:center;padding:12vh 16px 24px}
+#concordQuickSearch.open{display:flex}
+#concordQuickSearch .qs-panel{background:#102019;border:1px solid #35694f;border-radius:16px;width:min(530px,100%);padding:17px;box-shadow:0 25px 75px #000b;max-height:75vh;overflow:auto}
+#concordQuickSearch input{width:100%;padding:13px;border-radius:9px;background:#07120d;color:#effaf4;border:1px solid #35694f;margin:10px 0}
+#concordQuickSearch .qs-result{width:100%;text-align:left;padding:11px;border-radius:8px;background:transparent;color:#d8f5e5}
+#concordQuickSearch .qs-result:hover{background:#1c4934}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2237,6 +2264,38 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
 
   concordSupabase.auth.onAuthStateChange((_event, session) => {
     overlay.style.display = session ? 'none' : 'flex';
+  });
+})();
+</script>
+<script>
+(() => {
+  if(document.getElementById('concordQuickSearch'))return;
+  const search=document.getElementById('searchBtn');
+  if(!search)return;
+  const overlay=document.createElement('div');overlay.id='concordQuickSearch';
+  const panel=document.createElement('div');panel.className='qs-panel';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label','Pesquisa rápida de canais');
+  const header=document.createElement('div');header.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:12px';
+  const title=document.createElement('strong');title.textContent='Ir para um canal';
+  const closeBtn=document.createElement('button');closeBtn.type='button';closeBtn.textContent='Fechar';closeBtn.className='pill';
+  header.append(title,closeBtn);
+  const input=document.createElement('input');input.placeholder='Buscar canal de texto ou voz...';input.setAttribute('aria-label','Buscar canal');
+  const results=document.createElement('div');
+  panel.append(header,input,results);overlay.append(panel);document.body.append(overlay);
+  const close=()=>{overlay.classList.remove('open');search.focus()};
+  const render=()=>{
+    results.replaceChildren();
+    const q=input.value.trim().toLocaleLowerCase('pt-BR');
+    const els=[...document.querySelectorAll('[data-channel],.voice-room')];
+    const found=els.filter(el=>(el.dataset.channel||el.dataset.room||el.textContent||'').toLocaleLowerCase('pt-BR').includes(q)).slice(0,30);
+    if(!found.length){const p=document.createElement('p');p.textContent='Nenhum canal encontrado.';results.append(p)}
+    found.forEach(el=>{const b=document.createElement('button');b.className='qs-result';b.type='button';b.textContent=(el.classList.contains('voice-room')?'🎙 ':'# ')+(el.dataset.room||el.dataset.channel||el.textContent.trim());b.onclick=()=>{close();el.click()};results.append(b)})
+  };
+  const open=()=>{overlay.classList.add('open');input.value='';render();input.focus()};
+  search.onclick=open;closeBtn.onclick=close;input.oninput=render;
+  overlay.onclick=e=>{if(e.target===overlay)close()};
+  document.addEventListener('keydown',e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();overlay.classList.contains('open')?close():open()}
+    if(e.key==='Escape'&&overlay.classList.contains('open'))close();
   });
 })();
 </script>
