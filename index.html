@@ -2425,6 +2425,9 @@ const dmNav=$('#concordFriendsNav');
 const dmFriends=document.createElement('div');dmFriends.id='dmFriends';dmFriends.className='concord-dm-friends';dmFriends.hidden=true;
 socialPanel.append(dmFriends);
 let dmOpen=false,dmPeer=null,dmRequest=0,dmBusy=false,dmFriendIds=new Set(),dmTimer=null,dmSending=false,dmNeedsRefresh=false;
+const concordDmDrafts=new Map();
+const dmHeaderAvatar=document.createElement('span');dmHeaderAvatar.id='concordDmHeaderAvatar';dmHeaderAvatar.className='concord-friend-avatar';dmHeaderAvatar.hidden=true;
+dmPane.querySelector('.concord-dm-header')?.insertBefore(dmHeaderAvatar,dmPane.querySelector('.concord-dm-header strong'));
 function dmShow(open){
   ++dmRequest;
   dmOpen=open;dmPane.hidden=!open;
@@ -2451,7 +2454,7 @@ function dmShow(open){
   dmFriends.hidden=!open;
   $('#concordFriendsNav').classList.toggle('active',open);
   $('#concordFriendsNav').setAttribute('aria-pressed',String(open));
-  if(!open){dmPeer=null;$('#dmPeerLabel').textContent='Selecione um amigo';$('#dmInput').disabled=true;$('#dmSend').disabled=true;renderChatHistory()}
+  if(!open){if(dmPeer)concordDmDrafts.set(dmPeer,$('#dmInput').value);dmHeaderAvatar.hidden=true;dmPeer=null;$('#dmPeerLabel').textContent='Selecione um amigo';$('#dmInput').disabled=true;$('#dmSend').disabled=true;renderChatHistory()}
 }
 
 $('#concordFriendsNav').onclick=()=>{dmShow(true);$('#concordAddFriend')?.focus();};
@@ -2459,7 +2462,10 @@ $('#dmBack').onclick=()=>dmShow(false);
 function dmSelect(id){
   if(!dmFriendIds.has(id))return;
   if(dmOpen&&dmPeer===id){$('#dmInput').focus();return}
+  if(dmPeer)concordDmDrafts.set(dmPeer,$('#dmInput').value);
   dmShow(true);dmPeer=id;
+  dmHeaderAvatar.hidden=false;dmHeaderAvatar.dataset.concordFriendAvatar=id;concordApplyFriendAvatar(dmHeaderAvatar,id);
+  $('#dmInput').value=concordDmDrafts.get(id)||'';
   dmProfileAction.hidden=false;
   $('#dmHistory').textContent='Carregando conversa…';
   document.querySelectorAll('.concord-dm-friend').forEach(btn=>{const selected=btn.dataset.peerId===id;btn.classList.toggle('active',selected);btn.setAttribute('aria-current',selected?'true':'false')});
@@ -2486,8 +2492,10 @@ function dmRender(rows){
   const firstRender=!previousIds.length||list.textContent==='Carregando conversa…';
   list.replaceChildren();
   if(!rows.length){list.textContent='Nenhuma mensagem ainda. Envie a primeira!';return}
-  rows.forEach(msg=>{
+  rows.forEach((msg,index)=>{
     const item=document.createElement('article');item.className='concord-dm-message';
+    const prev=rows[index-1];const grouped=prev&&prev.sender_id===msg.sender_id&&Math.abs(new Date(msg.created_at)-new Date(prev.created_at))<300000;
+    if(grouped)item.classList.add('concord-dm-grouped');
     item.dataset.messageId=String(msg.id);
     item.dataset.senderId=String(msg.sender_id);
     if(msg.sender_id===socialUser)item.classList.add('mine');
@@ -2526,7 +2534,7 @@ $('#dmForm').onsubmit=async event=>{
     const {error}=await concordSupabase.from('concord_direct_messages').insert({sender_id:account,recipient_id:peer,body});
     if(error)throw error;
     if(dmPeer===peer&&socialUser===account){
-      if(input.value.trim()===body)input.value='';
+      if(input.value.trim()===body){input.value='';concordDmDrafts.delete(peer);}
       const history=$('#dmHistory');
       if(history&&history.querySelector('.concord-dm-message')){
         const item=document.createElement('article');item.className='concord-dm-message mine';
@@ -3226,4 +3234,23 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  window.addEventListener('resize',()=>{if(window.innerWidth>760)close()});
 })();
 </script>
+<style>
+/* CONCORD: mensagens diretas mais limpas e organizadas. */
+#concordDmPane .concord-dm-header{background:#11251c!important;border-bottom:1px solid #29513c!important;min-height:65px}
+#concordDmHeaderAvatar{width:38px;height:38px;min-width:38px;display:grid;place-items:center;border-radius:50%;background:#28583c;font-size:14px;font-weight:700}
+#concordDmHeaderAvatar[hidden]{display:none!important}
+#concordDmPane #dmHistory{background:#101c17;padding:18px 24px!important}
+#dmHistory .concord-dm-message,#dmHistory .concord-dm-message.mine{display:block;max-width:100%!important;width:100%;margin:0!important;padding:9px 42px 9px 13px!important;border:0!important;border-radius:8px!important;background:transparent!important;box-shadow:none!important}
+#dmHistory .concord-dm-message:hover{background:#ffffff0a!important}
+#dmHistory .concord-dm-message.mine:hover{background:#1d3928!important}
+#dmHistory .concord-dm-message strong{color:#67dc9d;font-size:13px}
+#dmHistory .concord-dm-message time{margin-left:9px;color:#809a8b;font-size:10px}
+#dmHistory .concord-dm-message p{margin:4px 0 0!important;line-height:1.55;color:#e2eee6}
+#dmHistory .concord-dm-message.concord-dm-grouped{padding-top:2px!important;padding-bottom:5px!important}
+#dmHistory .concord-dm-message.concord-dm-grouped strong,#dmHistory .concord-dm-message.concord-dm-grouped time{display:none}
+#dmHistory .concord-dm-message.concord-dm-grouped p{margin-top:0!important}
+#concordDmPane #dmForm{background:#13271d!important;border-top:1px solid #2b4b38!important;padding:12px 18px!important}
+#concordDmPane #dmInput{background:#203c2c!important;border:1px solid #396348!important;border-radius:12px!important}
+@media(max-width:760px){#concordDmPane #dmHistory{padding:10px!important}#concordDmPane .concord-dm-header{min-height:58px}#concordDmPane #dmForm{padding:10px 8px calc(10px + env(safe-area-inset-bottom,0px))!important}}
+</style>
 </body></html>                              
