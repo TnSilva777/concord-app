@@ -207,6 +207,35 @@ body.concord-custom-server-view #concordServerPanel{display:block}
 .concord-server-heading{align-items:flex-start;flex-wrap:wrap}
 .concord-server-description{margin:0 6px 15px;color:#a9cbb6;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 .concord-server-actions button{white-space:nowrap}
+
+/* CONCORD Server HUD 3.0 — estrutura de servidores inspirada em apps de comunidades */
+body.concord-custom-server-view .sidebar{background:#121a19;border-right:1px solid #304139}
+body.concord-custom-server-view .brand{background:#17241f;border-bottom:1px solid #32483b}
+body.concord-custom-server-view .main{background:#121b19}
+body.concord-custom-server-view .topbar{background:#192520;box-shadow:0 2px 10px #0002}
+body.concord-custom-server-view .servers{background:#0a1210}
+body.concord-custom-server-view #concordServerPanel{padding:0 8px 18px;scrollbar-width:thin;scrollbar-color:#3e604e transparent}
+.concord-server-heading{position:sticky;top:0;z-index:3;margin:0 -8px 8px;padding:16px 12px 14px;background:#182620;border-bottom:1px solid #35493d;box-shadow:0 3px 10px #0002;align-items:center;gap:8px}
+.concord-server-heading strong{font-size:15px;letter-spacing:-.2px;line-height:1.3;max-width:100%;overflow-wrap:anywhere}
+.concord-server-actions{width:100%;justify-content:flex-start;gap:7px}
+.concord-server-actions button{border-radius:7px;padding:7px 10px;font-size:11px;background:#24392d;border:1px solid #365742;color:#cce8d6;transition:background .15s,transform .15s}
+.concord-server-actions button:hover{background:#326b4b;transform:translateY(-1px)}
+.concord-server-actions .concord-server-settings{font-size:16px;padding:4px 10px}
+.concord-server-description{margin:11px 9px;padding:12px;background:#1b3025;border-radius:9px;border-left:3px solid #56d89c;color:#d1e7d8}
+.concord-server-hint{font-size:10px;color:#809f8d;padding:7px 10px 14px;line-height:1.5}
+.concord-server-section{margin:12px 8px 6px;color:#a7b7ae;font-size:10px;letter-spacing:1.05px;font-weight:850}
+.concord-server-empty{margin:8px 12px 18px;font-style:italic;color:#718e7e}
+.concord-server-room{margin:3px 1px;border-radius:7px;min-height:37px;padding:2px 4px;transition:background .15s}
+.concord-server-room:hover{background:#283b30}
+.concord-server-room-name{font-size:13px!important;color:#b8c8bf!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.concord-server-room-name:hover{color:#f1fff5!important}
+.concord-server-room button:not(.concord-server-room-name){opacity:.4;transition:opacity .15s}
+.concord-server-room:hover button:not(.concord-server-room-name),.concord-server-room button:focus-visible{opacity:1}
+.concord-local-voice-person{background:#1c3027;border-left:2px solid #41c98b;border-radius:7px}
+.concord-community-item .server{border-radius:16px;transition:border-radius .18s,background .18s}
+.concord-community-item .server:hover,.concord-community-item .server.active{border-radius:12px;background:#28754d;color:#fff}
+.concord-community-item:has(.server.active)::before{content:"";position:absolute;left:-11px;top:9px;width:4px;height:30px;border-radius:0 5px 5px 0;background:#a0f7c7}
+@media(max-width:760px){.concord-server-heading{position:relative}.concord-server-actions{gap:5px}.concord-server-actions button{padding:6px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -722,6 +751,7 @@ function renderCommunityChannels(){
   if(!Array.isArray(community.channels))community.channels=[];
   const heading=document.createElement('div');heading.className='concord-server-heading';
   const title=document.createElement('strong');title.textContent=community.name;
+  const settings=document.createElement('button');settings.type='button';settings.className='concord-server-settings';settings.textContent='⚙';settings.title='Configurações do servidor';settings.setAttribute('aria-label','Configurações do servidor');settings.onclick=()=>editLocalCommunity(community.id);
   const invite=document.createElement('button');invite.type='button';invite.textContent='🔗 Convite';invite.title='Compartilhar modelo do servidor com canais';
   invite.onclick=()=>concordInviteCommunity(community);
   const add=document.createElement('button');add.type='button';add.textContent='＋ Criar sala';add.title='Criar canal de texto ou sala de voz';
@@ -735,9 +765,10 @@ function renderCommunityChannels(){
     if(!saveConcordData()){community.channels.pop();simple('Não foi possível salvar','Verifique o armazenamento do navegador.');return}
     renderCommunityChannels();showConcordToast('Sala criada','A sala foi adicionada ao servidor neste navegador.');
   };
-  const controls=document.createElement('div');controls.className='concord-server-actions';controls.append(invite,add);
+  const controls=document.createElement('div');controls.className='concord-server-actions';controls.append(settings,invite,add);
   heading.append(title,controls);concordServerPanel.append(heading);
   if(community.description){const description=document.createElement('p');description.className='concord-server-description';description.textContent=community.description;concordServerPanel.append(description)}
+  const hint=document.createElement('div');hint.className='concord-server-hint';hint.textContent='Personalize canais e salas • Clique em ⚙ para editar o servidor';concordServerPanel.append(hint);
   for(const kind of ['text','voice']){
     const section=document.createElement('div');section.className='concord-server-section';section.textContent=kind==='text'?'CANAIS DE TEXTO':'SALAS DE VOZ';concordServerPanel.append(section);
     const rooms=community.channels.filter(item=>item.type===kind);
@@ -795,7 +826,7 @@ function renderCommunities(){
   concordData.communities.forEach(community=>{
     const group=document.createElement('div');group.className='concord-community-item';group.dataset.communityId=community.id;
     const b=document.createElement('button');b.type='button';b.className='server';
-    b.title=community.name;b.setAttribute('aria-label','Abrir comunidade '+community.name);
+    b.title=community.name+' • Clique para abrir';b.setAttribute('aria-label','Abrir comunidade '+community.name);
     b.textContent=community.icon||community.name.slice(0,1).toUpperCase();
     b.onclick=()=>{
       document.querySelectorAll('.server').forEach(x=>x.classList.remove('active'));b.classList.add('active');
