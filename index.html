@@ -642,6 +642,20 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
 #dmHistory .concord-dm-message{overflow-wrap:anywhere}
 #dmHistory .concord-dm-message time{font-variant-numeric:tabular-nums}
 @media(max-width:640px){.concord-dm-friend.active{border-radius:9px!important}}
+
+/* CONCORD distinctive social HUD: calm emerald accents, friendly touch-first design */
+#concordDmPane{background:radial-gradient(ellipse at 85% 0%,rgba(43,161,100,.075),transparent 48%)}
+#concordDmProfileAction{margin-left:auto!important;background:rgba(34,122,80,.25)!important;border:1px solid #347955!important;color:#c9f6df!important;white-space:nowrap}
+#concordDmProfileAction:hover{background:rgba(47,165,101,.34)!important}
+.concord-dm-header{gap:10px!important}
+.concord-dm-header strong{letter-spacing:.015em}
+.concord-dm-friend-row{border:1px solid transparent}
+.concord-dm-friend-row:has(.concord-dm-friend.active){border-color:rgba(77,221,147,.27)}
+#dmHistory .concord-dm-message{border:1px solid rgba(117,214,155,.10)}
+#dmHistory .concord-dm-message.mine{border-color:rgba(121,235,170,.22)}
+#dmHistory .concord-dm-message p{line-height:1.5}
+#dmHistory .concord-home-intro{max-width:680px;margin:clamp(16px,7vh,72px) auto;padding:clamp(16px,4vw,32px);border:1px solid rgba(74,180,117,.24);border-radius:20px;background:linear-gradient(135deg,rgba(18,68,44,.50),rgba(10,34,27,.22))}
+@media(max-width:700px){#concordDmProfileAction{margin-left:0!important}.concord-dm-header{align-items:center}#dmHistory .concord-home-intro{margin:14px 4px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2239,6 +2253,13 @@ concordDiagnosticsButton.onclick=async()=>{
 // Mensagens privadas: area separada dos canais publicos, com armazenamento no Supabase.
 const dmPane=document.createElement('section');dmPane.id='concordDmPane';dmPane.hidden=true;
 dmPane.innerHTML='<div class="concord-dm-header"><button type="button" id="dmBack">← Voltar</button><strong>Conversas privadas</strong><span id="dmPeerLabel">Selecione um amigo</span></div><div id="dmHistory" class="concord-dm-history" role="log" aria-live="polite">Selecione um amigo na lista à esquerda.</div><form id="dmForm" class="concord-dm-form"><input id="dmInput" type="text" maxlength="2000" placeholder="Mensagem privada..." autocomplete="off" required disabled><button type="submit" disabled id="dmSend">Enviar</button></form>';
+// CONCORD identity: quick access to the selected friend's profile.
+const dmProfileAction=document.createElement('button');
+dmProfileAction.type='button';dmProfileAction.id='concordDmProfileAction';
+dmProfileAction.textContent='◉ Perfil';dmProfileAction.title='Ver perfil do amigo';
+dmProfileAction.hidden=true;
+dmProfileAction.onclick=()=>{if(dmPeer&&dmFriendIds.has(dmPeer))concordViewProfile(dmPeer)};
+dmPane.querySelector('.concord-dm-header')?.append(dmProfileAction);
 const chatContainer=$('#messages');
 if(chatContainer)chatContainer.parentNode.insertBefore(dmPane,chatContainer.nextSibling);
 const dmNav=$('#concordFriendsNav');
@@ -2248,6 +2269,7 @@ let dmOpen=false,dmPeer=null,dmRequest=0,dmBusy=false,dmFriendIds=new Set(),dmTi
 function dmShow(open){
   ++dmRequest;
   dmOpen=open;dmPane.hidden=!open;
+  dmProfileAction.hidden=!open||!dmPeer;
   if(open&&!dmPeer){
     const history=$('#dmHistory');
     if(history&&!history.querySelector('.concord-home-intro')){
@@ -2278,6 +2300,7 @@ $('#dmBack').onclick=()=>dmShow(false);
 function dmSelect(id){
   if(!dmFriendIds.has(id))return;
   dmShow(true);dmPeer=id;
+  dmProfileAction.hidden=false;
   $('#dmHistory').textContent='Carregando conversa…';
   document.querySelectorAll('.concord-dm-friend').forEach(btn=>{const selected=btn.dataset.peerId===id;btn.classList.toggle('active',selected);btn.setAttribute('aria-current',selected?'true':'false')});
   $('#dmPeerLabel').textContent=concordFriendDisplayName(id);
@@ -2409,7 +2432,7 @@ async function refreshSocial(){
     const dmLabel=document.createElement('div');dmLabel.className='concord-dm-label';dmLabel.textContent='CONVERSAS COM AMIGOS';dmList.append(dmLabel);
     if(!ids.length){const empty=document.createElement('div');empty.textContent='Aceite uma amizade para conversar.';dmList.append(empty)}
     ids.forEach(id=>{const row=document.createElement('div');row.className='concord-dm-friend-row';const button=document.createElement('button');button.type='button';button.className='concord-dm-friend';button.dataset.peerId=id;button.classList.toggle('active',dmOpen&&dmPeer===id);button.setAttribute('aria-current',dmOpen&&dmPeer===id?'true':'false');button.textContent=(online.has(id)?'🟢 ':'✉ ')+concordFriendDisplayName(id);button.setAttribute('aria-label','Abrir conversa privada com '+concordFriendDisplayName(id));button.onclick=()=>dmSelect(id);const profile=document.createElement('button');profile.type='button';profile.className='concord-dm-visit';profile.textContent='◉';profile.title='Visitar perfil';profile.onclick=()=>concordViewProfile(id);row.append(button,profile);dmList.append(row)});
-    if(dmOpen&&dmPeer&&!dmFriendIds.has(dmPeer)){dmPeer=null;$('#dmHistory').textContent='Esta amizade não está mais ativa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true}
+    if(dmOpen&&dmPeer&&!dmFriendIds.has(dmPeer)){dmProfileAction.hidden=true;dmPeer=null;$('#dmHistory').textContent='Esta amizade não está mais ativa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true}
     const list=$('#concordFriends');list.replaceChildren();
     if(!friends.length){list.textContent='Nenhum amigo adicionado.'}
     for(const f of friends){
