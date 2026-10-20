@@ -334,6 +334,19 @@ body.concord-custom-server-view #concordServerPanel{padding:0 7px 14px;backgroun
 .concord-friend-details small{font-size:10px;color:#9cbaa6}
 .concord-friend button{flex-shrink:0}
 .concord-friends-empty-filter{padding:12px;color:#a9c4b1;font-size:12px;text-align:center}
+
+.concord-profile-card{position:relative;overflow:hidden;border-radius:13px;background:#1a3025;border:1px solid #42604d;padding:0 17px 18px}
+.concord-profile-banner{height:92px;margin:0 -17px}
+.concord-profile-card-avatar{position:relative;width:72px!important;height:72px!important;border:5px solid #1a3025;margin-top:-36px;font-size:24px;box-sizing:content-box}
+.concord-profile-card h3{margin:9px 0 3px;font-size:21px;overflow-wrap:anywhere}
+.concord-profile-card>p{margin:0 0 18px;color:#a7c8b2;font-size:12px}
+.concord-profile-about{border-top:1px solid #42604d;padding-top:14px}
+.concord-profile-about strong{font-size:11px;letter-spacing:.7px}
+.concord-profile-about p{margin:8px 0 0;line-height:1.55;font-size:13px;overflow-wrap:anywhere}
+.concord-dm-friend-row{display:flex;align-items:center;gap:4px;margin:2px 9px}
+.concord-dm-friend-row .concord-dm-friend{flex:1;min-width:0;margin:0;width:auto;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.concord-dm-visit{background:#234c36;border-radius:7px;padding:8px;color:#c9f7db}
+.concord-dm-visit:hover{background:#32734e}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -1024,6 +1037,26 @@ function openCommunityCreator(){
   createdButton?.click();
   simple('Comunidade criada','Comunidade salva neste navegador. Ela deve continuar após atualizar a página. Para compartilhar com outras pessoas, ainda será necessário integrar servidores ao Supabase.');
 }
+function concordViewProfile(userId){
+ const own=!userId||userId===socialUser,profile=own?concordData.profile:null,modal=$('#simpleModal');
+ $('#simpleTitle').textContent=own?'Meu perfil':'Perfil do amigo';
+ const body=$('#simpleText');body.replaceChildren();
+ const card=document.createElement('div');card.className='concord-profile-card';
+ const banner=document.createElement('div');banner.className='concord-profile-banner';banner.style.background=own?(profile.color||'#16865e'):'#28644a';
+ const avatar=document.createElement('div');avatar.className='avatar concord-profile-card-avatar';
+ if(own)setConcordAvatar(avatar,profile);else avatar.textContent=String(userId||'?').slice(0,2).toUpperCase();
+ const name=document.createElement('h3');name.textContent=own?(profile.name||'Você'):'Amigo '+userId.slice(0,8);
+ const status=document.createElement('p');status.textContent=own?(profile.status||'● Online'):'Dados públicos não sincronizados';
+ const about=document.createElement('div');about.className='concord-profile-about';
+ const heading=document.createElement('strong');heading.textContent='SOBRE MIM';
+ const bio=document.createElement('p');bio.textContent=own?(profile.bio||'Você ainda não escreveu uma biografia.'):'Nome, foto e biografia de amigos ainda não são sincronizados pelo Supabase.';
+ about.append(heading,bio);card.append(banner,avatar,name,status,about);body.append(card);
+ const foot=modal.querySelector('.footbuttons');foot.replaceChildren();
+ const close=document.createElement('button');close.className='pill';close.textContent='Fechar';close.onclick=()=>modal.classList.remove('show');foot.append(close);
+ if(own){const edit=document.createElement('button');edit.className='primary';edit.textContent='✎ Editar perfil';edit.onclick=openProfileEditor;foot.append(edit)}
+ else if(dmFriendIds.has(userId)){const msg=document.createElement('button');msg.className='primary';msg.textContent='✉ Mensagem';msg.onclick=()=>{modal.classList.remove('show');dmSelect(userId)};foot.append(msg)}
+ modal.classList.add('show');
+}
 function openProfileEditor(){
   const modal=$('#simpleModal');$('#simpleTitle').textContent='Personalizar perfil';$('#simpleText').replaceChildren();
   const wrap=document.createElement('div');wrap.className='profile-fields';
@@ -1093,7 +1126,10 @@ function openProfileEditor(){
   avatarInput.oninput=previewAvatar;colorInput.oninput=previewAvatar;
   foot.append(cancel,save);previewAvatar();modal.classList.add('show');
 }
-$('#addServer').onclick=openCommunityCreator;$('#profileBtn').onclick=openProfileEditor;updateProfileUI();renderCommunities();concordReceiveCommunityInvite();
+$('#addServer').onclick=openCommunityCreator;$('#profileBtn').onclick=()=>{
+ const choice=prompt('Perfil: 1 para visualizar ou 2 para personalizar','1');
+ if(choice==='1')concordViewProfile();else if(choice==='2')openProfileEditor();
+};updateProfileUI();renderCommunities();concordReceiveCommunityInvite();
 // Anima o contorno da foto quando o microfone detecta voz (somente no dispositivo local).
 function setLocalSpeaking(on){document.querySelectorAll('.user .avatar,.roster-person.me .avatar,.room-member.you-in-room .mini-avatar').forEach(el=>el.classList.toggle('speaking',!!on));}
 
@@ -1457,7 +1493,7 @@ async function refreshSocial(){
     const dmList=$('#dmFriends');dmList.replaceChildren();
     const dmLabel=document.createElement('div');dmLabel.className='concord-dm-label';dmLabel.textContent='CONVERSAS COM AMIGOS';dmList.append(dmLabel);
     if(!ids.length){const empty=document.createElement('div');empty.textContent='Aceite uma amizade para conversar.';dmList.append(empty)}
-    ids.forEach(id=>{const button=document.createElement('button');button.type='button';button.className='concord-dm-friend';button.textContent=(online.has(id)?'🟢 ':'✉ ')+'Amigo '+id.slice(0,8);button.setAttribute('aria-label','Abrir conversa privada com amigo '+id.slice(0,8));button.onclick=()=>dmSelect(id);dmList.append(button)});
+    ids.forEach(id=>{const row=document.createElement('div');row.className='concord-dm-friend-row';const button=document.createElement('button');button.type='button';button.className='concord-dm-friend';button.textContent=(online.has(id)?'🟢 ':'✉ ')+'Amigo '+id.slice(0,8);button.setAttribute('aria-label','Abrir conversa privada com amigo '+id.slice(0,8));button.onclick=()=>dmSelect(id);const profile=document.createElement('button');profile.type='button';profile.className='concord-dm-visit';profile.textContent='◉';profile.title='Visitar perfil';profile.onclick=()=>concordViewProfile(id);row.append(button,profile);dmList.append(row)});
     if(dmOpen&&dmPeer&&!dmFriendIds.has(dmPeer)){dmPeer=null;$('#dmHistory').textContent='Esta amizade não está mais ativa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true}
     const list=$('#concordFriends');list.replaceChildren();
     if(!friends.length){list.textContent='Nenhum amigo adicionado.'}
@@ -1472,6 +1508,7 @@ async function refreshSocial(){
       label.title='ID: '+other;
       const status=document.createElement('small');status.textContent=f.status==='pending'?'Pedido pendente':online.has(other)?'● Online':'○ Offline';
       details.append(label,status);row.append(avatar,details);
+      const visit=document.createElement('button');visit.type='button';visit.textContent='◉';visit.title='Visitar perfil';visit.setAttribute('aria-label','Visitar perfil de '+label.textContent);visit.onclick=()=>concordViewProfile(other);row.append(visit);
       if(f.status==='accepted'){
         const message=document.createElement('button');message.textContent='✉';message.title='Enviar mensagem';message.setAttribute('aria-label','Conversar com '+label.textContent);
         message.onclick=()=>dmSelect(other);row.append(message);
