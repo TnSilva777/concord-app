@@ -434,6 +434,21 @@ body.concord-custom-server-view #concordServerPanel{padding:0 7px 14px;backgroun
 .concord-user-controls .gear:focus-visible{outline:2px solid #68e9a8;outline-offset:2px}
 .concord-mic-control.concord-mic-active{color:#70f0ae;background:#153f2c}
 @media(max-width:420px){.concord-user-controls{gap:2px}.concord-user-controls .gear{min-width:28px;padding:5px}}
+</style><style>
+.concord-server-heading{position:relative;display:block;padding:0 0 8px;margin:0}
+.concord-server-menu-wrap{position:relative;width:100%}
+.concord-server-heading .concord-server-menu-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 13px;background:#13241d;border:0;border-bottom:1px solid #365344;border-radius:0;color:#f2fff7;font-size:14px;font-weight:800;text-align:left}
+.concord-server-menu-trigger span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.concord-server-menu-trigger span:last-child{font-size:22px;font-weight:400;transition:transform .18s}
+.concord-server-menu-trigger[aria-expanded="true"] span:last-child{transform:rotate(180deg)}
+.concord-server-heading .concord-server-menu-trigger:hover,.concord-server-heading .concord-server-menu-trigger[aria-expanded="true"]{background:#1b3b2b}
+.concord-server-dropdown[hidden]{display:none!important}
+.concord-server-dropdown{position:absolute;top:calc(100% + 4px);left:6px;right:6px;z-index:35;padding:7px;background:#1c2823;border:1px solid #405549;border-radius:12px;box-shadow:0 16px 36px #000a;display:flex;flex-direction:column;max-height:min(65vh,440px);overflow-y:auto}
+.concord-server-heading .concord-server-option{display:flex;align-items:center;gap:12px;width:100%;padding:11px 10px;border:0;border-radius:7px;background:transparent;color:#e6eee8;text-align:left;font-size:12px;font-weight:600}
+.concord-server-heading .concord-server-option:hover,.concord-server-heading .concord-server-option:focus-visible{background:#315540;outline:none}
+.concord-server-option-icon{width:21px;text-align:center;font-size:17px;color:#b7d5c2}
+.concord-server-menu-divider{height:1px;background:#3a4d42;margin:6px 4px}
+.concord-server-heading .concord-server-option.danger{color:#ffb2b2}
 </style></head><body>
 <div class="app"><aside class="servers"><div class="logo concord-brand-mark" aria-label="Logo CONCORD" title="CONCORD">C</div><button type="button" class="server" id="concordFriendsNav" title="Amigos e conversas privadas" aria-label="Abrir amigos e conversas privadas">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
 <aside class="sidebar"><div class="brand"><strong>CONCORD</strong><small>SUA COMUNIDADE. SEU ESPAÇO.</small></div><button class="search" id="searchBtn">⌕ &nbsp; Buscar canais</button><div class="section">CONCORD OFICIAL</div><button class="channel active" data-channel="geral"><span>#</span> geral</button><button class="channel" data-channel="regras"><span>#</span> regras</button><button class="channel" data-channel="anuncios"><span>#</span> anúncios</button><div class="section">COMUNIDADES</div><button class="channel" data-channel="jogos"><span>#</span> jogos</button><button class="channel" data-channel="tecnologia"><span>#</span> tecnologia</button><button class="channel" data-channel="memes"><span>#</span> memes</button><div class="section">CANAIS DE VOZ</div><button class="channel" id="voiceBtn"><span>◖</span> Sala de voz <span class="online"></span></button><div class="section voice-section-title">SALAS DE VOZ <button id="addVoiceRoom" title="Criar sala de voz">＋</button></div>
@@ -1121,7 +1136,9 @@ function concordReceiveCommunityInvite(){
   }catch(error){simple('Convite inválido','Não foi possível ler este convite de servidor.')}
 }
 window.addEventListener('hashchange',concordReceiveCommunityInvite);
+let concordServerMenuController=new AbortController();
 function renderCommunityChannels(){
+  concordServerMenuController.abort();concordServerMenuController=new AbortController();
   const community=concordData.communities.find(item=>item.id===concordSelectedCommunity);
   concordServerPanel.replaceChildren();
   if(!community)return;
@@ -1142,7 +1159,35 @@ close();renderCommunityChannels();[...concordServerPanel.querySelectorAll('.conc
   const restore=document.createElement('button');restore.type='button';restore.textContent='↑ Restaurar';restore.title='Importar servidores de um backup';
   restore.onclick=()=>{const input=document.createElement('input');input.type='file';input.accept='.json,application/json';input.onchange=()=>concordImportServers(input.files?.[0]);input.click()};
   controls.append(backup,restore);
-  heading.append(title,controls);concordServerPanel.append(heading);
+  const menuWrap=document.createElement('div');menuWrap.className='concord-server-menu-wrap';
+  const menuTrigger=document.createElement('button');menuTrigger.type='button';menuTrigger.className='concord-server-menu-trigger';menuTrigger.setAttribute('aria-haspopup','menu');menuTrigger.setAttribute('aria-expanded','false');menuTrigger.setAttribute('aria-label','Opções do servidor '+community.name);
+  const menuName=document.createElement('span');menuName.textContent=community.name;
+  const chevron=document.createElement('span');chevron.textContent='⌄';menuTrigger.append(menuName,chevron);
+  const menu=document.createElement('div');menu.className='concord-server-dropdown';menu.setAttribute('role','menu');menu.hidden=true;
+  const closeMenu=()=>{menu.hidden=true;menuTrigger.setAttribute('aria-expanded','false')};
+  const addOption=(label,icon,handler,destructive=false)=>{
+    const option=document.createElement('button');option.type='button';option.setAttribute('role','menuitem');option.className='concord-server-option'+(destructive?' danger':'');
+    const symbol=document.createElement('span');symbol.className='concord-server-option-icon';symbol.textContent=icon;
+    const name=document.createElement('span');name.textContent=label;option.append(symbol,name);
+    option.onclick=()=>{closeMenu();handler()};menu.append(option);
+  };
+  const addDivider=()=>{const divider=document.createElement('div');divider.className='concord-server-menu-divider';divider.setAttribute('role','separator');menu.append(divider)};
+  addOption('Convidar para o servidor','♧',()=>invite.click());
+  addDivider();
+  addOption('Configurações do servidor','⚙',()=>settings.click());
+  addOption('Criar canal ou sala de voz','⊕',()=>add.click());
+  addDivider();
+  addOption('Fazer backup do servidor','↓',()=>backup.click());
+  addOption('Restaurar backup','↑',()=>restore.click());
+  addDivider();
+  addOption('Copiar ID do servidor','▣',()=>{
+    if(navigator.clipboard?.writeText)navigator.clipboard.writeText(community.id).then(()=>showConcordToast('ID copiado',community.id)).catch(()=>prompt('Copie o ID:',community.id));
+    else prompt('Copie o ID:',community.id);
+  });
+  menuTrigger.onclick=()=>{const opening=menu.hidden;menu.hidden=!opening;menuTrigger.setAttribute('aria-expanded',String(opening));if(opening)menu.querySelector('button')?.focus()};
+  menu.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();closeMenu();menuTrigger.focus()}});
+  document.addEventListener('pointerdown',event=>{if(!menuWrap.contains(event.target))closeMenu()},{signal:concordServerMenuController.signal});
+  menuWrap.append(menuTrigger,menu);heading.append(menuWrap);concordServerPanel.append(heading);
   if(community.description){const description=document.createElement('p');description.className='concord-server-description';description.textContent=community.description;concordServerPanel.append(description)}
   const hint=document.createElement('div');hint.className='concord-server-hint';hint.textContent='Personalize canais e salas • Clique em ⚙ para editar o servidor';concordServerPanel.append(hint);
   if(community.channels.length>4){
