@@ -2506,7 +2506,7 @@ function dmShow(open){
   const headerIcon=$('.topbar .hash');if(headerIcon)headerIcon.textContent=open?'✉':'#';
   dmNav.classList.toggle('active',open);dmNav.setAttribute('aria-pressed',String(open));dmNav.title=open?'Voltar aos canais':'Conversas privadas';
   socialPanel.hidden=!open;
-  dmFriends.hidden=!open;concordDmFilter.hidden=!open;
+  dmFriends.hidden=true;concordDmFilter.hidden=true;
   $('#concordFriendsNav').classList.toggle('active',open);
   $('#concordFriendsNav').setAttribute('aria-pressed',String(open));
   if(!open){concordDmReply=null;document.getElementById('concordDmReplyPreview')?.remove();if(dmPeer)concordSaveDmDraft(dmPeer,$('#dmInput').value);dmHeaderAvatar.hidden=true;dmPeer=null;$('#dmPeerLabel').textContent='Selecione um amigo';$('#dmInput').disabled=true;$('#dmSend').disabled=true;renderChatHistory()}
@@ -2764,16 +2764,8 @@ async function refreshSocial(){
         if(label&&sender!==socialUser)label.textContent=concordFriendDisplayName(sender);
       }
     }
-    concordDmPrefsLoad();
-    const dmList=$('#dmFriends');dmList.replaceChildren();
-    const dmLabel=document.createElement('div');dmLabel.className='concord-dm-label';dmLabel.textContent='CONVERSAS COM AMIGOS';dmList.append(dmLabel);
-    if(!ids.length){const empty=document.createElement('div');empty.textContent='Aceite uma amizade para conversar.';dmList.append(empty)}
-    ids.slice().sort((a,b)=>Number(concordDmPreferences.favorites.has(b))-Number(concordDmPreferences.favorites.has(a))||concordFriendDisplayName(a).localeCompare(concordFriendDisplayName(b),'pt-BR')).forEach(id=>{const row=document.createElement('div');row.className='concord-dm-friend-row';row.dataset.friendName=concordFriendDisplayName(id).toLocaleLowerCase('pt-BR');row.hidden=!!concordDmPreferences.filter&&!row.dataset.friendName.includes(concordDmPreferences.filter);const button=document.createElement('button');button.type='button';button.className='concord-dm-friend';button.dataset.peerId=id;button.classList.toggle('active',dmOpen&&dmPeer===id);button.setAttribute('aria-current',dmOpen&&dmPeer===id?'true':'false');button.textContent='';
-    const friendAvatar=document.createElement('span');friendAvatar.className='concord-friend-avatar';friendAvatar.dataset.concordFriendAvatar=id;concordApplyFriendAvatar(friendAvatar,id);
-    const friendLabel=document.createElement('span');friendLabel.textContent=concordFriendDisplayName(id);
-    friendAvatar.classList.add(online.has(id)?'concord-aura-online':'concord-aura-offline');
-    button.title=concordFriendDisplayName(id)+' • '+(online.has(id)?'Online':'Offline');
-    button.append(friendAvatar,friendLabel);button.setAttribute('aria-label','Abrir conversa privada com '+concordFriendDisplayName(id));button.onclick=()=>dmSelect(id);const profile=document.createElement('button');profile.type='button';profile.className='concord-dm-visit';profile.textContent='◉';profile.title='Visitar perfil';profile.onclick=()=>concordViewProfile(id);const favorite=document.createElement('button');favorite.type='button';favorite.className='concord-dm-favorite';favorite.textContent=concordDmPreferences.favorites.has(id)?'★':'☆';favorite.setAttribute('aria-pressed',String(concordDmPreferences.favorites.has(id)));favorite.title=concordDmPreferences.favorites.has(id)?'Remover dos favoritos':'Adicionar aos favoritos';favorite.setAttribute('aria-label',favorite.title);favorite.onclick=()=>concordDmFavorite(id);row.append(button);dmList.append(row);row.oncontextmenu=e=>{e.preventDefault();concordOpenFriendMenu(e,id,true)}});
+    // A lista AMIGOS é a navegação única; não renderizar conversas duplicadas.
+    dmFriends.replaceChildren();
     if(dmOpen&&dmPeer&&!dmFriendIds.has(dmPeer)){dmProfileAction.hidden=true;dmPeer=null;$('#dmPeerLabel').textContent='Selecione um amigo';$('#dmHistory').textContent='Esta amizade não está mais ativa.';$('#dmInput').disabled=true;$('#dmSend').disabled=true}
     const list=$('#concordFriends');list.replaceChildren();
     if(!friends.length){list.textContent='Nenhum amigo adicionado.'}
@@ -3378,4 +3370,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
 #dmFriends .concord-dm-friend{justify-content:flex-start;gap:11px}
 #dmFriends .concord-dm-friend>span:nth-child(2){flex:1}
 @media(prefers-reduced-motion:reduce){#dmFriends .concord-dm-friend .concord-friend-avatar{transition:none}}
+</style><style>
+/* CONCORD clean: apenas a lista de amigos serve para abrir conversas. */
+#dmFriends,#concordDmQuickSearch{display:none!important}
 </style></body></html>                              
