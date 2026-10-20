@@ -2500,7 +2500,7 @@ function concordFriendAvatarUrl(id){
 function concordApplyFriendAvatar(element,id){
  if(!element||!id)return;
  const url=concordFriendAvatars.get(id);
- if(!url){element.style.backgroundImage='';element.textContent=concordFriendDisplayName(id).slice(0,1).toUpperCase()||'?';return}
+ if(!url){element.style.backgroundImage='';const label=concordFriendNames.get(id);element.textContent=label?label.slice(0,1).toUpperCase():'?';return}
  element.textContent='';
  element.style.backgroundImage='url("'+url+'")';
  element.style.backgroundPosition='center';
@@ -2574,7 +2574,11 @@ async function refreshSocial(){
         for(const profile of publicProfiles||[]){
           if(typeof profile.display_name==='string'&&profile.display_name.trim())concordFriendNames.set(profile.user_id,profile.display_name.trim().slice(0,28));
         }
-      }else if(publicError)console.warn('Nomes públicos indisponíveis:',publicError.message);
+      }else if(publicError){
+        console.warn('Nomes públicos indisponíveis:',publicError.message);
+        const panel=document.getElementById('concordFriends');
+        if(panel)panel.title='Não foi possível carregar os nomes públicos. Verifique a tabela e as permissões concord_public_profiles no Supabase.';
+      }
     }
     if(typeof voiceSignal!=='undefined'&&voiceSignal&&joinedRoom)voiceParticipants();
     if(typeof concordVoiceLobby!=='undefined'&&concordVoiceLobby)concordSyncVoiceLobby();
