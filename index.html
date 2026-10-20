@@ -2156,9 +2156,11 @@ const concordVoiceNameLookupAttempted=new Set();
 function voiceParticipants(){
   if(!voiceSignal||!joinedRoom)return;
   const state=voiceSignal.presenceState(),members=[];
+   const speakingByPeer=new Map();
+   if(concordVoiceLobby)for(const entry of Object.values(concordVoiceLobby.presenceState()).flat())if(entry?.id)speakingByPeer.set(entry.id,!!entry.speaking);
   Object.values(state).flat().forEach(p=>{
     if(!p||!p.id||p.id===voicePeerId)return;
-    if(!members.some(m=>m.id===p.id)){const publicName=p.userId&&concordFriendNames.get(p.userId);const name=String(publicName||p.name||'Participante').trim().slice(0,28)||'Participante';members.push({id:p.id,userId:p.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!p.sharing,speaking:!!p.speaking})};
+    if(!members.some(m=>m.id===p.id)){const publicName=p.userId&&concordFriendNames.get(p.userId);const name=String(publicName||p.name||'Participante').trim().slice(0,28)||'Participante';members.push({id:p.id,userId:p.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!p.sharing,speaking:speakingByPeer.get(p.id)===true})};
   });
   for(const [id,peer] of voicePeers)if(!members.some(m=>m.id===id)){peer.close();voicePeers.delete(id);for(const [key,audio] of voiceAudio){if(key.startsWith(id+':')){audio.remove();voiceAudio.delete(key)}}voicePendingIce.delete(id);concordLiveStreams.delete(id);if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none'}}
   roomRoster[joinedRoom]=[{id:voicePeerId,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream,speaking:concordIsLocallySpeaking},...members];
@@ -2287,8 +2289,12 @@ function concordSyncVoiceLobby(){
    if(room===joinedRoom)continue;
    roomRoster[room]=groups.get(room)||[];
  }
- // A lobby presence update must never overwrite the active call roster.
- if(joinedRoom&&callJoined)renderCallRoster();
+ // Preserve the active WebRTC roster and update the speaking effects.
+ if(joinedRoom&&callJoined){
+   const speaking=new Map((groups.get(joinedRoom)||[]).map(member=>[member.id,!!member.speaking]));
+   for(const member of roomRoster[joinedRoom]||[])if(!member.isMe)member.speaking=speaking.get(member.id)===true;
+   renderCallRoster();
+ }
  concordVoiceLobbyRooms.clear();
  for(const room of groups.keys())concordVoiceLobbyRooms.add(room);
  renderRooms();
