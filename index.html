@@ -951,7 +951,7 @@ function renderConcordLocalVoiceMembers(container,room){
     const row=document.createElement('div');row.className='concord-local-voice-person';
     const avatar=document.createElement('span');avatar.className='mini-avatar';avatar.textContent=String(member.initial||'?').slice(0,2);
     if(member.isMe)setConcordAvatar(avatar,concordData.profile);
-    const name=document.createElement('span');name.textContent=member.isMe?'Você':String(member.name||'Participante');
+    const name=document.createElement('span');name.textContent=member.isMe?String(concordData.profile?.name||member.name||'Participante').trim():String(member.name||'Participante');
     const status=document.createElement('span');status.textContent=member.isMe?(micEnabled?'🎙':'🔇'):'🎧';
     row.append(avatar,name,status);
     const live=concordLiveBadge(member);
