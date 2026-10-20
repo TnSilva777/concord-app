@@ -2756,7 +2756,8 @@ async function initConcordSocial(session){
   socialRefreshQueued=false;
   dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#dmHistory').textContent='Selecione um amigo na lista à esquerda.';
   if(id!==concordProfileUser)restoreConcordProfileForUser(id);
-  if(id&&concordData.profile.name==='Você'){
+  // Auth metadata is the account-wide source of truth; localStorage can be stale on another device.
+  if(id){
     const auth=session?.user;
     const cloudProfile=auth?.user_metadata?.concord_profile;
     if(cloudProfile&&typeof cloudProfile==='object'&&typeof cloudProfile.name==='string'&&cloudProfile.name.trim()){
@@ -2766,7 +2767,7 @@ async function initConcordSocial(session){
   }
   if(id&&concordData.profile.name==='Você'){
     const auth=session?.user;
-    const proposed=String(auth?.user_metadata?.display_name||auth?.user_metadata?.full_name||auth?.user_metadata?.name||auth?.email?.split('@')[0]||'').trim().slice(0,28);
+    const proposed=String(auth?.user_metadata?.display_name||auth?.user_metadata?.full_name||auth?.user_metadata?.name||'').trim().slice(0,28);
     if(proposed){concordData.profile.name=proposed;concordData.profile.avatar=proposed[0].toUpperCase();saveConcordProfileForUser();updateProfileUI()}
   }
   if(id){syncConcordAvatarFromCloud(id)}socialUser=id;voiceRoomsUser=id;initPublicChat(session);concordLoadServersFromCloud(id).catch(console.warn);clearInterval(socialTimer);socialTimer=null;
