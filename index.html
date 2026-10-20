@@ -2678,7 +2678,7 @@ async function concordRefreshFriendAvatars(ids){
  document.querySelectorAll('[data-concord-friend-avatar]').forEach(el=>concordApplyFriendAvatar(el,el.dataset.concordFriendAvatar));
  concordVoiceAvatarVersion++;
 }
-function concordFriendDisplayName(id){return concordFriendNames.get(id)||'Nome indisponível'}
+function concordFriendDisplayName(id){return concordFriendNames.get(id)||'Perfil sem nome'}
 async function concordPublishPublicProfile(){
   if(!concordProfileUser)return false;
   const name=String(concordData.profile.name||'').trim().slice(0,28);
@@ -2742,8 +2742,11 @@ async function refreshSocial(){
     if(visibleIds.length){
       const {data:publicProfiles,error:publicError}=await concordSupabase.from('concord_public_profiles').select('user_id,display_name').in('user_id',visibleIds);
       if(!publicError&&requestUser===socialUser){
+        document.getElementById('concordFriends')?.removeAttribute('title');
         for(const profile of publicProfiles||[]){
-          if(typeof profile.display_name==='string'&&profile.display_name.trim())concordFriendNames.set(profile.user_id,profile.display_name.trim().slice(0,28));
+          if(typeof profile.display_name==='string'&&profile.display_name.trim()){
+             concordFriendNames.set(profile.user_id,profile.display_name.trim().slice(0,28));
+           }
         }
       }else if(publicError){
         console.warn('Nomes públicos indisponíveis:',publicError.message);
