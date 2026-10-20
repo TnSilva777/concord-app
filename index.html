@@ -18,7 +18,6 @@
 .profile-fields{display:grid;gap:8px;margin:14px 0}.profile-fields label{font-size:12px;color:var(--muted)}.profile-fields input{width:100%;margin-top:5px;padding:11px;border-radius:9px;background:#0d0d15;border:1px solid var(--line);color:var(--text);outline:none}.profile-fields input:focus{border-color:var(--purple2)}
 .community-card{display:flex;gap:10px;align-items:center;padding:10px;background:#1b1929;border:1px solid #302a47;border-radius:10px;margin:8px 0}.community-card .community-symbol{width:42px;height:42px;display:grid;place-items:center;border-radius:14px;background:linear-gradient(135deg,#9b65ff,#3d1c86);font-size:22px}.community-card small{display:block;color:var(--muted);margin-top:3px}
 
-<
 /* CONCORD HUD refinement — visual-only, preserving existing handlers */
 :root{color-scheme:dark}
 html,body{width:100%;min-width:0}
@@ -58,6 +57,22 @@ button:disabled{cursor:not-allowed;opacity:.55}
 @media(min-width:1100px){.app{grid-template-columns:76px 250px minmax(250px,1fr)}.servers{padding-inline:12px}.server.active:before{left:-12px}}
 @media(max-width:760px){.topbar{padding-inline:12px;gap:7px}.topbar .sub{display:none}.composer{padding-bottom:max(12px,env(safe-area-inset-bottom))}.messages{padding-inline:15px}.welcome{padding:18px}.dialog{padding:18px}.voice-dialog{padding:0}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+
+
+/* HUD v2 */
+.search{display:flex;align-items:center;gap:8px}
+.search::after{content:"Ctrl K";margin-left:auto;font-size:10px;color:#8f84ad;background:#28213a;border:1px solid #3e3159;border-radius:5px;padding:2px 5px}
+#concordChannelFinder{position:fixed;inset:0;background:#050409c9;z-index:9000;display:none;align-items:flex-start;justify-content:center;padding:clamp(40px,12vh,130px) 15px 20px;backdrop-filter:blur(7px)}
+#concordChannelFinder.open{display:flex}
+.concord-finder-box{width:min(540px,100%);max-height:75vh;overflow:auto;background:#171522;border:1px solid #564176;border-radius:16px;padding:16px;box-shadow:0 25px 80px #000a}
+.concord-finder-box input{width:100%;padding:14px;background:#0c0b13;border:1px solid #554074;border-radius:10px;color:#fff;outline:none}
+.concord-finder-box input:focus{border-color:#b389ff}
+.concord-finder-result{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;padding:12px;border-radius:9px;color:#ddd3f5}
+.concord-finder-result:hover,.concord-finder-result:focus-visible{background:#34234f}
+.concord-finder-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.concord-finder-title button{background:#302541;border-radius:8px;padding:6px 10px}
+#concordToast{position:fixed;bottom:25px;right:25px;z-index:9500;background:#211832;border:1px solid #6e4da0;color:#fff;border-radius:12px;padding:12px 18px;box-shadow:0 12px 40px #0007;max-width:min(380px,90vw)}
+@media(max-width:760px){.search::after{content:"⌕";padding:0;border:0;background:none}}
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -272,6 +287,40 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   user.appendChild(logout);
   client.auth.onAuthStateChange((_event, session) => {
     if (!session) auth.style.display = 'flex';
+  });
+})();
+</script>
+<script>
+(() => {
+  const search = document.getElementById('searchBtn');
+  if (!search || document.getElementById('concordChannelFinder')) return;
+  const finder = document.createElement('div');
+  finder.id = 'concordChannelFinder';
+  finder.innerHTML = '<section class="concord-finder-box" role="dialog" aria-modal="true" aria-label="Buscar canais"><div class="concord-finder-title"><strong>Buscar canais</strong><button type="button" id="concordFinderClose" aria-label="Fechar busca">✕</button></div><input id="concordFinderInput" placeholder="Digite o nome de um canal..." autocomplete="off" aria-label="Nome do canal"><div id="concordFinderResults"></div></section>';
+  document.body.append(finder);
+  const input = finder.querySelector('input'), results = finder.querySelector('#concordFinderResults');
+  const close = () => { finder.classList.remove('open'); search.focus(); };
+  const render = () => {
+    results.replaceChildren();
+    const term = input.value.trim().toLocaleLowerCase('pt-BR');
+    const channels = [...document.querySelectorAll('[data-channel],.voice-room')];
+    const matching = channels.filter(el => (el.dataset.channel || el.dataset.room || el.textContent || '').toLocaleLowerCase('pt-BR').includes(term));
+    if (!matching.length) { const p = document.createElement('p'); p.textContent = 'Nenhum canal encontrado.'; p.style.color = '#a5a0bd'; results.append(p); }
+    matching.forEach(el => {
+      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'concord-finder-result';
+      btn.textContent = (el.classList.contains('voice-room') ? '🎙 ' : '# ') + (el.dataset.channel || el.dataset.room);
+      btn.onclick = () => { close(); el.click(); };
+      results.append(btn);
+    });
+  };
+  const open = () => { finder.classList.add('open'); input.value = ''; render(); input.focus(); };
+  search.onclick = open;
+  finder.querySelector('#concordFinderClose').onclick = close;
+  finder.addEventListener('click', e => { if (e.target === finder) close(); });
+  input.addEventListener('input', render);
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); finder.classList.contains('open') ? close() : open(); }
+    if (e.key === 'Escape' && finder.classList.contains('open')) close();
   });
 })();
 </script>
