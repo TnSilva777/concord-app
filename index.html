@@ -313,6 +313,11 @@ body.concord-custom-server-view #concordServerPanel{padding:0 7px 14px;backgroun
 #concordToast{border-radius:10px}
 @media(max-width:1050px) and (min-width:761px){.app{grid-template-columns:64px 224px minmax(0,1fr)}}
 @media(max-width:760px){.app{grid-template-columns:58px minmax(0,1fr)}.topbar{padding:0 12px}.messages{padding:12px}.composer{padding:0 12px 12px}}
+
+#concordDiagnosticsButton{display:block;width:calc(100% - 20px);margin:12px 10px;padding:10px 9px;text-align:left;background:#223c2d;border:1px solid #42664f;border-radius:8px;color:#dcf8e7;font-size:12px;font-weight:650}
+#concordDiagnosticsButton:hover{background:#305b40}
+#concordDiagnosticsButton:disabled{opacity:.65;cursor:wait}
+#simpleText{white-space:pre-line;overflow-wrap:anywhere;line-height:1.65}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -1255,6 +1260,48 @@ socialPanel.hidden=true;
 const sidebarSearch=$('#searchBtn');
 if(sidebarSearch)sidebarSearch.parentNode.insertBefore(socialPanel,sidebarSearch);
 let socialUser=null,socialTimer=null,socialBusy=false,socialRefreshQueued=false;
+const concordDiagnosticsButton=document.createElement('button');
+concordDiagnosticsButton.type='button';
+concordDiagnosticsButton.id='concordDiagnosticsButton';
+concordDiagnosticsButton.textContent='🛡 Diagnóstico de conexão';
+concordDiagnosticsButton.title='Verificar autenticação e acesso às mensagens privadas sem revelar dados da conta';
+socialPanel.append(concordDiagnosticsButton);
+concordDiagnosticsButton.onclick=async()=>{
+  if(concordDiagnosticsButton.disabled)return;
+  concordDiagnosticsButton.disabled=true;
+  concordDiagnosticsButton.textContent='⏳ Verificando conexão...';
+  const lines=[];
+  try{
+    const {data,error}=await concordSupabase.auth.getUser();
+    const user=data?.user;
+    if(error||!user){
+      lines.push('Autenticação: não validada'+(error?' ('+error.message+')':''));
+      lines.push('Ação: saia da conta, entre novamente e repita o teste.');
+    }else{
+      lines.push('Autenticação: válida');
+      lines.push('Identidade do CONCORD: '+(socialUser===user.id?'corresponde à sessão':'não corresponde à sessão'));
+      const {data:friends,error:friendError}=await concordSupabase.from('concord_friend_requests')
+        .select('requester_id,recipient_id,status')
+        .or('requester_id.eq.'+user.id+',recipient_id.eq.'+user.id)
+        .eq('status','accepted').limit(100);
+      if(friendError)lines.push('Leitura das amizades: falhou ('+friendError.message+')');
+      else{
+        lines.push('Leitura das amizades: funcionando');
+        lines.push('Amizades aceitas visíveis: '+(friends||[]).length);
+        if(dmPeer){
+          const isFriend=(friends||[]).some(f=>(f.requester_id===user.id&&f.recipient_id===dmPeer)||(f.recipient_id===user.id&&f.requester_id===dmPeer));
+          lines.push('Amizade com a conversa atual: '+(isFriend?'confirmada':'não encontrada'));
+        }else lines.push('Conversa atual: selecione um amigo para verificar a amizade.');
+      }
+      const {error:dmError}=await concordSupabase.from('concord_direct_messages').select('id').limit(1);
+      lines.push('Leitura das mensagens: '+(dmError?'falhou ('+dmError.message+')':'funcionando'));
+      lines.push('Envio: não testado (nenhuma mensagem foi criada).');
+    }
+  }catch(error){lines.push('Falha no diagnóstico: '+(error.message||'erro inesperado'))}
+  finally{concordDiagnosticsButton.disabled=false;concordDiagnosticsButton.textContent='🛡 Diagnóstico de conexão'}
+  simple('Diagnóstico de conexão',lines.join('\n'));
+};
+
 // Mensagens privadas: area separada dos canais publicos, com armazenamento no Supabase.
 const dmPane=document.createElement('section');dmPane.id='concordDmPane';dmPane.hidden=true;
 dmPane.innerHTML='<div class="concord-dm-header"><button type="button" id="dmBack">← Voltar</button><strong>Conversas privadas</strong><span id="dmPeerLabel">Selecione um amigo</span></div><div id="dmHistory" class="concord-dm-history" role="log" aria-live="polite">Selecione um amigo na lista à esquerda.</div><form id="dmForm" class="concord-dm-form"><input id="dmInput" type="text" maxlength="2000" placeholder="Mensagem privada..." autocomplete="off" required disabled><button type="submit" disabled id="dmSend">Enviar</button></form>';
