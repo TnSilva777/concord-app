@@ -562,6 +562,15 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
 #concordVoiceGrid.open{display:flex!important;flex:1 1 auto!important;min-height:0!important}
 #concordVoiceGrid .cvg-tile video{z-index:0}
 #concordVoiceGrid .cvg-tile .cvg-name,#concordVoiceGrid .cvg-tile .cvg-live{z-index:2}
+
+/* Compact live indicator in voice roster, with a dedicated fullscreen control */
+.room-member .concord-live-button,.sidebar .concord-live-button{font-size:9px!important;line-height:1!important;letter-spacing:0!important;padding:3px 5px!important;border-radius:4px!important;margin:0!important;white-space:nowrap;min-height:18px;max-width:72px;flex-shrink:0}
+#concordVoiceGrid .cvg-tile{background:#091710}
+#concordVoiceGrid .cvg-tile video{object-fit:contain!important;max-width:100%;max-height:100%}
+#concordVoiceGrid .cvg-tile .cvg-zoom{right:10px;top:10px}
+#concordVoiceGrid .cvg-tile:fullscreen{width:100vw!important;height:100vh!important;max-height:none!important;border-radius:0!important;background:#000!important}
+#concordVoiceGrid .cvg-tile:fullscreen video{object-fit:contain!important}
+#concordVoiceGrid .cvg-tile:fullscreen .cvg-zoom{z-index:10}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2714,7 +2723,11 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
     const zoom=document.createElement('button');zoom.type='button';zoom.className='cvg-zoom';zoom.textContent=tile.classList.contains('cvg-expanded')?'↙ Reduzir':'⛶ Ampliar';
     zoom.setAttribute('aria-label',tile.classList.contains('cvg-expanded')?'Voltar à grade':'Ampliar transmissão');
     zoom.onclick=()=>{const was=tile.classList.toggle('cvg-expanded');zoom.textContent=was?'↙ Reduzir':'⛶ Ampliar';zoom.setAttribute('aria-label',was?'Voltar à grade':'Ampliar transmissão')};
-    tile.append(zoom);
+    const full=document.createElement('button');full.type='button';full.className='cvg-fullscreen';full.textContent='⛶ Tela cheia';full.title='Abrir transmissão em tela cheia';
+    full.style.cssText='position:absolute;top:10px;right:105px;z-index:4;background:#10271ee8;border:1px solid #66b98b;border-radius:7px;padding:6px 10px;font-size:12px';
+    full.onclick=async()=>{try{if(document.fullscreenElement===tile)await document.exitFullscreen();else if(tile.requestFullscreen)await tile.requestFullscreen();else{tile.classList.add('cvg-expanded')}}catch(e){console.warn('Tela cheia indisponível',e)}};
+    tile.addEventListener('fullscreenchange',()=>{full.textContent=document.fullscreenElement===tile?'↙ Sair da tela cheia':'⛶ Tela cheia'});
+    tile.append(zoom,full);
    }
    tiles.append(tile);
   });
