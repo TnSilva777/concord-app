@@ -2079,6 +2079,7 @@ function openProfileEditor(){
           const {error:profileError}=await concordSupabase.auth.updateUser({data:{display_name:n,concord_profile:{name:n,status:concordData.profile.status,bio:concordData.profile.bio,avatar:concordData.profile.avatar,color:concordData.profile.color}}});
           if(profileError)throw profileError;
           const publicSaved=await concordPublishPublicProfile();
+          if(publicSaved){document.getElementById('concordChooseNameHint')?.remove();concordRefreshPublicNameLabels()}
           notice=(publicSaved?'Nome público sincronizado para seus amigos. ':'Seu nome foi salvo na conta, mas NÃO foi publicado para seus amigos. Confira as permissões de concord_public_profiles no Supabase. ')+notice;
         }catch(error){console.warn('Não foi possível sincronizar o nome:',error);notice+=' O nome não foi sincronizado com a conta; tente salvar novamente.'}
       }
@@ -2120,9 +2121,8 @@ function setLocalSpeaking(on){
  if(on===concordIsLocallySpeaking)return;
  concordIsLocallySpeaking=on;
  document.querySelectorAll('.room-member.you-in-room').forEach(el=>el.classList.toggle('concord-member-speaking',on));
- const now=Date.now();
- if(concordVoiceLobby&&callJoined&&joinedRoom&&now-concordVoiceSpeakingLast>350){
-   concordVoiceSpeakingLast=now;
+ if(concordVoiceLobby&&callJoined&&joinedRoom){
+   concordVoiceSpeakingLast=Date.now();
    concordVoiceLobby.track({id:voicePeerId,userId:socialUser,room:joinedRoom,name:voicePeerName(),sharing:!!stream,speaking:on}).catch(console.warn);
  }
 }
@@ -2732,6 +2732,7 @@ async function concordRefreshFriendAvatars(ids){
  concordVoiceAvatarVersion++;
 }
 function concordFriendDisplayName(id){return concordFriendNames.get(id)||'Perfil sem nome'}
+function concordRefreshPublicNameLabels(){if(socialUser)refreshSocial().catch(console.warn)}
 async function concordPublishPublicProfile(){
   if(!concordProfileUser)return false;
   const name=String(concordData.profile.name||'').trim().slice(0,28);
@@ -2906,7 +2907,7 @@ async function initConcordSocial(session){
     if(proposed){concordData.profile.name=proposed;concordData.profile.avatar=proposed[0].toUpperCase();saveConcordProfileForUser();updateProfileUI()}
   }
   if(id){syncConcordAvatarFromCloud(id)}socialUser=id;voiceRoomsUser=id;initPublicChat(session);concordLoadServersFromCloud(id).catch(console.warn);clearInterval(socialTimer);socialTimer=null;
-  if(!id){concordLeaveVoiceLobby();dmShow(true);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
+  if(!id){if(window.concordNamesRealtime){concordSupabase.removeChannel(window.concordNamesRealtime).catch(console.warn);window.concordNamesRealtime=null}concordLeaveVoiceLobby();dmShow(true);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
   dmShow(true);
   await concordJoinVoiceLobby(id).catch(error=>console.warn('Lobby de voz:',error));
   await concordPublishPublicProfile().catch(error=>console.warn('Falha ao publicar perfil:',error));
@@ -2922,6 +2923,7 @@ async function initConcordSocial(session){
     }
   }catch(error){console.warn('Não foi possível verificar nome público',error)}
   await Promise.all([refreshSocial(),refreshSharedVoiceRooms()]);
+  if(!window.concordNamesRealtime){window.concordNamesRealtime=concordSupabase.channel('concord-public-name-updates').on('postgres_changes',{event:'*',schema:'public',table:'concord_public_profiles'},()=>concordRefreshPublicNameLabels()).subscribe()}
   socialTimer=setInterval(()=>{if(document.visibilityState==='visible'){refreshSocial();refreshSharedVoiceRooms()}},30000);
 }
 concordSupabase.auth.getSession().then(({data})=>initConcordSocial(data.session)).catch(console.warn);
@@ -3477,4 +3479,8 @@ body.concord-home-view .app>.sidebar .user{margin-top:auto;flex-shrink:0}
 .room-member.concord-member-speaking{background:rgba(46,187,115,.13)!important;border-radius:10px}
 .room-member .mini-avatar.speaking,.roster-person .avatar.speaking{isolation:isolate;box-shadow:0 0 0 2px #55ed9f,0 0 16px #43d99a88}
 @media(prefers-reduced-motion:reduce){.room-member .mini-avatar.speaking::before,.room-member .mini-avatar.speaking::after,.roster-person .avatar.speaking::before,.roster-person .avatar.speaking::after{animation:none}}
+</style><style>
+.room-member .mini-avatar.speaking,.roster-person .avatar.speaking,.user .avatar.speaking{outline:3px solid #3cff8d!important;outline-offset:3px!important;box-shadow:0 0 0 6px #18ed8540,0 0 24px #35ffa5a8!important;animation:concordSpeakingGlow .75s ease-in-out infinite alternate!important}
+@keyframes concordSpeakingGlow{from{filter:brightness(1)}to{filter:brightness(1.22)}}
+@media(prefers-reduced-motion:reduce){.room-member .mini-avatar.speaking,.roster-person .avatar.speaking,.user .avatar.speaking{animation:none!important}}
 </style></body></html>                              
