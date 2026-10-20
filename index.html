@@ -2506,15 +2506,27 @@ function concordApplyFriendAvatar(element,id){
  element.style.backgroundPosition='center';
  element.style.backgroundSize='cover';
 }
+// Avoid downloading the same profile photo every social refresh.
+const concordAvatarCheckedAt=new Map();
 async function concordRefreshFriendAvatars(ids){
  const account=socialUser;
- await Promise.all(ids.map(async id=>{
+ const now=Date.now();
+ const pending=[...new Set(ids)].filter(id=>!concordAvatarCheckedAt.has(id)||now-concordAvatarCheckedAt.get(id)>120000);
+ await Promise.all(pending.map(async id=>{
+   concordAvatarCheckedAt.set(id,now);
    const url=concordFriendAvatarUrl(id);
    if(!url)return;
    try{
-     const response=await fetch(url,{method:'GET',cache:'no-store'});
+     // Image loading works with storage/CDN responses that do not support HEAD.
+     const loaded=await new Promise(resolve=>{
+       const picture=new Image();
+       const timeout=setTimeout(()=>{picture.onload=null;picture.onerror=null;resolve(false)},8000);
+       picture.onload=()=>{clearTimeout(timeout);resolve(true)};
+       picture.onerror=()=>{clearTimeout(timeout);resolve(false)};
+       picture.src=url+'?v='+Math.floor(now/120000);
+     });
      if(account!==socialUser)return;
-     if(response.ok)concordFriendAvatars.set(id,url+'?v='+Math.floor(Date.now()/60000));
+     if(loaded)concordFriendAvatars.set(id,url+'?v='+Math.floor(now/120000));
      else concordFriendAvatars.delete(id);
    }catch(error){console.warn('Foto do amigo indisponível:',error)}
  }));
@@ -2645,7 +2657,7 @@ async function initConcordSocial(session){
   }
   concordFriendNames.clear();
   concordFriendAvatars.clear();
-  concordFriendAvatars.clear();
+  concordAvatarCheckedAt.clear();
   if(typeof concordVoiceNameLookupAttempted!=='undefined')concordVoiceNameLookupAttempted.clear();
   socialRefreshQueued=false;
   dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#dmHistory').textContent='Selecione um amigo na lista à esquerda.';
