@@ -899,7 +899,7 @@ function openProfileEditor(){
   avatarInput.oninput=previewAvatar;colorInput.oninput=previewAvatar;
   foot.append(cancel,save);previewAvatar();modal.classList.add('show');
 }
-$('#addServer').onclick=openCommunityCreator;$('#profileBtn').onclick=openProfileEditor;updateProfileUI();renderCommunities();
+$('#addServer').onclick=openCommunityCreator;$('#profileBtn').onclick=openProfileEditor;updateProfileUI();renderCommunities();concordReceiveCommunityInvite();
 // Anima o contorno da foto quando o microfone detecta voz (somente no dispositivo local).
 function setLocalSpeaking(on){document.querySelectorAll('.user .avatar,.roster-person.me .avatar,.room-member.you-in-room .mini-avatar').forEach(el=>el.classList.toggle('speaking',!!on));}
 
