@@ -395,6 +395,25 @@ body.concord-custom-server-view #concordServerPanel{padding:0 7px 14px;backgroun
 .concord-screen-control svg{display:block;pointer-events:none}
 @media(max-width:1100px){.user{gap:5px}.concord-user-controls{gap:2px}.concord-user-controls .gear{width:30px;height:30px;min-width:30px}}
 </style>
+<style>
+#concordHud{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;padding:18px;background:rgba(0,0,0,.74);backdrop-filter:blur(8px)}
+#concordHud section{width:min(470px,100%);max-height:min(90vh,780px);overflow:auto;background:linear-gradient(155deg,#1c3e30,#10251c 65%);border:1px solid #467a60;border-radius:20px;padding:24px;color:#f0fff5;box-shadow:0 28px 90px #000b}
+.concord-hud-header{display:flex;justify-content:space-between;align-items:start;gap:12px;margin-bottom:16px}
+.concord-hud-header h2{margin:0;font-size:21px;line-height:1.3;overflow-wrap:anywhere}
+#concordHud .concord-hud-close{font-size:25px;line-height:1;border:0;background:#ffffff12;color:#eafff2;border-radius:10px;width:34px;height:34px;cursor:pointer;flex-shrink:0}
+.concord-hud-form{display:grid;gap:14px}
+.concord-hud-field{display:grid;gap:7px;font-size:13px;font-weight:600;color:#d4eddf}
+#concordHud .concord-hud-input{box-sizing:border-box;width:100%;background:#0b2017;border:1px solid #4c8064;border-radius:11px;padding:12px;color:#fff;font:inherit;font-size:15px;outline:none}
+#concordHud .concord-hud-input:focus{border-color:#82e8ae;box-shadow:0 0 0 3px #50e79725}
+#concordHud textarea.concord-hud-input{resize:vertical;min-height:88px}
+.concord-hud-count{justify-self:end;font-size:11px;color:#a2c4b0;font-weight:400}
+.concord-hud-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;margin-top:8px}
+#concordHud .concord-hud-actions button{padding:11px 15px;border-radius:10px;color:#fff;cursor:pointer;font-weight:650}
+#concordHud .concord-hud-cancel{background:#355746;border:1px solid #547864}
+#concordHud .concord-hud-save{background:#158b5d;border:1px solid #35bb83}
+#concordHud .concord-hud-delete{background:#783a40;border:1px solid #a95962;margin-right:auto}
+@media(max-width:600px){#concordHud{align-items:end;padding:8px}#concordHud section{width:100%;padding:20px;border-radius:20px 20px 10px 10px;max-height:88dvh}#concordHud .concord-hud-input{font-size:16px}}
+</style>
 </head><body>
 <div class="app"><aside class="servers"><div class="logo concord-brand-mark" aria-label="Logo CONCORD" title="CONCORD">C</div><button type="button" class="server" id="concordFriendsNav" title="Amigos e conversas privadas" aria-label="Abrir amigos e conversas privadas">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
 <aside class="sidebar"><div class="brand"><strong>CONCORD</strong><small>SUA COMUNIDADE. SEU ESPAÇO.</small></div><button class="search" id="searchBtn">⌕ &nbsp; Buscar canais</button><div class="section">CONCORD OFICIAL</div><button class="channel active" data-channel="geral"><span>#</span> geral</button><button class="channel" data-channel="regras"><span>#</span> regras</button><button class="channel" data-channel="anuncios"><span>#</span> anúncios</button><div class="section">COMUNIDADES</div><button class="channel" data-channel="jogos"><span>#</span> jogos</button><button class="channel" data-channel="tecnologia"><span>#</span> tecnologia</button><button class="channel" data-channel="memes"><span>#</span> memes</button><div class="section">CANAIS DE VOZ</div><button class="channel" id="voiceBtn"><span>◖</span> Sala de voz <span class="online"></span></button><div class="section voice-section-title">SALAS DE VOZ <button id="addVoiceRoom" title="Criar sala de voz">＋</button></div>
@@ -902,20 +921,49 @@ function updateProfileUI(){const name=concordData.profile.name||'Você';const us
   }
 }
 function concordHud(title,fields,onSave,onDelete){
-document.getElementById('concordHud')?.remove();
-const bg=document.createElement('div');bg.id='concordHud';bg.style.cssText='position:fixed;inset:0;z-index:99999;background:#000b;display:grid;place-items:center;padding:20px;backdrop-filter:blur(5px)';
-const box=document.createElement('section');box.style.cssText='background:#142d22;border:1px solid #39805d;border-radius:16px;padding:24px;width:min(430px,100%);color:#fff;box-shadow:0 25px 80px #0008';
-const h=document.createElement('h2');h.textContent=title;box.append(h);const inputs={};
-for(const f of fields){const label=document.createElement('label');label.textContent=f.label;label.style.cssText='display:block;margin:16px 0;font-size:13px';const el=document.createElement(f.options?'select':f.multiline?'textarea':'input');el.style.cssText='display:block;width:100%;box-sizing:border-box;margin-top:8px;background:#092018;border:1px solid #44775e;border-radius:8px;padding:11px;color:white';if(f.options)for(const o of f.options){const opt=document.createElement('option');opt.value=o[0];opt.textContent=o[1];el.append(opt)}else el.value=f.value||'';if(!f.options)el.maxLength=f.max||180;inputs[f.key]=el;label.append(el);box.append(label)}
-const actions=document.createElement('div');actions.style.cssText='display:flex;gap:9px;flex-wrap:wrap;margin-top:20px';
-const button=(label,fn,color)=>{const b=document.createElement('button');b.textContent=label;b.type='button';b.style.cssText='padding:11px;border:0;border-radius:8px;background:'+color+';color:white;cursor:pointer';b.onclick=fn;actions.append(b)};
-const values=()=>Object.fromEntries(Object.entries(inputs).map(([k,v])=>[k,v.value]));
-button('Cancelar',()=>bg.remove(),'#345446');button('Salvar',()=>onSave(values(),()=>bg.remove()),'#14875c');if(onDelete)button('Excluir servidor',()=>onDelete(()=>bg.remove()),'#983d42');
-box.append(actions);bg.append(box);document.body.append(bg);bg.onclick=e=>{if(e.target===bg)bg.remove()};bg.onkeydown=e=>{
-if(e.key==='Escape'){e.preventDefault();bg.remove();return}
-if(e.key==='Tab'){const focusable=[...box.querySelectorAll('button,input,select,textarea')].filter(el=>!el.disabled);if(!focusable.length)return;const first=focusable[0],last=focusable[focusable.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}
-if(e.key==='Enter'&&e.target.tagName!=='TEXTAREA'&&e.target.tagName!=='BUTTON'){e.preventDefault();onSave(values(),()=>bg.remove())}
-};box.querySelector('input,select,textarea')?.focus();
+  document.getElementById('concordHud')?.remove();
+  const previousFocus=document.activeElement;
+  const bg=document.createElement('div');bg.id='concordHud';bg.setAttribute('role','presentation');
+  const box=document.createElement('section');box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');box.setAttribute('aria-labelledby','concordHudTitle');
+  const header=document.createElement('div');header.className='concord-hud-header';
+  const h=document.createElement('h2');h.id='concordHudTitle';h.textContent=title;
+  const x=document.createElement('button');x.type='button';x.className='concord-hud-close';x.textContent='×';x.setAttribute('aria-label','Fechar janela');
+  header.append(h,x);box.append(header);
+  const form=document.createElement('form');form.className='concord-hud-form';
+  const inputs={};
+  for(const f of fields){
+    const label=document.createElement('label');label.className='concord-hud-field';
+    const labelText=document.createElement('span');labelText.textContent=f.label;
+    const el=document.createElement(f.options?'select':f.multiline?'textarea':'input');
+    el.className='concord-hud-input';el.name=f.key;
+    if(f.options){for(const o of f.options){const opt=document.createElement('option');opt.value=o[0];opt.textContent=o[1];el.append(opt)}el.value=f.value??f.options[0]?.[0]??''}
+    else {el.value=f.value??'';el.maxLength=f.max||180;if(f.multiline)el.rows=3}
+    if(!f.options&&el.maxLength>0){const count=document.createElement('small');count.className='concord-hud-count';const update=()=>count.textContent=el.value.length+'/'+el.maxLength;el.addEventListener('input',update);update();label.append(labelText,el,count)}
+    else label.append(labelText,el);
+    inputs[f.key]=el;form.append(label);
+  }
+  const actions=document.createElement('div');actions.className='concord-hud-actions';
+  const cancel=document.createElement('button');cancel.type='button';cancel.className='concord-hud-cancel';cancel.textContent='Cancelar';
+  const save=document.createElement('button');save.type='submit';save.className='concord-hud-save';save.textContent='Salvar alterações';
+  const values=()=>Object.fromEntries(Object.entries(inputs).map(([k,v])=>[k,v.value]));
+  const close=()=>{bg.remove();if(previousFocus?.isConnected)previousFocus.focus()};
+  x.onclick=cancel.onclick=close;
+  form.onsubmit=e=>{e.preventDefault();onSave(values(),close)};
+  actions.append(cancel,save);
+  if(onDelete){const del=document.createElement('button');del.type='button';del.className='concord-hud-delete';del.textContent='Excluir servidor';del.onclick=()=>onDelete(close);actions.prepend(del)}
+  form.append(actions);box.append(form);bg.append(box);document.body.append(bg);
+  bg.onclick=e=>{if(e.target===bg)close()};
+  bg.onkeydown=e=>{
+    if(e.key==='Escape'){e.preventDefault();close();return}
+    if(e.key==='Tab'){
+      const focusable=[...box.querySelectorAll('button,input,select,textarea')].filter(el=>!el.disabled);
+      if(!focusable.length)return;
+      const first=focusable[0],last=focusable[focusable.length-1];
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+    }
+  };
+  (box.querySelector('input,select,textarea')||x).focus();
 }
 function editLocalCommunity(id){
 const community=concordData.communities.find(x=>x.id===id);if(!community)return;
