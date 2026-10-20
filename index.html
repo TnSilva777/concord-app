@@ -744,10 +744,7 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
  .app>.sidebar{box-shadow:10px 0 32px rgba(0,0,0,.35)}
 }
 
-/* Manual friend sync and mobile-friendly controls. */
-.concord-social-sync{align-self:stretch;min-height:34px;padding:7px 10px;border:1px solid #315e47;border-radius:9px;background:#153d2b;color:#d4f9e3;font-size:12px}
-.concord-social-sync:disabled{opacity:.6;cursor:wait}
-@media(max-width:760px){.concord-social-sync{min-height:40px}.concord-friends-toolbar{gap:8px}}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js'"></script>
 <script>
@@ -2387,46 +2384,6 @@ concordFriendsSearchInput.type='search';concordFriendsSearchInput.placeholder='B
 concordFriendsSearchInput.oninput=()=>{concordFriendsSearch=concordFriendsSearchInput.value.trim().toLowerCase();concordApplyFriendsFilter()};
 concordFriendsToolbar.append(concordFriendsTabs,concordFriendsSearchInput);
 socialPanel.insertBefore(concordFriendsToolbar,$('#concordFriends'));
-// Manual sync helps recover from missed presence events or intermittent mobile connections.
-const concordSocialSync=document.createElement('button');
-concordSocialSync.type='button';
-concordSocialSync.className='concord-social-sync';
-concordSocialSync.textContent='↻ Atualizar amigos';
-concordSocialSync.setAttribute('aria-label','Atualizar lista de amigos e fotos');
-concordSocialSync.onclick=async()=>{
- if(concordSocialSync.disabled||!socialUser)return;
- concordSocialSync.disabled=true;concordSocialSync.textContent='Atualizando…';
- try{
-  concordAvatarCheckedAt.clear();
-  await refreshSocial();
-  if(dmOpen&&dmPeer)await dmLoad();
- }catch(error){console.warn('Falha na atualização manual:',error)}
- finally{concordSocialSync.disabled=false;concordSocialSync.textContent='↻ Atualizar amigos'}
-};
-concordFriendsToolbar.append(concordSocialSync);
-const concordProfileSync=document.createElement('button');
-concordProfileSync.type='button';
-concordProfileSync.className='concord-social-sync';
-concordProfileSync.textContent='↥ Sincronizar meu nome';
-concordProfileSync.setAttribute('aria-label','Enviar meu nome de perfil para os amigos');
-concordProfileSync.onclick=async()=>{
- if(concordProfileSync.disabled||!socialUser)return;
- concordProfileSync.disabled=true;
- concordProfileSync.textContent='Sincronizando…';
- try{
-   const saved=await concordPublishPublicProfile();
-   concordProfileSync.textContent=saved?'✓ Nome sincronizado':'⚠ Nome não sincronizado';
-   concordProfileSync.title=saved?'Seu nome público está salvo no Supabase.':'Verifique seu nome em Configurações e a tabela concord_public_profiles no Supabase.';
-   if(saved)await refreshSocial();
- }catch(error){
-   console.warn('Falha ao sincronizar nome:',error);
-   concordProfileSync.textContent='⚠ Falha ao sincronizar';
- }finally{
-   concordProfileSync.disabled=false;
-   setTimeout(()=>{if(concordProfileSync.isConnected)concordProfileSync.textContent='↥ Sincronizar meu nome'},4500);
- }
-};
-concordFriendsToolbar.append(concordProfileSync);
 function concordApplyFriendsFilter(){
   const rows=[...socialPanel.querySelectorAll('.concord-friend')];
   let shown=0;
@@ -2732,18 +2689,6 @@ async function refreshSocial(){
       list.append(row);
     }
     concordApplyFriendsFilter();
-    // Explain missing names instead of silently displaying broken-looking profiles.
-    let missingNotice=document.getElementById('concordMissingNamesNotice');
-    if(!missingNotice){
-      missingNotice=document.createElement('p');
-      missingNotice.id='concordMissingNamesNotice';
-      missingNotice.setAttribute('role','status');
-      missingNotice.style.cssText='margin:8px 10px;padding:9px;border:1px solid #755d35;border-radius:8px;background:#332818;color:#f5dfae;font-size:12px;line-height:1.4';
-      socialPanel.insertBefore(missingNotice,document.getElementById('concordFriends'));
-    }
-    const missingCount=visibleIds.filter(id=>!concordFriendNames.has(id)).length;
-    missingNotice.hidden=missingCount===0;
-    if(missingCount)missingNotice.textContent=missingCount+' perfil(is) sem nome público. Peça para essas pessoas salvarem o nome no perfil. Se continuar, execute concord-repair-missing-names.sql no Supabase e confira as permissões.';
     // Refresh all visible avatars after both friends lists have been rebuilt.
     document.querySelectorAll('[data-concord-friend-avatar]').forEach(el=>concordApplyFriendAvatar(el,el.dataset.concordFriendAvatar));
     const {error:presenceError}=await concordSupabase.from('concord_presence').upsert({user_id:requestUser,last_seen:new Date().toISOString()});
