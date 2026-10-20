@@ -2627,7 +2627,7 @@ async function refreshSocial(){
       const row=document.createElement('div');row.className='concord-friend';
       row.dataset.friendStatus=f.status==='pending'?'pending':online.has(other)?'online':'offline';
       row.dataset.friendName=concordFriendDisplayName(other).toLowerCase();
-      const avatar=document.createElement('span');avatar.className='concord-friend-avatar';avatar.textContent=concordFriendNames.has(other)?concordFriendDisplayName(other).slice(0,2).toUpperCase():'?';
+      const avatar=document.createElement('span');avatar.className='concord-friend-avatar';avatar.dataset.concordFriendAvatar=other;concordApplyFriendAvatar(avatar,other);
       const details=document.createElement('div');details.className='concord-friend-details';
       const label=document.createElement('strong');label.textContent=concordFriendDisplayName(other);
       label.title=concordFriendDisplayName(other);
@@ -2645,6 +2645,8 @@ async function refreshSocial(){
       list.append(row);
     }
     concordApplyFriendsFilter();
+    // Refresh all visible avatars after both friends lists have been rebuilt.
+    document.querySelectorAll('[data-concord-friend-avatar]').forEach(el=>concordApplyFriendAvatar(el,el.dataset.concordFriendAvatar));
     const {error:presenceError}=await concordSupabase.from('concord_presence').upsert({user_id:requestUser,last_seen:new Date().toISOString()});
     if(presenceError)console.warn('Presença indisponível',presenceError.message);
   }catch(error){
