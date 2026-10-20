@@ -2044,7 +2044,8 @@ function openProfileEditor(){
         try{
           const {error:profileError}=await concordSupabase.auth.updateUser({data:{display_name:n,concord_profile:{name:n,status:concordData.profile.status,bio:concordData.profile.bio,avatar:concordData.profile.avatar,color:concordData.profile.color}}});
           if(profileError)throw profileError;
-          notice='Nome e perfil salvos na conta. '+notice;await concordPublishPublicProfile();
+          const publicSaved=await concordPublishPublicProfile();
+          notice=(publicSaved?'Nome público sincronizado para seus amigos. ':'Seu nome foi salvo na conta, mas NÃO foi publicado para seus amigos. Confira as permissões de concord_public_profiles no Supabase. ')+notice;
         }catch(error){console.warn('Não foi possível sincronizar o nome:',error);notice+=' O nome não foi sincronizado com a conta; tente salvar novamente.'}
       }
       updateProfileUI();if(typeof renderRooms==='function')renderRooms();modal.classList.remove('show');simple('Perfil atualizado',notice);
@@ -2744,7 +2745,7 @@ const copyId=document.createElement('button');copyId.className='concord-copy-id'
 // O ID da conta fica acessível somente no próprio perfil, não na lista de amigos.
 async function initConcordSocial(session){
   const id=session?.user?.id||null;
-  if(id===socialUser){if(id)concordPublishPublicProfile().catch(console.warn);return;}
+  if(id===socialUser){return;}
   // A previous account must never keep its microphone, room presence or DM state.
   if(socialUser&&socialUser!==id&&typeof callJoined!=='undefined'&&callJoined){
     try{leaveCall()}catch(error){console.warn('Falha ao encerrar chamada anterior:',error)}
