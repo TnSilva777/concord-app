@@ -645,7 +645,7 @@ function renderRooms(){
 function chooseRoom(room){if(callJoined&&joinedRoom&&joinedRoom!==room){simple('Você já está em uma call','Saia da sala '+joinedRoom+' antes de entrar em '+room+'.');return}activeRoom=room;renderRooms();$('#callSubtitle').textContent='Sala '+room;$('#voiceModal').classList.add('show');if(callJoined){$('#voiceStatus').textContent='Você está conectado à sala '+room+'.';renderCallRoster()}}
 
 document.querySelectorAll('.voice-room').forEach(btn=>btn.addEventListener('click',()=>chooseRoom(btn.dataset.room)));
-function syncLocalPresence(){for(const room of Object.keys(roomRoster)){roomRoster[room]=roomRoster[room].filter(m=>!m.isMe)}if(callJoined&&joinedRoom){if(!roomRoster[joinedRoom])roomRoster[joinedRoom]=[];roomRoster[joinedRoom].push({name:'Você',initial:'V',cls:'',game:false,isMe:true})}renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}
+function syncLocalPresence(){for(const room of Object.keys(roomRoster)){roomRoster[room]=roomRoster[room].filter(m=>!m.isMe)}if(callJoined&&joinedRoom){if(!roomRoster[joinedRoom])roomRoster[joinedRoom]=[];roomRoster[joinedRoom].push({name:concordData.profile?.name||'Você',initial:(concordData.profile?.name||'V').slice(0,1).toUpperCase(),cls:'',game:false,isMe:true})}renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}
 const originalJoinCall=joinCall;joinCall=async function(){if(callJoined)return;const roomToJoin=activeRoom;await originalJoinCall();if(callJoined){joinedRoom=roomToJoin;$('#callSubtitle').textContent='Conectado à sala '+joinedRoom;playCallTone('join');syncLocalPresence()}};
 const originalLeaveCall=leaveCall;leaveCall=function(){const wasJoined=callJoined;if(stream)stopShare();originalLeaveCall();joinedRoom=null;syncLocalPresence();if(wasJoined)playCallTone('leave')};$('#joinCall').onclick=joinCall;$('#leaveCall').onclick=leaveCall;
 // Salas personalizadas locais: criacao, exclusao e persistencia no navegador.
@@ -774,7 +774,13 @@ function setConcordAvatar(el,profile){
     el.textContent='';el.style.backgroundImage='url("'+photo+'")';el.style.backgroundSize='cover';el.style.backgroundPosition='center';
   }
 }
-function updateProfileUI(){const name=concordData.profile.name||'Você';const user=$('.user');if(user){setConcordAvatar(user.querySelector('.avatar'),concordData.profile);const label=user.querySelector('b');if(label)label.textContent=name;const status=user.querySelector('small');if(status){status.textContent='● '+(concordData.profile.status||'Online');status.title=concordData.profile.bio||'Editar perfil para adicionar uma biografia'}}document.querySelectorAll('.message .msghead b').forEach(label=>{if(label.dataset.self==='true'||label.textContent==='Thauwan'||label.textContent==='Você')label.textContent=name});}
+function updateProfileUI(){const name=concordData.profile.name||'Você';const user=$('.user');if(user){setConcordAvatar(user.querySelector('.avatar'),concordData.profile);const label=user.querySelector('b');if(label)label.textContent=name;const status=user.querySelector('small');if(status){status.textContent='● '+(concordData.profile.status||'Online');status.title=concordData.profile.bio||'Editar perfil para adicionar uma biografia'}}document.querySelectorAll('.message .msghead b').forEach(label=>{if(label.dataset.self==='true'||label.textContent==='Thauwan'||label.textContent==='Você')label.textContent=name});
+  if(typeof callJoined!=='undefined'&&callJoined&&typeof joinedRoom!=='undefined'&&joinedRoom){
+    const own=(roomRoster[joinedRoom]||[]).find(member=>member.isMe);
+    if(own){own.name=name;own.initial=name.slice(0,1).toUpperCase();renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}
+    if(typeof voiceSignal!=='undefined'&&voiceSignal)voiceSignal.track({id:voicePeerId,name:voicePeerName(),sharing:!!stream}).catch(console.warn);
+  }
+}
 function concordHud(title,fields,onSave,onDelete){
 document.getElementById('concordHud')?.remove();
 const bg=document.createElement('div');bg.id='concordHud';bg.style.cssText='position:fixed;inset:0;z-index:99999;background:#000b;display:grid;place-items:center;padding:20px;backdrop-filter:blur(5px)';
@@ -1194,7 +1200,7 @@ function voiceStatus(text){
   voiceConnectionBadge.textContent=connected?'● Áudio conectado':waiting?'◌ Conectando':'○ '+(callJoined?'Verificar conexão':'Fora da chamada');
   voiceConnectionBadge.dataset.state=connected?'connected':waiting?'waiting':'offline';
 }
-function voicePeerName(){return (typeof concordData!=='undefined'&&concordData.profile?.name)||'Participante'}
+function voicePeerName(){return String(concordData.profile?.name||'Participante').trim().slice(0,28)||'Participante'}
 function voiceParticipants(){
   if(!voiceSignal||!joinedRoom)return;
   const state=voiceSignal.presenceState(),members=[];
@@ -1601,6 +1607,11 @@ async function initConcordSocial(session){
   socialRefreshQueued=false;
   dmShow(false);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#dmHistory').textContent='Selecione um amigo na lista à esquerda.';
   if(id!==concordProfileUser)restoreConcordProfileForUser(id);
+  if(id&&concordData.profile.name==='Você'){
+    const auth=session?.user;
+    const proposed=String(auth?.user_metadata?.display_name||auth?.user_metadata?.full_name||auth?.user_metadata?.name||auth?.email?.split('@')[0]||'').trim().slice(0,28);
+    if(proposed){concordData.profile.name=proposed;concordData.profile.avatar=proposed[0].toUpperCase();saveConcordProfileForUser();updateProfileUI()}
+  }
   if(id)syncConcordAvatarFromCloud(id);socialUser=id;voiceRoomsUser=id;initPublicChat(session);clearInterval(socialTimer);socialTimer=null;
   if(!id){dmShow(true);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
   dmShow(true);
