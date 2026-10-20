@@ -2640,6 +2640,8 @@ async function refreshSocial(){
     for(const id of [...concordFriendAvatars.keys()])if(!visibleIds.includes(id)){concordFriendAvatars.delete(id);concordAvatarCheckedAt.delete(id)}
     // Defer image requests until names and friendship rows have rendered.
     queueMicrotask(()=>{if(requestUser===socialUser)concordRefreshFriendAvatars(visibleIds).catch(console.warn)});
+    // Names are fetched fresh so profile edits on other accounts are reflected.
+    for(const id of visibleIds)concordFriendNames.delete(id);
     for(const id of [...concordFriendNames.keys()])if(!visibleIds.includes(id))concordFriendNames.delete(id);
     if(visibleIds.length){
       const {data:publicProfiles,error:publicError}=await concordSupabase.from('concord_public_profiles').select('user_id,display_name').in('user_id',visibleIds);
