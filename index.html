@@ -2614,6 +2614,8 @@ async function refreshSocial(){
     const online=new Set((presence||[]).filter(p=>Date.now()-new Date(p.last_seen).getTime()<90000).map(p=>p.user_id));
     dmFriendIds=new Set(ids);
     const visibleIds=[...new Set(friends.map(f=>f.requester_id===socialUser?f.recipient_id:f.requester_id))];
+    // Keep the photo cache limited to the people currently visible to this account.
+    for(const id of [...concordFriendAvatars.keys()])if(!visibleIds.includes(id)){concordFriendAvatars.delete(id);concordAvatarCheckedAt.delete(id)}
     concordRefreshFriendAvatars(visibleIds).catch(console.warn);
     for(const id of [...concordFriendNames.keys()])if(!visibleIds.includes(id))concordFriendNames.delete(id);
     if(visibleIds.length){
@@ -2628,6 +2630,7 @@ async function refreshSocial(){
         if(panel)panel.title='Não foi possível carregar os nomes públicos. Verifique a tabela e as permissões concord_public_profiles no Supabase.';
       }
     }
+    // Reflect updated public names immediately in avatar initials and friend search.
     if(typeof voiceSignal!=='undefined'&&voiceSignal&&joinedRoom)voiceParticipants();
     if(typeof concordVoiceLobby!=='undefined'&&concordVoiceLobby)concordSyncVoiceLobby();
     if(dmOpen&&dmPeer&&$('#dmPeerLabel'))$('#dmPeerLabel').textContent=concordFriendDisplayName(dmPeer);
