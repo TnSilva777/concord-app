@@ -872,7 +872,7 @@ function concordInviteCommunity(community){
   const encoded=btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(snapshot)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   const link=location.origin+location.pathname+'#servidor='+encoded;
   if(link.length>6000){simple('Convite muito grande','Este servidor tem canais demais para um link de modelo.');return}
-  const message='Convite copiado. As salas de voz terão o mesmo identificador para vocês se conectarem; mudanças futuras de canais ainda não sincronizam automaticamente.';
+  const message='Convite copiado. Envie novamente após criar salas para que seus amigos possam atualizar a estrutura do servidor.';
   if(navigator.clipboard?.writeText)navigator.clipboard.writeText(link).then(()=>showConcordToast('Convite copiado',message)).catch(()=>prompt('Copie o link do convite:',link));
   else prompt('Copie o link do convite:',link);
 }
@@ -888,10 +888,21 @@ function concordReceiveCommunityInvite(){
     if(!confirm('Entrar na estrutura do servidor "'+name+'"? As salas de voz poderão conectar vocês, mas canais novos e mensagens ainda não são sincronizados automaticamente.'))return;
     const channels=data.channels.filter(item=>item&&typeof item.name==='string'&&item.name.trim()&&['text','voice'].includes(item.type)).map((item,index)=>({id:data.v===2&&/^ch[0-9]+(?:-[0-9]+)?$/.test(item.id||'')?item.id:'ch'+Date.now()+'-'+index,name:item.name.trim().slice(0,32),type:item.type}));
     const imported={id:data.v===2&&/^c[0-9]+$/.test(data.id||'')?data.id:'c'+Date.now(),name,icon:String(data.icon||'🎮').slice(0,4),description:String(data.description||'').slice(0,180),channels,createdAt:new Date().toISOString()};
-    if(concordData.communities.some(item=>item.id===imported.id)){simple('Servidor já adicionado','Você já tem este servidor neste navegador.');location.hash='';return}
+    const existing=concordData.communities.find(item=>item.id===imported.id);
+    if(existing){
+      if(data.v!==2){simple('Servidor já adicionado','Você já tem este servidor neste navegador.');location.hash='';return}
+      const oldSnapshot={...existing,channels:[...(existing.channels||[])]};
+      const incoming=new Map(imported.channels.map(channel=>[channel.id,channel]));
+      const preserved=(existing.channels||[]).filter(channel=>!incoming.has(channel.id));
+      Object.assign(existing,{name:imported.name,icon:imported.icon,description:imported.description,channels:[...imported.channels,...preserved]});
+      if(!saveConcordData()){Object.assign(existing,oldSnapshot);simple('Erro ao atualizar','Não foi possível salvar as salas.');return}
+      renderCommunities();if(concordSelectedCommunity===existing.id)renderCommunityChannels();
+      showConcordToast('Servidor atualizado','Novas salas do convite foram adicionadas; salas locais antigas foram preservadas.');
+      location.hash='';return;
+    }
     concordData.communities.push(imported);
     if(!saveConcordData()){concordData.communities.pop();simple('Falha ao importar','Não foi possível salvar o servidor neste navegador.');return}
-    renderCommunities();showConcordToast('Servidor adicionado','As salas de voz deste convite usam os mesmos IDs. Para novas salas, será preciso importar um convite atualizado.');
+    renderCommunities();showConcordToast('Servidor adicionado','Para receber novas salas futuramente, abra um convite atualizado do mesmo servidor.');
     location.hash='';
   }catch(error){simple('Convite inválido','Não foi possível ler este convite de servidor.')}
 }
@@ -1501,11 +1512,11 @@ function dmRender(rows){
   const list=$('#dmHistory');
   const previousIds=[...list.querySelectorAll('[data-message-id]')].map(el=>el.dataset.messageId);
   const nextIds=rows.map(msg=>String(msg.id));
-  if(previousIds.length===nextIds.length&&previousIds.every((id,i)=>id===nextIds[i]))return;
+  if(previousIds.length===nextIds.length&&previousIds.every((id,i)=>id===nextIds[i])&&(rows.length>0||list.textContent==='Nenhuma mensagem ainda. Envie a primeira!'))return;
   const wasNearBottom=list.scrollHeight-list.scrollTop-list.clientHeight<100;
   const oldScrollTop=list.scrollTop;
   const oldScrollHeight=list.scrollHeight;
-  const firstRender=!previousIds.length;
+  const firstRender=!previousIds.length||list.textContent==='Carregando conversa…';
   list.replaceChildren();
   if(!rows.length){list.textContent='Nenhuma mensagem ainda. Envie a primeira!';return}
   rows.forEach(msg=>{
