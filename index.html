@@ -3032,7 +3032,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
       <h2 id="authHeading">Que bom ter você aqui!</h2>
       <p id="authTitle">Entre na sua conta para continuar.</p>
       <form id="concordAuthForm">
-        <label class="auth-field" for="authDisplayName" id="authDisplayNameField" hidden>Nome no CONCORD<input id="authDisplayName" type="text" maxlength="28" minlength="2" placeholder="Como seus amigos vão te ver" autocomplete="nickname"></label>
+        <label class="auth-field" for="authDisplayName" id="authDisplayNameField" hidden>Seu nome no CONCORD<input id="authDisplayName" type="text" maxlength="28" minlength="2" placeholder="Como seus amigos vão te ver" autocomplete="nickname"></label>
         <label class="auth-field" for="authEmail">E-mail<input id="authEmail" type="email" placeholder="voce@exemplo.com" autocomplete="email" required></label>
         <label class="auth-field" for="authPassword">Senha<input id="authPassword" type="password" placeholder="Sua senha" autocomplete="current-password" minlength="6" required></label>
         <button id="authSubmit" type="submit">Entrar no CONCORD →</button>
@@ -3057,6 +3057,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
     const nameField=document.getElementById('authDisplayNameField');
     nameField.hidden=!registering;
     document.getElementById('authDisplayName').required=registering;
+    if(registering)document.getElementById('authDisplayName').focus();
     document.getElementById('authTitle').textContent =
       registering ? 'Crie sua conta e venha fazer parte.' : 'Entre na sua conta para continuar.';
     document.getElementById('authHeading').textContent = registering ? 'Comece sua jornada! 🚀' : 'Que bom ter você aqui!';
@@ -3077,8 +3078,10 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
     try {
       const email = document.getElementById('authEmail').value.trim();
       const password = document.getElementById('authPassword').value;
+      const chosenName=document.getElementById('authDisplayName').value.trim().replace(/\\s+/g,' ').slice(0,28);
+      if(registering&&(chosenName.length<2||chosenName==='Você'||chosenName==='Perfil sem nome'))throw new Error('Escolha um nome de exibição com pelo menos 2 caracteres.');
       const { data, error } = registering
-        ? await concordSupabase.auth.signUp({ email, password, options:{data:{display_name:document.getElementById('authDisplayName').value.trim().slice(0,28)}} })
+        ? await concordSupabase.auth.signUp({ email, password, options:{data:{display_name:chosenName,concord_profile:{name:chosenName,avatar:chosenName.slice(0,1).toUpperCase(),color:'#16865e',status:'',bio:''}}} })
         : await concordSupabase.auth.signInWithPassword({ email, password });
 
       if (error) throw error;
@@ -3551,4 +3554,14 @@ body.concord-home-view .app>.sidebar .user{margin-top:auto;flex-shrink:0}
 #concordVoiceGrid .cvg-avatar.speaking{outline:3px solid #4dff9a!important;outline-offset:5px!important;box-shadow:0 0 0 7px rgba(49,255,145,.2),0 0 26px rgba(49,255,145,.65)!important;animation:concordVoiceGridSpeaking .75s ease-in-out infinite alternate!important}
 @keyframes concordVoiceGridSpeaking{from{filter:brightness(1)}to{filter:brightness(1.2)}}
 @media(prefers-reduced-motion:reduce){#concordVoiceGrid .cvg-avatar.speaking{animation:none!important}}
+</style><style>
+/* CONCORD HUD refinement: clear account onboarding and consistent focus states. */
+#concordAuth .auth-field[hidden]{display:none!important}
+#concordAuth .auth-box{box-shadow:inset 1px 0 #4ac78a17}
+#concordAuth .auth-field input:focus-visible{outline:2px solid #5de7a1;outline-offset:2px;border-color:#5de7a1}
+#concordAuth #authDisplayName{background-image:linear-gradient(90deg,#53d99416,transparent 65%)}
+#concordAuth #authMessage:not(:empty){border-radius:9px;padding:9px 11px;background:#244a353b;line-height:1.45}
+.concord-local-voice-person,.concord-friend-open-chat,.concord-server-room{transition:background-color .16s ease,border-color .16s ease}
+.concord-local-voice-person:hover,.concord-server-room:hover{background-color:#24503b}
+@media(prefers-reduced-motion:reduce){.concord-local-voice-person,.concord-friend-open-chat,.concord-server-room{transition:none}}
 </style></body></html>                              
