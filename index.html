@@ -1489,7 +1489,7 @@ concordInlineSound.onclick=async()=>{
   if(!tracks.length){concordInlineSound.textContent='Aguardando áudio…';return}
   remoteAudioMuted=false;
   const original=$('#headphoneToggle');if(original)original.textContent='🎧';
-  const results=await Promise.allSettled(tracks.map(async audio=>{audio.muted=false;await audio.play()}));
+  const results=await Promise.allSettled(tracks.map(async audio=>{audio.muted=false;audio.autoplay=true;await audio.play()}));
   const blocked=results.some(x=>x.status==='rejected');
   concordInlineSound.textContent=blocked?'🔊 Tentar novamente':'🔊 Som ativado';
   concordInlineSound.title=blocked?'Navegador bloqueou o som: tente novamente':'Áudio remoto ativado';
@@ -2595,7 +2595,7 @@ function voiceParticipants(){
   }
   for(const [id,peer] of voicePeers)if(!members.some(m=>m.id===id)){
     if(!concordVoiceLastSeen.has(id))concordVoiceLastSeen.set(id,now);
-    if(now-concordVoiceLastSeen.get(id)<3500){
+    if(now-concordVoiceLastSeen.get(id)<9000){
       const previous=(roomRoster[joinedRoom]||[]).find(m=>m.id===id);
       if(previous)members.push(previous);
       continue;
@@ -2715,6 +2715,10 @@ async function voiceConnect(id,initiator){
     let audio=voiceAudio.get(audioKey);
     if(!audio){audio=document.createElement('audio');audio.autoplay=true;audio.playsInline=true;audio.muted=remoteAudioMuted;audio.style.display='none';audio.volume=Math.min(1,concordPeerVolume(id)/100);document.body.append(audio);voiceAudio.set(audioKey,audio)}
     audio.srcObject=new MediaStream([e.track]);
+    audio.setAttribute('playsinline','');
+    // iOS may defer remote playback until a user gesture. Keep the stream attached
+    // and expose the existing sound-unlock control instead of treating it as a disconnect.
+    audio.addEventListener('pause',()=>{if(!remoteAudioMuted&&callJoined&&e.track.readyState==='live')concordAudioUnlock.hidden=false});
     // Keep system-share audio separate from microphone playback to reduce feedback loops.
     const screenAudio=!!e.streams?.some(remote=>remote.getVideoTracks().length>0);
     if(screenAudio){audio.dataset.concordSystemAudio='true';audio.title='Áudio compartilhado da aba';audio.volume=Math.min(1,concordScreenAudioVolume/100);}else{audio.dataset.concordVoiceAudio='true';}
@@ -2835,10 +2839,10 @@ function concordSyncVoiceLobby(){
    const now=Date.now();
    for(const member of actual)concordLobbySeenAt.set(member.id,now);
    const previous=(roomRoster[room]||[]).filter(m=>!m.isMe&&m.id!==voicePeerId);
-   const grace=previous.filter(m=>!actual.some(a=>a.id===m.id)&&now-(concordLobbySeenAt.get(m.id)||0)<1800);
+   const grace=previous.filter(m=>!actual.some(a=>a.id===m.id)&&now-(concordLobbySeenAt.get(m.id)||0)<5000);
    for(const member of grace)if(!concordLobbySeenAt.has(member.id))concordLobbySeenAt.set(member.id,now);
    roomRoster[room]=[...(activeRoom?[{id:voicePeerId,userId:socialUser,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream,speaking:concordIsLocallySpeaking,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted}]:[]),...actual,...grace];
-   if(grace.length&&!concordLobbyRefreshTimer)concordLobbyRefreshTimer=setTimeout(()=>{concordLobbyRefreshTimer=null;if(concordVoiceLobby)concordSyncVoiceLobby()},2000);
+   if(grace.length&&!concordLobbyRefreshTimer)concordLobbyRefreshTimer=setTimeout(()=>{concordLobbyRefreshTimer=null;if(concordVoiceLobby)concordSyncVoiceLobby()},5200);
  }
  // Preserve the active WebRTC roster and update the speaking effects.
  if(joinedRoom&&callJoined){
