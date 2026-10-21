@@ -1497,6 +1497,7 @@ async function concordRegisterOwnedServer(server){
  const {data,error}=await concordSupabase.rpc('concord_create_server',{p_server_key:server.id});
  if(error){console.warn('Registro protegido do servidor:',error.message);return false}
  concordRegisteredServers.add(server.id);
+ if(data&&server.inviteToken!==data){server.inviteToken=data;saveConcordData()}
  return !!data;
 }
 async function concordRegisterExistingServers(){
@@ -1742,11 +1743,15 @@ function refreshConcordLocalVoiceMembers(){
   }
 }
 function concordCommunityInviteLink(community){
-  const snapshot={v:2,id:community.id,name:String(community.name||'Servidor').slice(0,40),icon:String(community.icon||'🎮').slice(0,4),description:String(community.description||'').slice(0,180),channels:(community.channels||[]).slice(0,40).map(item=>({id:item.id,name:String(item.name||'').slice(0,32),type:item.type==='voice'?'voice':'text'}))};
+  const snapshot={v:2,token:community.inviteToken||null,id:community.id,name:String(community.name||'Servidor').slice(0,40),icon:String(community.icon||'🎮').slice(0,4),description:String(community.description||'').slice(0,180),channels:(community.channels||[]).slice(0,40).map(item=>({id:item.id,name:String(item.name||'').slice(0,32),type:item.type==='voice'?'voice':'text'}))};
   const encoded=btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(snapshot)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   return location.origin+location.pathname+'#servidor='+encoded;
 }
-function concordInviteFriendsToCommunity(community){
+async function concordInviteFriendsToCommunity(community){
+  if(!community.readOnlyMember&&!community.inviteToken){
+    const registered=await concordRegisterOwnedServer(community);
+    if(!registered){simple('Convite indisponível','Não foi possível autorizar convites deste servidor. Tente novamente.');return}
+  }
   const link=concordCommunityInviteLink(community);
   if(link.length>6000){simple('Convite muito grande','O servidor tem canais demais para este tipo de convite.');return}
   document.querySelector('.concord-friend-invite-overlay')?.remove();
@@ -1794,7 +1799,7 @@ function concordInviteCommunity(community){
   if(navigator.clipboard?.writeText)navigator.clipboard.writeText(link).then(()=>showConcordToast('Convite copiado',message)).catch(()=>prompt('Copie o link do convite:',link));
   else prompt('Copie o link do convite:',link);
 }
-function concordReceiveCommunityInvite(){
+async function concordReceiveCommunityInvite(){
   const encoded=new URLSearchParams(location.hash.slice(1)).get('servidor');
   if(!encoded)return;
   try{
@@ -1805,6 +1810,10 @@ function concordReceiveCommunityInvite(){
     const name=data.name.trim().slice(0,40);
     if(!confirm('Entrar na estrutura do servidor "'+name+'"? As salas de voz poderão conectar vocês, mas canais novos e mensagens ainda não são sincronizados automaticamente.'))return;
     const channels=data.channels.filter(item=>item&&typeof item.name==='string'&&item.name.trim()&&['text','voice'].includes(item.type)).map((item,index)=>({id:data.v===2&&/^ch[0-9]+(?:-[0-9]+)?$/.test(item.id||'')?item.id:'ch'+Date.now()+'-'+index,name:item.name.trim().slice(0,32),type:item.type}));
+    if(data.token&&typeof data.token==='string'&&/^[0-9a-f-]{36}$/i.test(data.token)){
+      const {data:joined,error:joinError}=await concordSupabase.rpc('concord_join_server',{p_server_key:data.id,p_token:data.token});
+      if(joinError||!joined){simple('Convite não autorizado','Entre em sua conta e use um convite válido do servidor.');return}
+    }
     const imported={id:data.v===2&&/^c[0-9]+$/.test(data.id||'')?data.id:'c'+Date.now(),name,icon:String(data.icon||'🎮').slice(0,4),description:String(data.description||'').slice(0,180),channels,readOnlyMember:true,createdAt:new Date().toISOString()};
     const existing=concordData.communities.find(item=>item.id===imported.id);
     if(existing){
