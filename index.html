@@ -1621,7 +1621,8 @@ async function concordSaveServersToCloud(id){
 }
 const concordRegisteredServers=new Set();
 async function concordRegisterOwnedServer(server){
- if(!socialUser||!server||server.readOnlyMember||server.ownerId!==socialUser||!/^c[0-9]+$/.test(server.id||''))return false;
+ if(!socialUser||!server||server.readOnlyMember||!/^c[0-9]+$/.test(server.id||''))return false;
+ if(server.ownerId!==socialUser){console.warn('Servidor sem proprietário autenticado ou de outra conta:',server.id);return false;}
  const {data,error}=await concordSupabase.rpc('concord_create_server',{p_server_key:server.id});
  if(error){console.warn('Registro protegido do servidor:',error.message);return false}
  concordRegisteredServers.add(server.id);
@@ -1879,7 +1880,10 @@ async function concordInviteFriendsToCommunity(community){
   if(community.readOnlyMember&&!community.inviteToken){simple('Convite indisponível','Peça ao dono um convite atualizado para compartilhar este servidor.');return}
   if(!community.readOnlyMember&&!community.inviteToken){
     const registered=await concordRegisterOwnedServer(community);
-    if(!registered){simple('Convite indisponível','Não foi possível autorizar convites deste servidor. Tente novamente.');return}
+    if(!registered){
+      const message=!socialUser?'Entre na sua conta antes de convidar pessoas.':!community.ownerId?'Este servidor antigo foi criado sem proprietário vinculado à conta. Para convites protegidos, crie um novo servidor enquanto estiver conectado.':community.ownerId!==socialUser?'Somente a conta que criou este servidor pode registrar convites. Entre com essa conta.':'O servidor não pôde ser registrado no Supabase. Verifique se foi criado nesta conta e tente novamente.';
+      simple('Convite indisponível',message);return
+    }
   }
   if(!/^[0-9a-f-]{36}$/i.test(community.inviteToken||'')){simple('Convite indisponível','Não foi possível obter um token válido. Tente novamente ou peça ao dono para registrar o servidor.');return}
   const link=concordCommunityInviteLink(community);
@@ -2201,12 +2205,13 @@ function openCommunityCreator(){
   ],(v,close)=>{
     const name=v.name.trim().slice(0,40);
     if(!name||concordData.communities.some(x=>x.name.toLowerCase()===name.toLowerCase())){simple('Nome inválido','Escolha um nome único.');return}
-    const community={id:'c'+Date.now(),name,icon:v.icon.trim().slice(0,4)||'🎮',description:v.description.trim().slice(0,180),channels:[],ownerId:socialUser||null,createdAt:new Date().toISOString()};
+    if(!socialUser){simple('Login necessário','Entre em sua conta antes de criar um servidor para convidar amigos.');return}
+    const community={id:'c'+Date.now(),name,icon:v.icon.trim().slice(0,4)||'🎮',description:v.description.trim().slice(0,180),channels:[],ownerId:socialUser,createdAt:new Date().toISOString()};
     concordData.communities.push(community);
     if(!saveConcordData()){concordData.communities.pop();simple('Erro','Não foi possível salvar.');return}
     close();renderCommunities();document.querySelector('[data-community-id="'+community.id+'"] .server')?.click();
     showConcordToast('Servidor criado','Agora você pode criar canais e salas de voz.');
-    concordRegisterOwnedServer(community).catch(error=>console.warn('Falha no registro seguro do servidor',error));
+    concordRegisterOwnedServer(community).then(registered=>{if(!registered)showConcordToast('Servidor criado','O servidor foi salvo, mas o convite ainda não foi autorizado. Verifique sua conexão.')}).catch(error=>console.warn('Falha no registro seguro do servidor',error));
   });
 }
 function concordViewProfile(userId){
