@@ -1491,6 +1491,17 @@ async function concordSaveServersToCloud(id){
     if(error)throw error;
   }catch(error){console.warn('Backup de servidores não sincronizado:',error.message)}
 }
+const concordRegisteredServers=new Set();
+async function concordRegisterOwnedServer(server){
+ if(!socialUser||!server||server.readOnlyMember||server.ownerId!==socialUser||!/^c[0-9]+$/.test(server.id||''))return false;
+ const {data,error}=await concordSupabase.rpc('concord_create_server',{p_server_key:server.id});
+ if(error){console.warn('Registro protegido do servidor:',error.message);return false}
+ concordRegisteredServers.add(server.id);
+ return !!data;
+}
+async function concordRegisterExistingServers(){
+ for(const server of concordData.communities||[])await concordRegisterOwnedServer(server);
+}
 async function concordLoadServersFromCloud(id){
   clearTimeout(concordCloudBackupTimer);
   concordCloudBackupUser=id||null;concordCloudBackupReady=false;
@@ -1522,6 +1533,7 @@ async function concordLoadServersFromCloud(id){
     concordCloudBackupReady=true;
     renderCommunities();
     if(concordSelectedCommunity)renderCommunityChannels();
+    await concordRegisterExistingServers();
     // Enviar para a nuvem apenas após a leitura ter sido concluída com sucesso.
     await concordSaveServersToCloud(id);
   }catch(error){
@@ -2042,6 +2054,7 @@ function openCommunityCreator(){
     if(!saveConcordData()){concordData.communities.pop();simple('Erro','Não foi possível salvar.');return}
     close();renderCommunities();document.querySelector('[data-community-id="'+community.id+'"] .server')?.click();
     showConcordToast('Servidor criado','Agora você pode criar canais e salas de voz.');
+    concordRegisterOwnedServer(community).catch(error=>console.warn('Falha no registro seguro do servidor',error));
   });
 }
 function concordViewProfile(userId){
