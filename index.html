@@ -1000,18 +1000,23 @@ localChatNotice.textContent='⚠ Chat público em teste: mensagens salvas apenas
 const messageList=$('#messageList');
 if(messageList)messageList.parentNode.insertBefore(localChatNotice,messageList);
 let concordServerChatReady=false,concordServerChatRequest=0;
-async function concordLoadServerChat(serverId,channelId){
+async function concordLoadServerChat(serverId,channelId,background=false){
  const request=++concordServerChatRequest;
- concordServerChatReady=false;
+ if(!background)concordServerChatReady=false;
  const warning=document.getElementById('concordServerLocalWarning');
- if(warning)warning.textContent='◌ Verificando acesso ao canal compartilhado…';
+ if(warning&&!background)warning.textContent='◌ Verificando acesso ao canal compartilhado…';
  if(!socialUser||!serverId||!channelId)return;
  try{
   const {data,error}=await concordSupabase.from('concord_server_channel_messages').select('id,author_id,body,created_at').eq('server_key',serverId).eq('channel_key',channelId).order('created_at',{ascending:false}).limit(100);
   if(error)throw error;
   if(request!==concordServerChatRequest||concordSelectedCommunity!==serverId||concordSelectedTextRoom!==channelId)return;
   concordServerChatReady=true;
-  const list=document.getElementById('messageList');list.replaceChildren();
+  const list=document.getElementById('messageList');
+  const atBottom=document.getElementById('messages').scrollHeight-document.getElementById('messages').scrollTop-document.getElementById('messages').clientHeight<80;
+  const fingerprint=(data||[]).map(row=>row.id).join('|');
+  if(background&&list.dataset.concordServerFingerprint===fingerprint)return;
+  list.dataset.concordServerFingerprint=fingerprint;
+  list.replaceChildren();
   const authorIds=[...new Set((data||[]).map(m=>m.author_id).filter(Boolean))];
   if(authorIds.length){
    const {data:profiles}=await concordSupabase.from('concord_public_profiles').select('user_id,display_name').in('user_id',authorIds);
@@ -1020,7 +1025,7 @@ async function concordLoadServerChat(serverId,channelId){
   if(request!==concordServerChatRequest)return;
   for(const entry of (data||[]).reverse())appendChatMessage({name:entry.author_id===socialUser?concordData.profile.name:concordFriendDisplayName(entry.author_id),text:entry.body,date:new Date(entry.created_at).toLocaleString('pt-BR')});
   if(warning)warning.textContent='✓ Canal protegido e sincronizado entre os membros do servidor.';
-  document.getElementById('messages').scrollTop=document.getElementById('messages').scrollHeight;
+  if(!background||atBottom)document.getElementById('messages').scrollTop=document.getElementById('messages').scrollHeight;
  }catch(error){
   if(request!==concordServerChatRequest)return;
   concordServerChatReady=false;
@@ -1028,9 +1033,13 @@ async function concordLoadServerChat(serverId,channelId){
   console.warn('Falha ao sincronizar canal de servidor:',error);
  }
 }
-setInterval(()=>{
- if(document.visibilityState==='visible'&&document.body.classList.contains('concord-custom-server-view')&&concordSelectedCommunity&&concordSelectedTextRoom&&socialUser)concordLoadServerChat(concordSelectedCommunity,concordSelectedTextRoom);
-},6000);
+let concordServerPolling=false;
+setInterval(async()=>{
+ if(concordServerPolling||document.visibilityState!=='visible'||!document.body.classList.contains('concord-custom-server-view')||!concordSelectedCommunity||!concordSelectedTextRoom||!socialUser)return;
+ concordServerPolling=true;
+ try{await concordLoadServerChat(concordSelectedCommunity,concordSelectedTextRoom,true)}
+ finally{concordServerPolling=false}
+},10000);
 const concordServerLocalWarning=document.createElement('div');
 concordServerLocalWarning.id='concordServerLocalWarning';
 concordServerLocalWarning.setAttribute('role','status');
