@@ -2195,7 +2195,7 @@ function renderCommunities(){
       document.querySelectorAll('.server').forEach(x=>x.classList.remove('active'));b.classList.add('active');
       $('#channelTitle').textContent=community.name;$('.topbar .sub').textContent=' — Servidor (canais locais)';
       const welcome=$('#messages .welcome');
-      if(welcome){welcome.querySelector('h1').textContent='Bem-vindo à '+community.name;welcome.querySelector('p').textContent='Comunidade salva neste navegador. Salas e mensagens próprias compartilhadas ainda não estão disponíveis.'}
+      if(welcome){welcome.querySelector('h1').textContent=community.name;welcome.querySelector('p').textContent='Escolha um canal no menu do servidor. A página de boas-vindas pode ser criada pelo proprietário como um canal de texto.'}
       if(dmOpen)dmShow(false);
       concordSelectedCommunity=community.id;
       concordSelectedTextRoom=null;
@@ -2205,10 +2205,14 @@ function renderCommunities(){
       $('#messages').hidden=false;
       $('#chatForm').closest('.composer').hidden=true;
       $('#messageList').replaceChildren();
-      const last=community.channels?.find(item=>item.id===community.lastTextRoom&&item.type==='text');
+      const last=community.channels?.find(item=>item.id===community.lastTextRoom&&item.type==='text')||community.channels?.find(item=>item.type==='text');
       if(last){
         const row=[...concordServerPanel.querySelectorAll('.concord-server-room')].find(item=>item.dataset.channelId===last.id);
         row?.querySelector('.concord-server-room-name')?.click();
+      }
+      if(window.innerWidth<=760){
+        document.body.classList.add('concord-mobile-nav-open');
+        const toggle=document.getElementById('concordMobileNavToggle');if(toggle){toggle.setAttribute('aria-expanded','true');toggle.setAttribute('aria-label','Fechar canais e amigos')}
       }
     };
     b.oncontextmenu=e=>{e.preventDefault();editLocalCommunity(community.id)};
@@ -2756,10 +2760,10 @@ function concordSyncVoiceLobby(){
    const now=Date.now();
    for(const member of actual)concordLobbySeenAt.set(member.id,now);
    const previous=(roomRoster[room]||[]).filter(m=>!m.isMe&&m.id!==voicePeerId);
-   const grace=previous.filter(m=>!actual.some(a=>a.id===m.id)&&now-(concordLobbySeenAt.get(m.id)||now)<8000);
+   const grace=previous.filter(m=>!actual.some(a=>a.id===m.id)&&now-(concordLobbySeenAt.get(m.id)||0)<1800);
    for(const member of grace)if(!concordLobbySeenAt.has(member.id))concordLobbySeenAt.set(member.id,now);
    roomRoster[room]=[...actual,...grace];
-   if(grace.length&&!concordLobbyRefreshTimer)concordLobbyRefreshTimer=setTimeout(()=>{concordLobbyRefreshTimer=null;if(concordVoiceLobby)concordSyncVoiceLobby()},8500);
+   if(grace.length&&!concordLobbyRefreshTimer)concordLobbyRefreshTimer=setTimeout(()=>{concordLobbyRefreshTimer=null;if(concordVoiceLobby)concordSyncVoiceLobby()},2000);
  }
  // Preserve the active WebRTC roster and update the speaking effects.
  if(joinedRoom&&callJoined){
