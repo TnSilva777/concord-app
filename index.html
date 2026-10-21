@@ -2491,7 +2491,9 @@ async function voiceConnect(id,initiator){
   if(voicePeers.has(id))return voicePeers.get(id);
   const peer=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
   voicePeers.set(id,peer);
-  micStream.getAudioTracks().forEach(track=>peer.addTrack(track,micStream));
+  const outgoingMic=micStream.getAudioTracks().find(track=>track.readyState==='live');
+  if(!outgoingMic){voiceStatus('Microfone indisponível. Saia e entre novamente na chamada para autorizar o dispositivo.');peer.close();voicePeers.delete(id);return;}
+  peer.addTrack(outgoingMic,micStream);
   if(stream?.getVideoTracks()[0]){concordTuneScreenSender(peer.addTrack(stream.getVideoTracks()[0],stream));for(const audioTrack of stream.getAudioTracks())peer.addTrack(audioTrack,stream)}
   peer.onicecandidate=e=>{if(e.candidate)voiceSend(id,'ice',e.candidate.toJSON()).catch(console.warn)};
   peer.ontrack=e=>{
@@ -2509,6 +2511,7 @@ async function voiceConnect(id,initiator){
     let audio=voiceAudio.get(audioKey);
     if(!audio){audio=document.createElement('audio');audio.autoplay=true;audio.playsInline=true;audio.muted=remoteAudioMuted;audio.style.display='none';audio.volume=Math.min(1,concordPeerVolume(id)/100);document.body.append(audio);voiceAudio.set(audioKey,audio)}
     audio.srcObject=new MediaStream([e.track]);
+    e.track.onunmute=()=>{if(!remoteAudioMuted)audio.play().catch(()=>{concordAudioUnlock.hidden=false})};
     concordWatchRemoteSpeech(id,e.track);
     if(concordWatching===id){concordInlineSound.textContent=remoteAudioMuted?'🔇 Som silenciado':'🔊 Ativar som';}
 
@@ -2517,7 +2520,7 @@ async function voiceConnect(id,initiator){
       voiceStatus('Áudio bloqueado pelo navegador. Clique em Ativar som na barra da transmissão.');
       concordAudioUnlock.hidden=false;
     });
-    voiceStatus('Áudio remoto recebido. Vocês já podem conversar.');
+    voiceStatus('Faixa de áudio recebida. Verificando reprodução…');
   };
   // Recovery is driven by ICE state, with bounded retries and no offer glare.
   let recoveryTimer=null,recoveryAttempts=0;
