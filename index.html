@@ -745,6 +745,23 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
 }
 
 
+
+/* CONCORD interface polish: subtle feedback, accessibility and calmer motion. */
+:root{--concord-focus:#72e6ae}
+button,a,input,textarea,select{transition:border-color .16s ease,background-color .16s ease,box-shadow .16s ease,color .16s ease}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--concord-focus);outline-offset:2px}
+.server,.channel,.voice-room,.room-member{transition:background-color .18s ease,color .18s ease,border-color .18s ease,box-shadow .18s ease,transform .18s ease}
+.server:hover{transform:translateY(-1px)}
+.channel.active{box-shadow:inset 3px 0 0 var(--green);font-weight:650}
+.channel:hover:not(.active){background:#183d2b}
+.voice-room:hover,.room-member:hover{background-color:rgba(53,212,154,.09)}
+.message{border-radius:10px;transition:background-color .16s ease}
+.message:hover{background:rgba(67,196,141,.035)}
+.composebox:focus-within{border-color:#4aae82!important;box-shadow:0 0 0 3px rgba(53,212,154,.10)}
+#callRosterList .roster-person{border-radius:10px}
+#callRosterList .roster-person:hover{background:rgba(67,196,141,.06)}
+.room-member.concord-member-speaking .mini-avatar,.roster-person .avatar.speaking{box-shadow:0 0 0 2px rgba(53,212,154,.8),0 0 14px rgba(53,212,154,.20)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.server:hover{transform:none}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js'"></script>
 <script>
