@@ -2411,13 +2411,14 @@ function voiceParticipants(){
    if(concordVoiceLobby)for(const entry of Object.values(concordVoiceLobby.presenceState()).flat())if(entry?.id)speakingByPeer.set(entry.id,!!entry.speaking);
   Object.values(state).flat().forEach(p=>{
     if(!p||!p.id||p.id===voicePeerId)return;
-    if(!members.some(m=>m.id===p.id)){const publicName=p.userId&&concordFriendNames.get(p.userId);const name=String(publicName||p.name||'Participante').trim().slice(0,28)||'Participante';members.push({id:p.id,userId:p.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!p.sharing,speaking:speakingByPeer.get(p.id)===true})};
+    if(!members.some(m=>m.id===p.id)){if(p.userId)concordRememberVoiceName(p.userId,p.name);const publicName=p.userId&&concordFriendNames.get(p.userId);const name=String(publicName||p.name||'Participante').trim().slice(0,28)||'Participante';members.push({id:p.id,userId:p.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!p.sharing,speaking:speakingByPeer.get(p.id)===true})};
   });
   // Oscilações de presença durante renegociação de vídeo não são saídas confirmadas.
   const now=Date.now();
   for(const member of members)concordVoiceLastSeen.set(member.id,now);
   const lobbyEntries=concordVoiceLobby?Object.values(concordVoiceLobby.presenceState()).flat():[];
   for(const entry of lobbyEntries)if(entry?.room===joinedRoom&&entry.id&&entry.id!==voicePeerId){
+    if(entry.userId)concordRememberVoiceName(entry.userId,entry.name);
     concordVoiceLastSeen.set(entry.id,now);
     if(!members.some(m=>m.id===entry.id)){
       const name=String((entry.userId&&concordFriendNames.get(entry.userId))||entry.name||'Participante').slice(0,28);
@@ -2556,6 +2557,7 @@ function concordSyncVoiceLobby(){
  const groups=new Map();
  for(const entry of Object.values(state).flat()){
    if(!entry?.id||!entry.room||entry.id===voicePeerId)continue;
+   if(entry.userId)concordRememberVoiceName(entry.userId,entry.name);
    const name=String((entry.userId&&concordFriendNames.get(entry.userId))||entry.name||'Participante').trim().slice(0,28)||'Participante';
    if(!groups.has(entry.room))groups.set(entry.room,[]);
    if(!groups.get(entry.room).some(member=>member.id===entry.id))groups.get(entry.room).push({id:entry.id,userId:entry.userId||null,name,initial:name[0].toUpperCase(),isMe:false,sharing:!!entry.sharing,speaking:!!entry.speaking});
@@ -2979,6 +2981,27 @@ async function concordRefreshFriendAvatars(ids){
 }
 const concordFriendNicknames=new Map();
 function concordFriendDisplayName(id){return concordFriendNames.get(id)||concordFriendNicknames.get(id)||'Nome ainda não definido'}
+function concordRememberVoiceName(id,name){
+ if(!id||id===socialUser||!socialUser||typeof name!=='string')return;
+ const chosen=name.trim().slice(0,28);
+ if(!chosen||['Participante','Você','Amigo','Nome ainda não definido','Nome não sincronizado'].includes(chosen))return;
+ if(concordFriendNames.get(id)===chosen)return;
+ concordFriendNames.set(id,chosen);
+ try{
+  const key='concord-voice-names:'+socialUser;
+  const known=JSON.parse(localStorage.getItem(key)||'{}');
+  if(!known||typeof known!=='object'||Array.isArray(known))return;
+  known[id]=chosen;localStorage.setItem(key,JSON.stringify(Object.fromEntries(Object.entries(known).slice(-100))));
+ }catch(error){console.warn('Cache de nomes indisponível:',error)}
+ if(dmOpen&&dmPeer===id)$('#dmPeerLabel').textContent=concordFriendDisplayName(id);
+ if(socialUser&&!socialBusy)queueMicrotask(()=>refreshSocial().catch(console.warn));
+}
+function concordRestoreVoiceNames(){
+ if(!socialUser)return;
+ try{const saved=JSON.parse(localStorage.getItem('concord-voice-names:'+socialUser)||'{}');
+ if(saved&&typeof saved==='object'&&!Array.isArray(saved))for(const [id,name] of Object.entries(saved))if(typeof name==='string'&&name.trim()&&!concordFriendNames.has(id))concordFriendNames.set(id,name.trim().slice(0,28));
+ }catch(error){console.warn('Cache de nomes indisponível:',error)}
+}
 function concordLoadFriendNicknames(){concordFriendNicknames.clear();try{for(const [id,name] of Object.entries(JSON.parse(localStorage.getItem('concord-nicknames-'+socialUser)||'{}')))if(typeof name==='string'&&name.trim())concordFriendNicknames.set(id,name.trim().slice(0,28))}catch(e){}}
 function concordRenameFriend(id){const name=prompt('Nome deste amigo para você (não altera o perfil dele):',concordFriendNicknames.get(id)||concordFriendNames.get(id)||'');if(name===null)return;const chosen=name.trim().slice(0,28);if(chosen)concordFriendNicknames.set(id,chosen);else concordFriendNicknames.delete(id);try{localStorage.setItem('concord-nicknames-'+socialUser,JSON.stringify(Object.fromEntries(concordFriendNicknames)))}catch(e){}refreshSocial().catch(console.warn)}
 function concordRefreshPublicNameLabels(){if(socialUser)refreshSocial().catch(console.warn)}
@@ -3160,7 +3183,7 @@ async function initConcordSocial(session){
     const proposed=String(auth?.user_metadata?.display_name||auth?.user_metadata?.full_name||auth?.user_metadata?.name||'').trim().slice(0,28);
     if(proposed){concordData.profile.name=proposed;concordData.profile.avatar=proposed[0].toUpperCase();saveConcordProfileForUser();updateProfileUI()}
   }
-  if(id){syncConcordAvatarFromCloud(id)}socialUser=id;concordLoadFriendNicknames();voiceRoomsUser=id;initPublicChat(session);concordLoadServersFromCloud(id).catch(console.warn);clearInterval(socialTimer);socialTimer=null;
+  if(id){syncConcordAvatarFromCloud(id)}socialUser=id;concordLoadFriendNicknames();concordRestoreVoiceNames();voiceRoomsUser=id;initPublicChat(session);concordLoadServersFromCloud(id).catch(console.warn);clearInterval(socialTimer);socialTimer=null;
   if(!id){if(window.concordNamesRealtime){concordSupabase.removeChannel(window.concordNamesRealtime).catch(console.warn);window.concordNamesRealtime=null}concordLeaveVoiceLobby();dmShow(true);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
   dmShow(true);
   await concordJoinVoiceLobby(id).catch(error=>console.warn('Lobby de voz:',error));
