@@ -2396,7 +2396,8 @@ function voiceParticipants(){
     }
   }
   for(const [id,peer] of voicePeers)if(!members.some(m=>m.id===id)){
-    if(now-(concordVoiceLastSeen.get(id)||now)<12000){
+    if(!concordVoiceLastSeen.has(id))concordVoiceLastSeen.set(id,now);
+    if(now-concordVoiceLastSeen.get(id)<12000){
       const previous=(roomRoster[joinedRoom]||[]).find(m=>m.id===id);
       if(previous)members.push(previous);
       continue;
@@ -2607,7 +2608,7 @@ function stopVoiceNetwork(){
   if(channel)concordSupabase.removeChannel(channel).catch(console.warn);
   for(const peer of voicePeers.values())peer.close();
   for(const id of [...concordRemoteSpeechMeters.keys()])concordStopRemoteSpeech(id);
-  voicePeers.clear();voicePendingIce.clear();for(const audio of voiceAudio.values())audio.remove();voiceAudio.clear();concordAudioUnlock.hidden=true;
+  voicePeers.clear();concordVoiceLastSeen.clear();voicePendingIce.clear();for(const audio of voiceAudio.values())audio.remove();voiceAudio.clear();concordAudioUnlock.hidden=true;
   if(joinedRoom){roomRoster[joinedRoom]=[];renderRooms();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}
 }
 const localJoinCall=joinCall;
