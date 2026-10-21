@@ -846,6 +846,17 @@ body.concord-home-view #concordDmPane:not([hidden]){display:flex!important}
  #voiceModal .voice-controls{display:flex;position:sticky;bottom:0;z-index:5;gap:10px;padding:12px max(12px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:#10231b;border-top:1px solid #315640}
  #voiceModal .voice-controls button{min-height:44px;min-width:44px}
 }
+
+/* CONCORD mobile: remain on server room roster while connected */
+@media(max-width:760px){
+ body.concord-mobile-nav-open.concord-custom-server-view .app>.sidebar{box-shadow:4px 0 24px #0005!important}
+ body.concord-custom-server-view #concordServerPanel{padding-bottom:16px!important}
+ body.concord-custom-server-view .concord-local-voice-person{display:flex;align-items:center;min-height:38px;padding:5px 7px;border-radius:9px;background:rgba(30,77,51,.22);gap:8px;max-width:100%}
+ body.concord-custom-server-view .concord-local-voice-person>span:nth-child(2){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+ body.concord-custom-server-view .concord-server-room{min-height:44px;touch-action:manipulation}
+ body.concord-custom-server-view .concord-voice-dock{border-radius:12px;border:1px solid #3c7052;background:linear-gradient(150deg,#173a29,#10271d);padding:9px 8px}
+ body.concord-custom-server-view #concordVoiceDockRoom{max-width:180px;overflow:hidden;text-overflow:ellipsis}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js'"></script>
 <script>
@@ -2142,11 +2153,13 @@ close();renderCommunityChannels();[...concordServerPanel.querySelectorAll('.conc
           if(!Object.prototype.hasOwnProperty.call(roomRoster,voiceKey))roomRoster[voiceKey]=[];
           chooseRoom(voiceKey).then(()=>{
             if(window.innerWidth<=760){
-              document.body.classList.remove('concord-mobile-nav-open');
-              document.getElementById('concordMobileNavToggle')?.setAttribute('aria-expanded','false');
-              $('#voiceModal').classList.add('show');
+              $('#voiceModal').classList.remove('show');
+              document.body.classList.add('concord-mobile-nav-open');
+              const toggle=document.getElementById('concordMobileNavToggle');
+              if(toggle){toggle.setAttribute('aria-expanded','true');toggle.setAttribute('aria-label','Fechar canais e amigos')}
+              refreshConcordLocalVoiceMembers();
             }
-          }).catch(error=>console.warn('Falha ao abrir call:',error));
+          }).catch(error=>console.warn('Falha ao entrar na call:',error));
           $('#callSubtitle').textContent='Sala '+room.name+' · '+community.name;
           voiceStatus('Entre na chamada para conectar o microfone. O amigo precisa importar o convite do mesmo servidor e entrar nesta sala.');
         }
