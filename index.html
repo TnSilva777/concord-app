@@ -1258,9 +1258,10 @@ $('#shareStatus').parentElement.insertBefore(concordShareAudioLabel,$('#shareSta
 // Volume individual do participante remoto (microfone + áudio de transmissão).
 const concordPeerVolumes=new Map();
 function concordPeerVolume(id){return concordPeerVolumes.get(id)??100}
+let concordScreenAudioVolume=Number(localStorage.getItem('concord-screen-audio-volume')||80);
 function concordSetPeerVolume(id,value){
  const volume=Math.max(0,Math.min(200,Number(value)||0));concordPeerVolumes.set(id,volume);
- for(const [key,audio] of voiceAudio)if(key.startsWith(id+':'))audio.volume=Math.min(1,volume/100);
+ for(const [key,audio] of voiceAudio)if(key.startsWith(id+':')&&!audio.dataset.concordSystemAudio)audio.volume=Math.min(1,volume/100);
  // A faixa de volume acima de 100% requer amplificação Web Audio separada.
 }
 function concordOpenAudioSettings(){
@@ -2402,6 +2403,13 @@ concordAudioUnlock.onclick=async()=>{
   if(results.some(item=>item.status==='rejected'))voiceStatus('O navegador ainda bloqueia o som. Confira as permissões de áudio da página.');
   else{concordAudioUnlock.hidden=true;voiceStatus('Reprodução de áudio remoto ativada.')}
 };
+const concordScreenVolumeRow=document.createElement('label');
+concordScreenVolumeRow.style.cssText='display:flex;gap:9px;align-items:center;padding:8px 0;color:#c7e8d3;font-size:12px';
+const concordScreenVolumeLabel=document.createElement('span');concordScreenVolumeLabel.textContent='Volume da transmissão';
+const concordScreenVolumeInput=document.createElement('input');concordScreenVolumeInput.type='range';concordScreenVolumeInput.min='0';concordScreenVolumeInput.max='100';concordScreenVolumeInput.value=String(concordScreenAudioVolume);concordScreenVolumeInput.style.cssText='flex:1;min-width:0;accent-color:#4ddd95';
+const concordScreenVolumeText=document.createElement('span');concordScreenVolumeText.textContent=concordScreenAudioVolume+'%';
+concordScreenVolumeInput.oninput=()=>{concordScreenAudioVolume=Number(concordScreenVolumeInput.value);localStorage.setItem('concord-screen-audio-volume',String(concordScreenAudioVolume));for(const audio of voiceAudio.values())if(audio.dataset.concordSystemAudio)audio.volume=concordScreenAudioVolume/100;concordScreenVolumeText.textContent=concordScreenAudioVolume+'%'};
+concordScreenVolumeRow.append(concordScreenVolumeLabel,concordScreenVolumeInput,concordScreenVolumeText);
 const concordVolumeRow=document.createElement('label');
 concordVolumeRow.style.cssText='display:flex;gap:9px;align-items:center;padding:8px 0;color:#c7e8d3;font-size:12px';
 const concordVolumeName=document.createElement('span');concordVolumeName.textContent='Volume do amigo';
@@ -2410,7 +2418,7 @@ const concordVolumeValue=document.createElement('span');concordVolumeValue.textC
 concordVolumeSlider.oninput=()=>{const id=concordWatching||[...voicePeers.keys()][0];if(id)concordSetPeerVolume(id,concordVolumeSlider.value);concordVolumeValue.textContent=concordVolumeSlider.value+'%'};
 concordVolumeRow.append(concordVolumeName,concordVolumeSlider,concordVolumeValue);
 const concordAudioBar=$('#voiceStatus');
-if(concordAudioBar){concordAudioBar.parentNode.insertBefore(concordAudioUnlock,concordAudioBar);concordAudioBar.parentNode.insertBefore(concordVolumeRow,concordAudioBar)}
+if(concordAudioBar){concordAudioBar.parentNode.insertBefore(concordAudioUnlock,concordAudioBar);concordAudioBar.parentNode.insertBefore(concordVolumeRow,concordAudioBar);concordAudioBar.parentNode.insertBefore(concordScreenVolumeRow,concordAudioBar)}
 
 async function voiceFlushIce(id){const peer=voicePeers.get(id);if(!peer?.remoteDescription)return;const pending=voicePendingIce.get(id)||[];voicePendingIce.delete(id);for(const candidate of pending){try{await peer.addIceCandidate(new RTCIceCandidate(candidate))}catch(error){console.warn('Candidato ICE rejeitado',error)}}}
 const voiceConnectionBadge=document.createElement('div');
@@ -2565,7 +2573,8 @@ async function voiceConnect(id,initiator){
   peer.onicecandidate=e=>{if(e.candidate)voiceSend(id,'ice',e.candidate.toJSON()).catch(console.warn)};
   peer.ontrack=e=>{
     if(e.track.kind==='video'){
-      const live=new MediaStream([e.track]);concordLiveStreams.set(id,live);concordShareRepairRequested.delete(id);
+      const live=new MediaStream([e.track]);concordLiveStreams.set(id,live);
+      e.track.addEventListener('unmute',()=>{concordShareRepairRequested.delete(id);renderRooms();renderCallRoster()});concordShareRepairRequested.delete(id);
       if(concordWatching===id){const player=$('#callScreenPreview');player.srcObject=live;player.muted=true;player.style.display='block';$('#callStageMessage').style.display='none';$('#stageBadge').style.display='block';$('#callSubtitle').textContent='Assistindo transmissão ao vivo';player.play().catch(()=>voiceStatus('Clique no vídeo para iniciar a reprodução.'))}
       concordSyncInlineStage();
       if(concordWatching===id){concordInlineSound.textContent='🔊 Ativar som';}
@@ -2580,13 +2589,13 @@ async function voiceConnect(id,initiator){
     audio.srcObject=new MediaStream([e.track]);
     // Keep system-share audio separate from microphone playback to reduce feedback loops.
     const screenAudio=!!e.streams?.some(remote=>remote.getVideoTracks().length>0);
-    if(screenAudio){audio.dataset.concordSystemAudio='true';audio.title='Áudio compartilhado da aba';}
+    if(screenAudio){audio.dataset.concordSystemAudio='true';audio.title='Áudio compartilhado da aba';audio.volume=Math.min(1,concordScreenAudioVolume/100);}else{audio.dataset.concordVoiceAudio='true';}
     e.track.onunmute=()=>{if(!remoteAudioMuted)audio.play().catch(()=>{concordAudioUnlock.hidden=false})};
     if(!screenAudio)concordWatchRemoteSpeech(id,e.track);
     if(concordWatching===id){concordInlineSound.textContent=remoteAudioMuted?'🔇 Som silenciado':'🔊 Ativar som';}
 
     e.track.addEventListener('ended',()=>{audio.remove();voiceAudio.delete(audioKey)},{once:true});
-    audio.play().catch(()=>{
+    if(audio.srcObject?.getAudioTracks().some(track=>track.readyState==='live'))audio.play().catch(()=>{
       voiceStatus('Áudio bloqueado pelo navegador. Clique em Ativar som na barra da transmissão.');
       concordAudioUnlock.hidden=false;
     });
