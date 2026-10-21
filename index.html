@@ -542,6 +542,13 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
 @media(max-width:760px){#concordVoiceGrid{padding:8px}#concordVoiceGrid .cvg-tiles{grid-auto-rows:minmax(160px,1fr)}}
 
 
+/* CONCORD call grid: clean responsive staging and explicit recovery state */
+#concordVoiceGrid .cvg-tiles{grid-template-columns:repeat(auto-fit,minmax(min(290px,100%),1fr));grid-auto-rows:minmax(210px,1fr);gap:12px;align-content:stretch}
+#concordVoiceGrid .cvg-tile{border-radius:18px;border:1px solid #376b50;box-shadow:inset 0 1px #ffffff0b,0 10px 26px #0002;transition:border-color .2s,box-shadow .2s}
+#concordVoiceGrid .cvg-tile:hover{border-color:#52a77a;box-shadow:0 8px 28px #0004}
+#concordVoiceGrid .cvg-name{bottom:13px;left:13px;padding:7px 11px;border-radius:9px}
+#concordVoiceGrid .cvg-waiting{position:absolute;top:12px;left:12px;z-index:3;border:1px solid #bd9d5366;border-radius:8px;padding:7px 10px;background:#201e14e8;color:#ffe5a4;font-size:11px}
+@media(max-width:760px){#concordVoiceGrid .cvg-tiles{grid-template-columns:1fr;grid-auto-rows:minmax(180px,1fr);gap:9px}}
 /* Participant tiles: independent screen shares with an in-tile zoom control */
 #concordVoiceGrid .cvg-tile{isolation:isolate}
 #concordVoiceGrid .cvg-zoom{position:absolute;right:10px;top:10px;z-index:3;background:#10271ee8;border:1px solid #66b98b;color:#fff;padding:6px 10px;border-radius:7px;cursor:pointer}
@@ -1418,12 +1425,19 @@ const concordLiveStreams=new Map();
 let concordWatching=null;
 function concordShowLive(id){
   const video=$('#callScreenPreview'),remote=concordLiveStreams.get(id);
-  if(!remote||!remote.getVideoTracks().some(t=>t.readyState==='live')){concordWatching=id;$('#voiceModal').classList.add('show');$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block';$('#callStageMessage').textContent='Aguardando vídeo de '+String((roomRoster[joinedRoom]||[]).find(m=>m.id===id)?.name||'seu amigo')+'…';$('#callSubtitle').textContent='Conectando à transmissão';voiceStatus('Aguardando a transmissão chegar. Verifique se a chamada está conectada.');return}
+  if(!remote||!remote.getVideoTracks().some(t=>t.readyState==='live')){concordWatching=id;$('#voiceModal').classList.add('show');$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block';$('#callStageMessage').textContent='Aguardando vídeo de '+String((roomRoster[joinedRoom]||[]).find(m=>m.id===id)?.name||'seu amigo')+'…';$('#callSubtitle').textContent='Conectando à transmissão';voiceStatus('Aguardando a transmissão chegar. Verifique se a chamada está conectada.');concordRequestShareRepair(id);return}
   concordWatching=id;video.srcObject=remote;video.muted=true;video.autoplay=true;video.playsInline=true;video.style.display='block';concordUpdateFullscreen();
   video.play().catch(()=>voiceStatus('Clique no vídeo para iniciar a reprodução da transmissão.'));
   $('#callStageMessage').style.display='none';$('#stageBadge').style.display='block';
   $('#callSubtitle').textContent='Assistindo transmissão ao vivo';
   $('#voiceModal').classList.add('show');
+}
+const concordShareRepairRequested=new Map();
+async function concordRequestShareRepair(id){
+ if(!callJoined||!voiceSignal||!id||id===voicePeerId)return;
+ const now=Date.now();if(now-(concordShareRepairRequested.get(id)||0)<12000)return;
+ concordShareRepairRequested.set(id,now);
+ await voiceSend(id,'resync-share',{at:now}).catch(console.warn);
 }
 function concordLiveBadge(member){
   if(!member.isMe&&!concordLiveStreams.has(member.id)&&!member.sharing)return null;
@@ -2453,7 +2467,7 @@ function voiceParticipants(){
     }
     peer.close();voicePeers.delete(id);concordVoiceLastSeen.delete(id);concordStopRemoteSpeech(id);
     for(const [key,audio] of voiceAudio)if(key.startsWith(id+':')){audio.remove();voiceAudio.delete(key)}
-    voicePendingIce.delete(id);concordLiveStreams.delete(id);
+    voicePendingIce.delete(id);concordLiveStreams.delete(id);concordShareRepairRequested.delete(id);
     if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none'}
   }
   roomRoster[joinedRoom]=[{id:voicePeerId,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream,speaking:concordIsLocallySpeaking},...members];
@@ -2585,6 +2599,14 @@ async function voiceSignalReceived(packet){
     }else if(msg.kind==='answer'){
       const peer=voicePeers.get(msg.from);
       if(peer&&peer.signalingState==='have-local-offer'){await peer.setRemoteDescription(new RTCSessionDescription(msg.data));await voiceFlushIce(msg.from)}
+    }else if(msg.kind==='resync-share'){
+      const peer=voicePeers.get(msg.from);
+      if(peer&&stream?.getVideoTracks().some(track=>track.readyState==='live')&&peer.signalingState==='stable'&&peer.connectionState!=='closed'){
+        const videoTrack=stream.getVideoTracks().find(track=>track.readyState==='live');
+        if(videoTrack&&!peer.getSenders().some(sender=>sender.track===videoTrack))concordTuneScreenSender(peer.addTrack(videoTrack,stream));
+        for(const audioTrack of stream.getAudioTracks())if(!peer.getSenders().some(sender=>sender.track===audioTrack))peer.addTrack(audioTrack,stream);
+        const offer=await peer.createOffer();await peer.setLocalDescription(offer);await voiceSend(msg.from,'offer',peer.localDescription.toJSON());
+      }
     }else if(msg.kind==='ice'){
       const peer=voicePeers.get(msg.from);
       if(peer?.remoteDescription)await peer.addIceCandidate(new RTCIceCandidate(msg.data));
@@ -2609,7 +2631,7 @@ function concordSyncVoiceLobby(){
    if(!groups.get(entry.room).some(member=>member.id===entry.id))groups.get(entry.room).push({id:entry.id,userId:entry.userId||null,name,initial:name[0].toUpperCase(),isMe:false,sharing:!!entry.sharing,speaking:!!entry.speaking});
  }
  for(const room of new Set([...concordVoiceLobbyRooms,...groups.keys()])){
-   if(room===joinedRoom)continue;
+   if(room===joinedRoom&&callJoined)continue;
    roomRoster[room]=groups.get(room)||[];
  }
  // Preserve the active WebRTC roster and update the speaking effects.
@@ -2671,10 +2693,10 @@ async function startVoiceNetwork(){
   finally{voiceStarting=false}
 }
 function stopVoiceNetwork(){
-  if(concordVoiceLobby)concordVoiceLobby.untrack().catch(console.warn);
+  if(concordVoiceLobby)concordVoiceLobby.untrack().then(()=>concordSyncVoiceLobby()).catch(console.warn);
   if(stream)stopShare();
   concordWatching=null;
-  concordLiveStreams.clear();
+  concordLiveStreams.clear();concordShareRepairRequested.clear();
   const stage=$('#callScreenPreview');if(stage){stage.srcObject=null;stage.style.display='none'}
   concordUpdateFullscreen();
   $('#callStageMessage').style.display='block';$('#stageBadge').style.display='none';
@@ -2687,6 +2709,7 @@ function stopVoiceNetwork(){
   for(const id of [...concordRemoteSpeechMeters.keys()])concordStopRemoteSpeech(id);
   voicePeers.clear();concordVoiceLastSeen.clear();voicePendingIce.clear();for(const audio of voiceAudio.values())audio.remove();voiceAudio.clear();concordAudioUnlock.hidden=true;
   if(joinedRoom){roomRoster[joinedRoom]=[];renderRooms();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}
+  if(concordVoiceLobby)concordSyncVoiceLobby();
 }
 const localJoinCall=joinCall;
 joinCall=async function(){
@@ -2694,7 +2717,7 @@ joinCall=async function(){
   if(callJoined&&joinedRoom)await startVoiceNetwork();
 };
 const localLeaveCall=leaveCall;
-leaveCall=function(){stopVoiceNetwork();localLeaveCall()};
+leaveCall=function(){stopVoiceNetwork();localLeaveCall();if(concordVoiceLobby)concordSyncVoiceLobby()};
 $('#joinCall').onclick=joinCall;
 $('#leaveCall').onclick=leaveCall;
 $('#headphoneToggle').onclick=()=>{
@@ -3592,9 +3615,10 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   const room=typeof joinedRoom!=='undefined'?joinedRoom:null;
   const members=typeof roomRoster!=='undefined'?(roomRoster[room]||[]):[];
   title.textContent='◉ '+concordVoiceRoomName(room)+' • '+members.length+' participante(s)';
+  for(const member of members){if(!member.isMe&&member.sharing&&!concordLiveStreams.get(member.id)?.getVideoTracks().some(t=>t.readyState==='live'))concordRequestShareRepair(member.id)}
   const signature=JSON.stringify([room,members.map(m=>{
    const live=m.isMe?(typeof stream!=='undefined'?stream:null):(typeof concordLiveStreams!=='undefined'?concordLiveStreams.get(m.id):null);
-   return [m.id,m.name,m.isMe,m.userId,typeof concordVoiceAvatarVersion!=='undefined'?concordVoiceAvatarVersion:0,live?.getVideoTracks().filter(t=>t.readyState==='live').map(t=>t.id)||[]];
+   return [m.id,m.name,m.isMe,m.userId,typeof concordVoiceAvatarVersion!=='undefined'?concordVoiceAvatarVersion:0,live?.getVideoTracks().filter(t=>t.readyState==='live').map(t=>t.id)||[],!!m.sharing,!!m.speaking];
   })]);
   if(signature===lastGridSignature)return;
   if(document.fullscreenElement?.classList?.contains('cvg-tile'))return;
@@ -3622,6 +3646,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
     tile.addEventListener('fullscreenchange',()=>{full.textContent=document.fullscreenElement===tile?'↙ Sair da tela cheia':'⛶ Tela cheia'});
     tile.append(zoom,full);
    }
+   if(member.sharing&&!live?.getVideoTracks().some(t=>t.readyState==='live')){const waiting=document.createElement('span');waiting.className='cvg-waiting';waiting.textContent='◌ Reconectando transmissão…';tile.append(waiting)}
    tiles.append(tile);
   });
  }
