@@ -3899,7 +3899,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  const open=()=>{document.body.classList.add('concord-mobile-nav-open');toggle.setAttribute('aria-expanded','true');toggle.setAttribute('aria-label','Fechar canais e amigos')};
  toggle.addEventListener('click',()=>document.body.classList.contains('concord-mobile-nav-open')?close():open());
  backdrop.addEventListener('click',close);
- sidebar.addEventListener('click',event=>{if(event.target.closest('button.channel,.concord-server-room button,.concord-dm-friend,.concord-dm-nav,#concordFriends button'))close()});
+ sidebar.addEventListener('click',event=>{if(event.target.closest('button.channel,.concord-server-room,.concord-local-voice-person,.concord-dm-friend,.concord-dm-nav,#concordFriends button'))close()});
  document.querySelector('.app>.servers')?.addEventListener('click',event=>{
    if(window.innerWidth>760)return;
    if(event.target.closest('.server,#concordFriendsNav,.concord-community-item'))open();
