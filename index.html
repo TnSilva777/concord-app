@@ -2869,7 +2869,7 @@ async function concordJoinVoiceLobby(userId){
  }
  const channel=concordSupabase.channel('concord-voice-lobby-v1',{config:{presence:{key:voicePeerId}}});
  concordVoiceLobby=channel;
- channel.on('presence',{event:'sync'},concordSyncVoiceLobby).on('presence',{event:'join'},concordSyncVoiceLobby).on('presence',{event:'leave'},concordSyncVoiceLobby).subscribe(async status=>{
+ channel.on('broadcast',{event:'voice-exit'},({payload})=>{if(!payload?.id||!payload?.room)return;concordLobbySeenAt.delete(payload.id);const arr=roomRoster[payload.room]||[];roomRoster[payload.room]=arr.filter(m=>m.id!==payload.id);renderRooms();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}).on('presence',{event:'sync'},concordSyncVoiceLobby).on('presence',{event:'join'},concordSyncVoiceLobby).on('presence',{event:'leave'},concordSyncVoiceLobby).subscribe(async status=>{
    if(status==='SUBSCRIBED'&&concordVoiceLobby===channel){
      concordSyncVoiceLobby();
      if(!callJoined||!joinedRoom)return;
@@ -2916,7 +2916,9 @@ async function startVoiceNetwork(){
   finally{voiceStarting=false}
 }
 function stopVoiceNetwork(){
+  if(joinedRoom){const old=joinedRoom;roomRoster[old]=(roomRoster[old]||[]).filter(m=>!m.isMe&&m.id!==voicePeerId&&(!socialUser||m.userId!==socialUser));renderRooms();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}
   if(concordVoiceLobby){const lobby=concordVoiceLobby;
+    if(joinedRoom)lobby.send({type:'broadcast',event:'voice-exit',payload:{id:voicePeerId,room:joinedRoom}}).catch(console.warn);
     concordLobbyUntrackTask=lobby.untrack().catch(error=>console.warn('Falha ao sair da presença de voz:',error)).then(async()=>{
       if(lobby!==concordVoiceLobby)return;
       if(callJoined&&joinedRoom){await lobby.track({id:voicePeerId,userId:socialUser,room:joinedRoom,name:voicePeerName(),sharing:!!stream,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted}).catch(console.warn)}
@@ -2949,7 +2951,7 @@ let concordCallJoinBusy=false;
 joinCall=async function(){
   if(concordCallJoinBusy||callJoined)return;
   concordCallJoinBusy=true;
-  try{await localJoinCall();if(callJoined&&joinedRoom)await startVoiceNetwork()}
+  try{await localJoinCall();if(callJoined&&joinedRoom){syncLocalPresence();renderRooms();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();await startVoiceNetwork()}}
   finally{concordCallJoinBusy=false}
 };
 const localLeaveCall=leaveCall;
