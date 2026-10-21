@@ -1945,18 +1945,19 @@ async function concordReceiveCommunityInvite(){
     const channels=data.channels.filter(item=>item&&typeof item.name==='string'&&item.name.trim()&&['text','voice'].includes(item.type)).map((item,index)=>({id:data.v===2&&/^ch[0-9]+(?:-[0-9]+)?$/.test(item.id||'')?item.id:'ch'+Date.now()+'-'+index,name:item.name.trim().slice(0,32),type:item.type}));
     if(data.token&&typeof data.token==='string'&&/^[0-9a-f-]{36}$/i.test(data.token)){
       const {data:joined,error:joinError}=await concordSupabase.rpc('concord_join_server',{p_server_key:data.id,p_token:data.token});
-      if(joinError||!joined){simple('Convite não autorizado','Entre em sua conta e use um convite válido do servidor.');return}
+      if(joinError){console.warn('Entrada no servidor recusada:',joinError);simple('Falha no convite','Não foi possível entrar: '+(joinError.message||'verifique sua conexão e o token.'));return}
+      if(!joined){simple('Convite não autorizado','Este convite expirou ou não é válido. Solicite outro ao dono do servidor.');return}
     }
-    const imported={id:data.v===2&&/^c[0-9]+$/.test(data.id||'')?data.id:'c'+Date.now(),name,icon:String(data.icon||'🎮').slice(0,4),description:String(data.description||'').slice(0,180),channels,readOnlyMember:true,createdAt:new Date().toISOString()};
+    const imported={id:data.v===2&&/^c[0-9]+$/.test(data.id||'')?data.id:'c'+Date.now(),name,icon:String(data.icon||'🎮').slice(0,4),description:String(data.description||'').slice(0,180),channels,inviteToken:typeof data.token==='string'?data.token:null,readOnlyMember:true,createdAt:new Date().toISOString()};
     const existing=concordData.communities.find(item=>item.id===imported.id);
     if(existing){
       if(data.v!==2){simple('Servidor já adicionado','Você já tem este servidor neste navegador.');location.hash='';return}
       const oldSnapshot={...existing,channels:[...(existing.channels||[])]};
       const incoming=new Map(imported.channels.map(channel=>[channel.id,channel]));
       const preserved=(existing.channels||[]).filter(channel=>!incoming.has(channel.id));
-      Object.assign(existing,{name:imported.name,icon:imported.icon,description:imported.description,channels:[...imported.channels,...preserved]});
+      Object.assign(existing,{name:imported.name,icon:imported.icon,description:imported.description,inviteToken:existing.inviteToken||imported.inviteToken,channels:[...imported.channels,...preserved]});
       if(!saveConcordData()){Object.assign(existing,oldSnapshot);simple('Erro ao atualizar','Não foi possível salvar as salas.');return}
-      renderCommunities();if(concordSelectedCommunity===existing.id)renderCommunityChannels();
+      renderCommunities();concordSelectedCommunity=existing.id;renderCommunityChannels();
       showConcordToast('Servidor atualizado','Novas salas do convite foram adicionadas; salas locais antigas foram preservadas.');
       location.hash='';return;
     }
