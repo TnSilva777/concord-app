@@ -3922,8 +3922,11 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  });
  document.addEventListener('keydown',event=>{if(event.key==='Escape')close()});
  // Start on the server channel list when reopening CONCORD on mobile, not its empty landing page.
- if(window.innerWidth<=760&&document.body.classList.contains('concord-custom-server-view'))open();
- window.addEventListener('load',()=>{if(window.innerWidth<=760&&document.body.classList.contains('concord-custom-server-view'))open()},{once:true});
+ let concordMobileServerDrawerInitialized=false;
+ const restoreServerDrawer=()=>{if(!concordMobileServerDrawerInitialized&&window.innerWidth<=760&&document.body.classList.contains('concord-custom-server-view')){concordMobileServerDrawerInitialized=true;open()}};
+ restoreServerDrawer();
+ window.addEventListener('load',restoreServerDrawer,{once:true});
+ new MutationObserver(restoreServerDrawer).observe(document.body,{attributes:true,attributeFilter:['class']});
  // Keep mobile navigation and chat from overlapping when switching views.
  document.querySelector('.app>.main')?.addEventListener('click',event=>{
    if(window.innerWidth<=760&&event.target.closest('#dmBack,.topbar button:not(#concordMobileNavToggle)'))close();
