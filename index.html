@@ -1335,7 +1335,7 @@ document.addEventListener('keydown',event=>{
   event.preventDefault();
   if(callJoined&&micStream)toggleMic();else openVoice();
 });
-function toggleMic(){if(!micStream)return;micEnabled=!micEnabled;micStream.getAudioTracks().forEach(t=>t.enabled=micEnabled);$('#micToggle').classList.toggle('on',micEnabled);$('#micToggle').textContent=micEnabled?'🎙':'🔇';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent=micEnabled?'Microfone ligado':'Microfone mutado';if($('#youRosterState'))$('#youRosterState').textContent=micEnabled?'🎙':'🔇';$('#audioStatus').textContent=micEnabled?'Microfone ligado':'Microfone mutado';concordUpdateUserMic();if(!micEnabled)setLocalSpeaking(false);$('#voiceStatus').textContent=micEnabled?'Microfone ligado. Fale para testar o indicador de nível.':'Microfone mutado.';renderCallRoster();renderRooms()}function leaveCall(){if(stream)stopShare();if(micFrame)cancelAnimationFrame(micFrame);micFrame=null;if(micStream)micStream.getTracks().forEach(t=>t.stop());micStream=null;if(micContext){micContext.close().catch(()=>{});micContext=null}micAnalyser=null;callJoined=false;micEnabled=true;concordUpdateUserMic();if(typeof setLocalSpeaking==='function')setLocalSpeaking(false);$('#micMeter').style.width='0';$('#callState').textContent='Não conectado';$('#callState').style.color='#9fbaaa';$('#callSubtitle').textContent='Pronto para conectar';$('#voiceStatus').textContent='Você saiu da sala. Entre novamente para testar o microfone.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Ainda não entrou';if($('#youRosterState'))$('#youRosterState').textContent='○';$('#audioStatus').textContent='Microfone desligado';$('#joinCall').textContent='Entrar na sala';$('#joinCall').disabled=false;$('#micToggle').disabled=true;$('#headphoneToggle').disabled=true;$('#callShare').disabled=true;$('#micToggle').classList.remove('on');$('#micToggle').textContent='🎙'}$('#joinCall').onclick=joinCall;$('#micToggle').onclick=toggleMic;$('#leaveCall').onclick=leaveCall;$('#headphoneToggle').onclick=()=>{if(!callJoined)return;remoteAudioMuted=!remoteAudioMuted;for(const audio of voiceAudio.values()){audio.muted=remoteAudioMuted;if(!remoteAudioMuted)audio.play().catch(()=>{concordAudioUnlock.hidden=false})}$('#headphoneToggle').textContent=remoteAudioMuted?'🔇':'🎧';$('#voiceStatus').textContent=remoteAudioMuted?'Áudio dos participantes silenciado.':'Áudio dos participantes ativado.';const inline=document.getElementById('concordInlineSound');if(inline)inline.textContent=remoteAudioMuted?'🔇 Som silenciado':'🔊 Som ativado';};$('#callShare').onclick=()=>{ $('#voiceModal').classList.remove('show');openShare()};$('#inviteBtn').onclick=$('#mobileInvite').onclick=async()=>{
+function toggleMic(){if(!micStream)return;micEnabled=!micEnabled;micStream.getAudioTracks().forEach(t=>t.enabled=micEnabled);$('#micToggle').classList.toggle('on',micEnabled);$('#micToggle').textContent=micEnabled?'🎙':'🔇';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent=micEnabled?'Microfone ligado':'Microfone mutado';if($('#youRosterState'))$('#youRosterState').textContent=micEnabled?'🎙':'🔇';$('#audioStatus').textContent=micEnabled?'Microfone ligado':'Microfone mutado';concordUpdateUserMic();if(!micEnabled)setLocalSpeaking(false);$('#voiceStatus').textContent=micEnabled?'Microfone ligado. Fale para testar o indicador de nível.':'Microfone mutado.';renderCallRoster();renderRooms()}function leaveCall(){if(stream)stopShare();if(micFrame)cancelAnimationFrame(micFrame);micFrame=null;if(micStream)micStream.getTracks().forEach(t=>t.stop());micStream=null;if(micContext){micContext.close().catch(()=>{});micContext=null}micAnalyser=null;callJoined=false;micEnabled=true;concordUpdateUserMic();if(typeof setLocalSpeaking==='function')setLocalSpeaking(false);$('#micMeter').style.width='0';$('#callState').textContent='Não conectado';$('#callState').style.color='#9fbaaa';$('#callSubtitle').textContent='Pronto para conectar';$('#voiceStatus').textContent='Você saiu da sala. Entre novamente para testar o microfone.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Ainda não entrou';if($('#youRosterState'))$('#youRosterState').textContent='○';$('#audioStatus').textContent='Microfone desligado';$('#joinCall').textContent='Entrar na sala';$('#joinCall').disabled=false;$('#micToggle').disabled=true;$('#headphoneToggle').disabled=true;$('#callShare').disabled=true;$('#micToggle').classList.remove('on');$('#micToggle').textContent='🎙'}$('#joinCall').onclick=joinCall;$('#micToggle').onclick=toggleMic;$('#leaveCall').onclick=leaveCall;$('#headphoneToggle').onclick=()=>{if(!callJoined)return;remoteAudioMuted=!remoteAudioMuted;for(const audio of voiceAudio.values()){audio.muted=remoteAudioMuted;if(!remoteAudioMuted)audio.play().catch(()=>{concordAudioUnlock.hidden=false;voiceStatus('Clique em Ativar som para liberar áudio no navegador.')})}$('#headphoneToggle').textContent=remoteAudioMuted?'🔇':'🎧';$('#voiceStatus').textContent=remoteAudioMuted?'Áudio dos participantes silenciado.':'Áudio dos participantes ativado.';const inline=document.getElementById('concordInlineSound');if(inline)inline.textContent=remoteAudioMuted?'🔇 Som silenciado':'🔊 Som ativado';};$('#callShare').onclick=()=>{ $('#voiceModal').classList.remove('show');openShare()};$('#inviteBtn').onclick=$('#mobileInvite').onclick=async()=>{
   const room=typeof activeRoom==='string'?activeRoom:'Geral';
   const url=new URL(location.href);url.hash='voz='+encodeURIComponent(room);
   try{await navigator.clipboard.writeText(url.href);simple('Convite copiado','Envie o link para seu amigo. Ambos devem entrar com suas contas e clicar em Entrar na sala '+room+'. Esta sala de teste não é privada.')}
@@ -2563,11 +2563,11 @@ async function voiceConnect(id,initiator){
   peer.onicecandidate=e=>{if(e.candidate)voiceSend(id,'ice',e.candidate.toJSON()).catch(console.warn)};
   peer.ontrack=e=>{
     if(e.track.kind==='video'){
-      const live=new MediaStream([e.track]);concordLiveStreams.set(id,live);
+      const live=new MediaStream([e.track]);concordLiveStreams.set(id,live);concordShareRepairRequested.delete(id);
       if(concordWatching===id){const player=$('#callScreenPreview');player.srcObject=live;player.muted=true;player.style.display='block';$('#callStageMessage').style.display='none';$('#stageBadge').style.display='block';$('#callSubtitle').textContent='Assistindo transmissão ao vivo';player.play().catch(()=>voiceStatus('Clique no vídeo para iniciar a reprodução.'))}
       concordSyncInlineStage();
       if(concordWatching===id){concordInlineSound.textContent='🔊 Ativar som';}
-      e.track.onmute=()=>{if(concordWatching===id){$('#callSubtitle').textContent='Transmissão pausada ou reconectando';voiceStatus('O vídeo do amigo foi interrompido. Aguardando retorno…')}};
+      e.track.onmute=()=>{if(concordVoiceMemberSharing(id))setTimeout(()=>{if(e.track.muted&&e.track.readyState==='live')concordRequestShareRepair(id)},2800);if(concordWatching===id){$('#callSubtitle').textContent='Transmissão pausada ou reconectando';voiceStatus('O vídeo do amigo foi interrompido. Aguardando retorno…')}};
       e.track.onunmute=()=>{if(concordWatching===id){const player=$('#callScreenPreview');player.srcObject=live;player.style.display='block';$('#callStageMessage').style.display='none';$('#callSubtitle').textContent='Assistindo transmissão ao vivo';player.play().catch(()=>{})}};
       e.track.onended=()=>{if(concordLiveStreams.get(id)===live)concordLiveStreams.delete(id);concordSyncInlineStage();if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block'}renderRooms()};
       renderRooms();if(typeof renderCallRoster==='function')renderCallRoster();return;
@@ -2592,7 +2592,7 @@ async function voiceConnect(id,initiator){
   const queueRecovery=()=>{
     if(recoveryTimer||!callJoined||!voiceSignal||voicePeers.get(id)!==peer)return;
     if(voicePeerId>=id)return; // Only one side initiates recovery.
-    if(recoveryAttempts>=3){voiceStatus('Não foi possível estabilizar esta conexão. Algumas redes precisam de um servidor TURN.');return}
+    if(recoveryAttempts>=3){voiceStatus('Conexão difícil nesta rede. Pode ser necessário servidor TURN.');return}
     recoveryTimer=setTimeout(async()=>{
       recoveryTimer=null;
       if(!callJoined||!voiceSignal||voicePeers.get(id)!==peer||peer.signalingState!=='stable'||peer.connectionState==='connected')return;
@@ -2637,7 +2637,7 @@ async function voiceSignalReceived(packet){
       if(peer&&peer.signalingState!=='stable'){
         // A oferta recebida pode coincidir com uma renegociação local.
         // O par de ID menor mantém sua oferta; o outro aceita a oferta recebida.
-        if(voicePeerId<msg.from){console.warn('Oferta simultânea: mantendo negociação local');return}
+        if(voicePeerId<msg.from){console.warn('Oferta simultânea: aguardando negociação remota estável');concordNegotiationPending.add(msg.from);return}
         if(peer.signalingState==='have-local-offer')await peer.setLocalDescription({type:'rollback'});
         else {console.warn('Aguardando sinalização estável para aceitar oferta');return}
       }
@@ -2647,9 +2647,10 @@ async function voiceSignalReceived(packet){
       await voiceFlushIce(msg.from);
       const answer=await peer.createAnswer();await peer.setLocalDescription(answer);
       await voiceSend(msg.from,'answer',peer.localDescription.toJSON());
+      if(concordNegotiationPending.delete(msg.from))setTimeout(()=>concordNegotiatePeer(msg.from),400);
     }else if(msg.kind==='answer'){
       const peer=voicePeers.get(msg.from);
-      if(peer&&peer.signalingState==='have-local-offer'){await peer.setRemoteDescription(new RTCSessionDescription(msg.data));await voiceFlushIce(msg.from)}
+      if(peer&&peer.signalingState==='have-local-offer'){await peer.setRemoteDescription(new RTCSessionDescription(msg.data));await voiceFlushIce(msg.from);if(concordNegotiationPending.delete(msg.from))setTimeout(()=>concordNegotiatePeer(msg.from),400)}
     }else if(msg.kind==='resync-share'){
       const peer=voicePeers.get(msg.from);
       if(peer&&stream?.getVideoTracks().some(track=>track.readyState==='live')&&peer.signalingState==='stable'&&peer.connectionState!=='closed'){
@@ -3673,9 +3674,9 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   for(const member of members){if(!member.isMe&&member.sharing&&!concordLiveStreams.get(member.id)?.getVideoTracks().some(t=>t.readyState==='live'))concordRequestShareRepair(member.id)}
   const signature=JSON.stringify([room,members.map(m=>{
    const live=m.isMe?(typeof stream!=='undefined'?stream:null):(typeof concordLiveStreams!=='undefined'?concordLiveStreams.get(m.id):null);
-   return [m.id,m.name,m.isMe,m.userId,typeof concordVoiceAvatarVersion!=='undefined'?concordVoiceAvatarVersion:0,live?.getVideoTracks().filter(t=>t.readyState==='live').map(t=>t.id)||[],!!m.sharing,!!m.speaking];
+   return [m.id,m.name,m.isMe,m.userId,typeof concordVoiceAvatarVersion!=='undefined'?concordVoiceAvatarVersion:0,live?.getVideoTracks().filter(t=>t.readyState==='live').map(t=>t.id)||[],!!m.sharing];
   })]);
-  if(signature===lastGridSignature)return;
+  if(signature===lastGridSignature){for(const m of members){const tile=[...tiles.children].find(t=>t.dataset.memberId===String(m.id));if(tile){tile.classList.toggle('cvg-speaking',!!m.speaking&&!m.sharing);tile.querySelector('.cvg-avatar')?.classList.toggle('speaking',!!(m.isMe?concordIsLocallySpeaking:m.speaking)&&!m.sharing)}}return;}
   if(document.fullscreenElement?.classList?.contains('cvg-tile'))return;
   lastGridSignature=signature;
   const expanded=tiles.querySelector('.cvg-expanded')?.dataset.memberId||null;
