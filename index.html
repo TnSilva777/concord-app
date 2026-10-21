@@ -999,6 +999,12 @@ localChatNotice.setAttribute('role','note');
 localChatNotice.textContent='⚠ Chat público em teste: mensagens salvas apenas neste navegador. Seus amigos ainda não recebem essas mensagens.';
 const messageList=$('#messageList');
 if(messageList)messageList.parentNode.insertBefore(localChatNotice,messageList);
+const concordServerLocalWarning=document.createElement('div');
+concordServerLocalWarning.id='concordServerLocalWarning';
+concordServerLocalWarning.setAttribute('role','status');
+concordServerLocalWarning.textContent='Mensagens deste servidor estão somente neste navegador. Sincronização protegida ainda não habilitada.';
+if(messageList)messageList.parentNode.insertBefore(concordServerLocalWarning,messageList);
+
 
 function readChatHistory(){
   try{
@@ -1091,7 +1097,10 @@ $('#chatForm').onsubmit=async event=>{
     catch(error){messages=[]}
     try{localStorage.setItem(key,JSON.stringify([...messages,entry].slice(-100)))}
     catch(error){simple('Não foi possível salvar','Verifique se o armazenamento do navegador está disponível.');return}
-    appendChatMessage(entry);input.value='';$('#messages').scrollTop=$('#messages').scrollHeight;return;
+    appendChatMessage(entry);input.value='';$('#messages').scrollTop=$('#messages').scrollHeight;
+    const localNotice=document.getElementById('concordServerLocalWarning');
+    if(localNotice)localNotice.textContent='Mensagens deste servidor estão somente neste navegador. Sincronização protegida ainda não habilitada.';
+    return;
   }
   const profile=typeof concordData!=='undefined'?concordData.profile:null;
   const entry={name:(profile?.name||'Você').slice(0,60),text:value,date:new Date().toLocaleString('pt-BR')};
@@ -3627,4 +3636,8 @@ body.concord-home-view .app>.sidebar .user{margin-top:auto;flex-shrink:0}
 #concordDmPane .concord-dm-header button{flex-shrink:0}
 #concordVoiceGrid .cvg-avatar{flex:0 0 62px;max-width:62px;aspect-ratio:1}
 #concordVoiceGrid .cvg-tile:has(video) .cvg-avatar{display:none!important}
+</style><style>
+#concordServerLocalWarning{display:none;font-size:11px;line-height:1.5;color:#bedac7;padding:7px 12px;margin:4px 12px 8px;border-left:2px solid #5aa779;background:#16322680;border-radius:4px}
+body.concord-custom-server-view #concordServerLocalWarning{display:block}
+body:not(.concord-custom-server-view) #concordServerLocalWarning{display:none}
 </style></body></html>                              
