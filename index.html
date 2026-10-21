@@ -2689,7 +2689,13 @@ function concordSyncVoiceLobby(){
  }
  for(const room of new Set([...concordVoiceLobbyRooms,...groups.keys()])){
    if(room===joinedRoom&&callJoined)continue;
-   roomRoster[room]=groups.get(room)||[];
+   const actual=groups.get(room)||[];
+   // Apply authoritative presence without blanking peers during a transient resync.
+   if(actual.length||!roomRoster[room]?.length)roomRoster[room]=actual;
+   else{
+     const seen=roomRoster[room]||[];
+     roomRoster[room]=seen.filter(m=>!m.isMe&&m.id!==voicePeerId);
+   }
  }
  // Preserve the active WebRTC roster and update the speaking effects.
  if(joinedRoom&&callJoined){
