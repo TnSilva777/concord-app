@@ -2738,6 +2738,7 @@ async function voiceSignalReceived(packet){
 // Voice lobby shares only chosen display name and active room, never audio or email.
 // This allows participants to appear in room lists before others join the same call.
 let concordVoiceLobby=null;
+let concordLobbyUntrackTask=Promise.resolve();
 const concordVoiceLobbyRooms=new Set();
 const concordLobbySeenAt=new Map();
 let concordLobbyRefreshTimer=null;
@@ -2783,7 +2784,8 @@ function concordSyncVoiceLobby(){
 async function concordJoinVoiceLobby(userId){
  if(concordVoiceLobby){
    const existing=concordVoiceLobby;
-   if(callJoined&&joinedRoom)await existing.track({id:voicePeerId,userId,room:joinedRoom,name:voicePeerName(),sharing:!!stream,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted}).catch(console.warn);
+   await concordLobbyUntrackTask;
+   if(callJoined&&joinedRoom&&existing===concordVoiceLobby)await existing.track({id:voicePeerId,userId,room:joinedRoom,name:voicePeerName(),sharing:!!stream,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted}).catch(console.warn);
    return;
  }
  const channel=concordSupabase.channel('concord-voice-lobby-v1',{config:{presence:{key:voicePeerId}}});
@@ -2813,6 +2815,7 @@ async function startVoiceNetwork(){
     if(!session)throw Error('Entre na sua conta para usar a chamada.');
     if(!callJoined)return;
     await concordJoinVoiceLobby(session.user.id);
+    if(!callJoined||!joinedRoom||voiceSignal)return;
     const topic='concord-voice-test-'+joinedRoom.toLowerCase().replace(/[^a-z0-9]/g,'-');
     const channel=concordSupabase.channel(topic,{config:{presence:{key:voicePeerId}}});
     voiceSignal=channel;
@@ -2831,7 +2834,13 @@ async function startVoiceNetwork(){
   finally{voiceStarting=false}
 }
 function stopVoiceNetwork(){
-  if(concordVoiceLobby)concordVoiceLobby.untrack().then(()=>concordSyncVoiceLobby()).catch(console.warn);
+  if(concordVoiceLobby){const lobby=concordVoiceLobby;
+    concordLobbyUntrackTask=lobby.untrack().catch(error=>console.warn('Falha ao sair da presença de voz:',error)).then(async()=>{
+      if(lobby!==concordVoiceLobby)return;
+      if(callJoined&&joinedRoom){await lobby.track({id:voicePeerId,userId:socialUser,room:joinedRoom,name:voicePeerName(),sharing:!!stream,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted}).catch(console.warn)}
+      concordSyncVoiceLobby();
+    });
+  }
   if(stream)stopShare();
   concordWatching=null;
   concordLiveStreams.clear();concordShareRepairRequested.clear();
@@ -2854,9 +2863,12 @@ function stopVoiceNetwork(){
   if(concordVoiceLobby)concordSyncVoiceLobby();
 }
 const localJoinCall=joinCall;
+let concordCallJoinBusy=false;
 joinCall=async function(){
-  await localJoinCall();
-  if(callJoined&&joinedRoom)await startVoiceNetwork();
+  if(concordCallJoinBusy||callJoined)return;
+  concordCallJoinBusy=true;
+  try{await localJoinCall();if(callJoined&&joinedRoom)await startVoiceNetwork()}
+  finally{concordCallJoinBusy=false}
 };
 const localLeaveCall=leaveCall;
 leaveCall=function(){
@@ -3909,6 +3921,9 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
    if(event.target.closest('.server,#concordFriendsNav,.concord-community-item'))open();
  });
  document.addEventListener('keydown',event=>{if(event.key==='Escape')close()});
+ // Start on the server channel list when reopening CONCORD on mobile, not its empty landing page.
+ if(window.innerWidth<=760&&document.body.classList.contains('concord-custom-server-view'))open();
+ window.addEventListener('load',()=>{if(window.innerWidth<=760&&document.body.classList.contains('concord-custom-server-view'))open()},{once:true});
  // Keep mobile navigation and chat from overlapping when switching views.
  document.querySelector('.app>.main')?.addEventListener('click',event=>{
    if(window.innerWidth<=760&&event.target.closest('#dmBack,.topbar button:not(#concordMobileNavToggle)'))close();
