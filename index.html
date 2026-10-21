@@ -2519,16 +2519,40 @@ async function voiceConnect(id,initiator){
     });
     voiceStatus('Áudio remoto recebido. Vocês já podem conversar.');
   };
-  peer.onconnectionstatechange=()=>{
-    if(peer.connectionState==='connected')voiceStatus('Participante conectado. Áudio da sala ativo.');
-    else if(peer.connectionState==='disconnected')voiceStatus('Conexão instável. Tentando recuperar o áudio…');
-    else if(peer.connectionState==='failed'){
-      voiceStatus('Conexão falhou. Tentando reconectar a chamada…');
-      if(peer.signalingState==='stable'&&voicePeerId<id){
-        peer.createOffer({iceRestart:true}).then(offer=>peer.setLocalDescription(offer)).then(()=>voiceSend(id,'offer',peer.localDescription.toJSON())).catch(error=>voiceStatus('Não foi possível reconectar. Sua rede pode exigir um servidor TURN.'));
-      }else if(voicePeerId>=id)voiceStatus('Conexão falhou. Aguarde o outro participante tentar reconectar.');
-    }
+  // Recovery is driven by ICE state, with bounded retries and no offer glare.
+  let recoveryTimer=null,recoveryAttempts=0;
+  const queueRecovery=()=>{
+    if(recoveryTimer||!callJoined||!voiceSignal||voicePeers.get(id)!==peer)return;
+    if(voicePeerId>=id)return; // Only one side initiates recovery.
+    if(recoveryAttempts>=3){voiceStatus('Não foi possível estabilizar esta conexão. Algumas redes precisam de um servidor TURN.');return}
+    recoveryTimer=setTimeout(async()=>{
+      recoveryTimer=null;
+      if(!callJoined||!voiceSignal||voicePeers.get(id)!==peer||peer.signalingState!=='stable'||peer.connectionState==='connected')return;
+      recoveryAttempts++;
+      try{
+        peer.restartIce();
+        const offer=await peer.createOffer({iceRestart:true});
+        await peer.setLocalDescription(offer);
+        await voiceSend(id,'offer',peer.localDescription.toJSON());
+        if(peer.connectionState!=='connected')queueRecovery();
+      }catch(error){console.warn('Reconexão WebRTC:',error);if(peer.signalingState==='stable')queueRecovery()}
+    },recoveryAttempts?7000:11000);
   };
+  const onPeerConnectionState=()=>{
+    const state=peer.connectionState,ice=peer.iceConnectionState;
+    if(state==='connected'||ice==='connected'||ice==='completed'){
+      recoveryAttempts=0;
+      if(recoveryTimer){clearTimeout(recoveryTimer);recoveryTimer=null}
+      voiceStatus('Participante conectado. Áudio da sala ativo.');
+    }else if(state==='disconnected'||state==='failed'||ice==='failed'||ice==='disconnected'){
+      voiceStatus('Conexão instável. Tentando reconectar…');
+      queueRecovery();
+    }else if(state==='connecting'||ice==='checking')queueRecovery();
+    else if(state==='closed'&&recoveryTimer){clearTimeout(recoveryTimer);recoveryTimer=null}
+  };
+  peer.onconnectionstatechange=onPeerConnectionState;
+  peer.oniceconnectionstatechange=onPeerConnectionState;
+  queueRecovery();
   if(initiator){
     const offer=await peer.createOffer();await peer.setLocalDescription(offer);
     await voiceSend(id,'offer',peer.localDescription.toJSON());
