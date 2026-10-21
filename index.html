@@ -762,6 +762,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
 #callRosterList .roster-person:hover{background:rgba(67,196,141,.06)}
 .room-member.concord-member-speaking .mini-avatar,.roster-person .avatar.speaking{box-shadow:0 0 0 2px rgba(53,212,154,.8),0 0 14px rgba(53,212,154,.20)}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.server:hover{transform:none}}
+
+/* Never let an active call overlay the private message view. */
+body.concord-home-view #concordVoiceGrid{display:none!important}
+body.concord-home-view #concordDmPane:not([hidden]){display:flex!important}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js'"></script>
 <script>
@@ -2775,6 +2779,7 @@ dmPane.querySelector('.concord-dm-header')?.insertBefore(dmHeaderAvatar,dmPane.q
 function dmShow(open){
   ++dmRequest;
   dmOpen=open;dmPane.hidden=!open;
+  if(open)window.concordCloseVoiceGrid?.();
   dmProfileAction.hidden=!open||!dmPeer;
   if(open&&!dmPeer){
     const history=$('#dmHistory');
@@ -3484,13 +3489,14 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  const title=document.createElement('strong');title.textContent='◉ Sala de voz • CONCORD';
  const close=document.createElement('button');close.type='button';close.textContent='Voltar ao chat';
  close.onclick=()=>{grid.classList.remove('open');messages.style.display='';lastGridSignature='';};
+ window.concordCloseVoiceGrid=()=>{if(grid.classList.contains('open'))close.click();};
  header.append(title,close);
  const tiles=document.createElement('div');tiles.className='cvg-tiles';grid.append(header,tiles);main.insertBefore(grid,messages);
- const open=()=>{if(!document.getElementById('joinCall')?.disabled)return;const stage=document.getElementById('concordInlineStage');if(stage)stage.hidden=true;messages.style.display='none';grid.classList.add('open');render()};
+ const open=()=>{if(document.body.classList.contains('concord-home-view')||document.getElementById('concordDmPane')?.hidden===false)return;if(!document.getElementById('joinCall')?.disabled)return;const stage=document.getElementById('concordInlineStage');if(stage)stage.hidden=true;messages.style.display='none';grid.classList.add('open');render()};
  const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=open;view.title='Ver participantes em grade'}
  const join=document.getElementById('joinCall');
  if(join)new MutationObserver(()=>{if(join.disabled&&typeof joinedRoom!=='undefined'&&joinedRoom)open()}).observe(join,{attributes:true,attributeFilter:['disabled']});
- if(join?.disabled)open();
+ if(join?.disabled&&!document.body.classList.contains('concord-home-view'))open();
  let lastGridSignature='';
  function render(){
   if(!grid.classList.contains('open'))return;
