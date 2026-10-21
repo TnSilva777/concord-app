@@ -1015,7 +1015,7 @@ async function concordLoadServerChat(serverId,channelId,background=false){
  if(!background)concordServerChatReady=false;
  const warning=document.getElementById('concordServerLocalWarning');
  if(warning&&!background)warning.textContent='◌ Verificando acesso ao canal compartilhado…';
- if(!socialUser||!serverId||!channelId)return;
+ if(!socialUser||!serverId||!channelId){concordServerChatReady=false;return;}
  try{
   const {data,error}=await concordSupabase.from('concord_server_channel_messages').select('id,author_id,body,created_at').eq('server_key',serverId).eq('channel_key',channelId).order('created_at',{ascending:false}).limit(100);
   if(error)throw error;
@@ -1024,7 +1024,7 @@ async function concordLoadServerChat(serverId,channelId,background=false){
   const list=document.getElementById('messageList');
   const atBottom=document.getElementById('messages').scrollHeight-document.getElementById('messages').scrollTop-document.getElementById('messages').clientHeight<80;
   const fingerprint=(data||[]).map(row=>row.id).join('|');
-  if(background&&list.dataset.concordServerFingerprint===fingerprint)return;
+  if(background&&list.dataset.concordServerFingerprint===fingerprint){if(warning)warning.textContent='✓ Canal protegido e sincronizado entre os membros do servidor.';return;}
   const authorIds=[...new Set((data||[]).map(m=>m.author_id).filter(Boolean))];
   if(authorIds.length){
    const {data:profiles}=await concordSupabase.from('concord_public_profiles').select('user_id,display_name').in('user_id',authorIds);
@@ -1037,7 +1037,7 @@ async function concordLoadServerChat(serverId,channelId,background=false){
   if(warning)warning.textContent='✓ Canal protegido e sincronizado entre os membros do servidor.';
   if(!background||atBottom)document.getElementById('messages').scrollTop=document.getElementById('messages').scrollHeight;
  }catch(error){
-  if(request!==concordServerChatRequest)return;
+  if(request!==concordServerChatRequest||concordSelectedCommunity!==serverId||concordSelectedTextRoom!==channelId)return;
   concordServerChatReady=false;
   if(warning)warning.textContent='⚠ Sem acesso ao canal compartilhado. Verifique seu convite de servidor. Suas mensagens locais não foram apagadas.';
   console.warn('Falha ao sincronizar canal de servidor:',error);
@@ -1053,7 +1053,7 @@ setInterval(async()=>{
 const concordServerLocalWarning=document.createElement('div');
 concordServerLocalWarning.id='concordServerLocalWarning';
 concordServerLocalWarning.setAttribute('role','status');
-concordServerLocalWarning.textContent='Mensagens deste servidor estão somente neste navegador. Sincronização protegida ainda não habilitada.';
+concordServerLocalWarning.textContent='◌ Verificando a sincronização protegida do canal…';
 if(messageList)messageList.parentNode.insertBefore(concordServerLocalWarning,messageList);
 
 
