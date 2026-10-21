@@ -821,6 +821,20 @@ body.concord-home-view #concordDmPane:not([hidden]){display:flex!important}
 .concord-call-state.is-deafened{border-color:#66806d;background:#1b2a22;color:#d5e6d9}
 .concord-call-state svg{width:14px;height:14px;display:block}
 .person-meta b{display:flex;align-items:center;min-width:0;gap:3px}.room-member .game-status,.concord-local-voice-person>span:last-child{display:inline-flex;align-items:center}
+
+/* CONCORD mobile voice layout: touch controls, scrollable channels, participant tiles */
+@media(max-width:760px){
+ body .app>.main>.topbar{gap:8px!important;overflow:hidden}
+ body .app>.main .messages{padding:12px!important}
+ body .app>.sidebar{width:min(340px,calc(100vw - 56px))!important;max-width:calc(100vw - 56px)!important}
+ #concordServerPanel{overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+ .concord-local-voice-person{min-height:35px;gap:7px}
+ .concord-server-room,.room-member,#concordMobileNavToggle{min-height:42px}
+ .voice-dialog{width:min(96vw,600px)!important;max-width:96vw!important}
+ #concordVoiceGrid{padding:8px!important}
+ #concordVoiceGrid .cvg-tiles{grid-template-columns:repeat(auto-fit,minmax(min(165px,100%),1fr))!important;grid-auto-rows:minmax(140px,1fr)!important}
+ .voice-controls button,.voice-control{min-width:42px;min-height:42px}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js'"></script>
 <script>
@@ -2770,8 +2784,10 @@ async function concordJoinVoiceLobby(userId){
  }
  const channel=concordSupabase.channel('concord-voice-lobby-v1',{config:{presence:{key:voicePeerId}}});
  concordVoiceLobby=channel;
- channel.on('presence',{event:'sync'},concordSyncVoiceLobby).subscribe(async status=>{
-   if(status==='SUBSCRIBED'&&concordVoiceLobby===channel&&callJoined&&joinedRoom){
+ channel.on('presence',{event:'sync'},concordSyncVoiceLobby).on('presence',{event:'join'},concordSyncVoiceLobby).on('presence',{event:'leave'},concordSyncVoiceLobby).subscribe(async status=>{
+   if(status==='SUBSCRIBED'&&concordVoiceLobby===channel){
+     concordSyncVoiceLobby();
+     if(!callJoined||!joinedRoom)return;
      await channel.track({id:voicePeerId,userId,room:joinedRoom,name:voicePeerName(),sharing:!!stream,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted}).catch(console.warn);
    }
  });
