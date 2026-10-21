@@ -990,7 +990,8 @@ const CONCORD_DRAFTS_STORE='concord-channel-drafts-v1';
 function readConcordDrafts(){try{const v=JSON.parse(localStorage.getItem(CONCORD_DRAFTS_STORE)||'{}');return v&&typeof v==='object'&&!Array.isArray(v)?v:{}}catch{return {}}}
 function saveConcordDraft(channel,value){try{const drafts=readConcordDrafts();if(value)drafts[channel]=value.slice(0,2000);else delete drafts[channel];localStorage.setItem(CONCORD_DRAFTS_STORE,JSON.stringify(drafts))}catch(error){console.warn('Rascunho nao salvo',error)}}
 $('#chatInput').maxLength=2000;
-$('#chatInput').addEventListener('input',()=>saveConcordDraft(concordActiveChannel,$('#chatInput').value));
+function concordCurrentDraftKey(){return document.body.classList.contains('concord-custom-server-view')&&concordSelectedCommunity&&concordSelectedTextRoom?'server:'+concordSelectedCommunity+':'+concordSelectedTextRoom:concordActiveChannel}
+$('#chatInput').addEventListener('input',()=>saveConcordDraft(concordCurrentDraftKey(),$('#chatInput').value));
 
 const concordDefaultMessages=$('#messageList').innerHTML;
 const localChatNotice=document.createElement('div');
@@ -1136,7 +1137,7 @@ $('#chatForm').onsubmit=async event=>{
     try{
       const {error}=await concordSupabase.from('concord_server_channel_messages').insert({server_key:concordSelectedCommunity,channel_key:room.id,author_id:socialUser,body:value});
       if(error)throw error;
-      input.value='';await concordLoadServerChat(concordSelectedCommunity,room.id);
+      input.value='';saveConcordDraft(concordCurrentDraftKey(),'');await concordLoadServerChat(concordSelectedCommunity,room.id);
     }catch(error){simple('Mensagem não enviada',error.message||'Falha de conexão ou permissão.')}
     finally{publicChatSending=false}
     return;
@@ -1982,6 +1983,7 @@ close();renderCommunityChannels();[...concordServerPanel.querySelectorAll('.conc
         $('#messageList').replaceChildren();
         concordInlineStage.hidden=true;$('#concordInlineVideo').srcObject=null;
         $('#messages').hidden=false;
+        if(concordSelectedTextRoom)saveConcordDraft(concordCurrentDraftKey(),$('#chatInput').value);
         concordSelectedTextRoom=kind==='text'?room.id:null;
         if(kind==='text'){community.lastTextRoom=room.id;saveConcordData()}
         ++publicChatSeq;publicChatRefreshPending=false;publicChatError.hidden=true;localChatNotice.textContent='✓ Canal local: mensagens salvas neste navegador.';
@@ -1990,6 +1992,7 @@ close();renderCommunityChannels();[...concordServerPanel.querySelectorAll('.conc
         const input=$('#chatInput');input.disabled=kind!=='text';
         if(kind==='text'){
           input.placeholder='Mensagem em #'+room.name;
+          input.value=readConcordDrafts()[concordCurrentDraftKey()]||'';
           concordLoadServerChat(concordSelectedCommunity,room.id).catch(console.warn);
           const key='concord-server-chat:'+concordSelectedCommunity+':'+room.id;
           try{const saved=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(saved))saved.slice(-100).forEach(appendChatMessage)}catch(error){console.warn('Mensagens locais indisponíveis',error)}
