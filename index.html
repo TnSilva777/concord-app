@@ -2528,7 +2528,7 @@ function voiceParticipants(){
   }
   for(const [id,peer] of voicePeers)if(!members.some(m=>m.id===id)){
     if(!concordVoiceLastSeen.has(id))concordVoiceLastSeen.set(id,now);
-    if(now-concordVoiceLastSeen.get(id)<12000){
+    if(now-concordVoiceLastSeen.get(id)<3500){
       const previous=(roomRoster[joinedRoom]||[]).find(m=>m.id===id);
       if(previous)members.push(previous);
       continue;
