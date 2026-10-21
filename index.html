@@ -2374,6 +2374,7 @@ function voiceStatus(text){
 }
 function voicePeerName(){return String(concordData.profile?.name||'Participante').trim().slice(0,28)||'Participante'}
 const concordVoiceNameLookupAttempted=new Set();
+const concordVoiceLastSeen=new Map();
 function voiceParticipants(){
   if(!voiceSignal||!joinedRoom)return;
   const state=voiceSignal.presenceState(),members=[];
@@ -2383,7 +2384,28 @@ function voiceParticipants(){
     if(!p||!p.id||p.id===voicePeerId)return;
     if(!members.some(m=>m.id===p.id)){const publicName=p.userId&&concordFriendNames.get(p.userId);const name=String(publicName||p.name||'Participante').trim().slice(0,28)||'Participante';members.push({id:p.id,userId:p.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!p.sharing,speaking:speakingByPeer.get(p.id)===true})};
   });
-  for(const [id,peer] of voicePeers)if(!members.some(m=>m.id===id)){peer.close();voicePeers.delete(id);for(const [key,audio] of voiceAudio){if(key.startsWith(id+':')){audio.remove();voiceAudio.delete(key)}}voicePendingIce.delete(id);concordLiveStreams.delete(id);if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none'}}
+  // Oscilações de presença durante renegociação de vídeo não são saídas confirmadas.
+  const now=Date.now();
+  for(const member of members)concordVoiceLastSeen.set(member.id,now);
+  const lobbyEntries=concordVoiceLobby?Object.values(concordVoiceLobby.presenceState()).flat():[];
+  for(const entry of lobbyEntries)if(entry?.room===joinedRoom&&entry.id&&entry.id!==voicePeerId){
+    concordVoiceLastSeen.set(entry.id,now);
+    if(!members.some(m=>m.id===entry.id)){
+      const name=String((entry.userId&&concordFriendNames.get(entry.userId))||entry.name||'Participante').slice(0,28);
+      members.push({id:entry.id,userId:entry.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!entry.sharing,speaking:!!entry.speaking});
+    }
+  }
+  for(const [id,peer] of voicePeers)if(!members.some(m=>m.id===id)){
+    if(now-(concordVoiceLastSeen.get(id)||now)<12000){
+      const previous=(roomRoster[joinedRoom]||[]).find(m=>m.id===id);
+      if(previous)members.push(previous);
+      continue;
+    }
+    peer.close();voicePeers.delete(id);concordVoiceLastSeen.delete(id);concordStopRemoteSpeech(id);
+    for(const [key,audio] of voiceAudio)if(key.startsWith(id+':')){audio.remove();voiceAudio.delete(key)}
+    voicePendingIce.delete(id);concordLiveStreams.delete(id);
+    if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none'}
+  }
   roomRoster[joinedRoom]=[{id:voicePeerId,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream,speaking:concordIsLocallySpeaking},...members];
   renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();concordQueueVoiceAvatars(members);
   // A participant's chosen public name can arrive after presence sync.
