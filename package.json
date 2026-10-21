@@ -1,0 +1,62 @@
+{
+  "name": "concord-desktop",
+  "version": "0.1.0",
+  "description": "CONCORD Desktop para Windows",
+  "main": "desktop/main.cjs",
+  "private": true,
+  "author": "CONCORD",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TnSilva777/concord-app.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "desktop:build": "electron-builder --win nsis --publish never",
+    "desktop:release": "electron-builder --win nsis --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "app.concord.desktop",
+    "productName": "CONCORD",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "desktop/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "CONCORD-Setup-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "TnSilva777",
+        "repo": "concord-app",
+        "releaseType": "release"
+      }
+    ]
+  }
+}
