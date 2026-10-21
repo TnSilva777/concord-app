@@ -2925,6 +2925,17 @@ async function initConcordSocial(session){
   if(!id){if(window.concordNamesRealtime){concordSupabase.removeChannel(window.concordNamesRealtime).catch(console.warn);window.concordNamesRealtime=null}concordLeaveVoiceLobby();dmShow(true);dmFriendIds.clear();$('#dmFriends').replaceChildren();$('#concordFriends').textContent='Entre na conta para ver seus amigos.';return}
   dmShow(true);
   await concordJoinVoiceLobby(id).catch(error=>console.warn('Lobby de voz:',error));
+  // Recupera nomes escolhidos e armazenados apenas neste navegador em versões antigas.
+  const localName=String(concordData.profile?.name||'').trim().slice(0,28);
+  if(localName&&localName!=='Você'&&localName!=='Perfil sem nome'){
+    try{
+      const chosen=String(session?.user?.user_metadata?.concord_profile?.name||session?.user?.user_metadata?.display_name||'').trim();
+      if(chosen!==localName){
+        const {error:syncError}=await concordSupabase.auth.updateUser({data:{display_name:localName,concord_profile:{name:localName,status:String(concordData.profile.status||'').slice(0,50),bio:String(concordData.profile.bio||'').slice(0,160),avatar:String(concordData.profile.avatar||'').slice(0,4),color:concordData.profile.color||'#16865e'}}});
+        if(syncError)console.warn('Falha na sincronização do nome antigo:',syncError.message);
+      }
+    }catch(error){console.warn('Falha ao recuperar nome local:',error)}
+  }
   await concordPublishPublicProfile().catch(error=>console.warn('Falha ao publicar perfil:',error));
   // Convite discreto para escolher nome, apenas quando esta conta não tem perfil público.
   try{
