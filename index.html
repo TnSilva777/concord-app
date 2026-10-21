@@ -2578,14 +2578,14 @@ function voiceParticipants(){
    const speakingByPeer=new Map();
    if(concordVoiceLobby)for(const entry of Object.values(concordVoiceLobby.presenceState()).flat())if(entry?.id)speakingByPeer.set(entry.id,!!entry.speaking);
   Object.values(state).flat().forEach(p=>{
-    if(!p||!p.id||p.id===voicePeerId)return;
+    if(!p||!p.id||p.id===voicePeerId||p.userId&&p.userId===socialUser)return;
     if(!members.some(m=>m.id===p.id)){if(p.userId)concordRememberVoiceName(p.userId,p.name);const publicName=p.userId&&concordFriendNames.get(p.userId);const name=String(publicName||p.name||'Participante').trim().slice(0,28)||'Participante';members.push({id:p.id,userId:p.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!p.sharing,speaking:speakingByPeer.get(p.id)===true,muted:!!p.muted,deafened:!!p.deafened})};
   });
   // Oscilações de presença durante renegociação de vídeo não são saídas confirmadas.
   const now=Date.now();
   for(const member of members)concordVoiceLastSeen.set(member.id,now);
   const lobbyEntries=concordVoiceLobby?Object.values(concordVoiceLobby.presenceState()).flat():[];
-  for(const entry of lobbyEntries)if(entry?.room===joinedRoom&&entry.id&&entry.id!==voicePeerId){
+  for(const entry of lobbyEntries)if(entry?.room===joinedRoom&&entry.id&&entry.id!==voicePeerId&&(!socialUser||entry.userId!==socialUser)){
     if(entry.userId)concordRememberVoiceName(entry.userId,entry.name);
     concordVoiceLastSeen.set(entry.id,now);
     if(!members.some(m=>m.id===entry.id)){
@@ -2825,7 +2825,7 @@ function concordSyncVoiceLobby(){
  const state=concordVoiceLobby.presenceState();
  const groups=new Map();
  for(const entry of Object.values(state).flat()){
-   if(!entry?.id||!entry.room||entry.id===voicePeerId)continue;
+   if(!entry?.id||!entry.room||entry.id===voicePeerId||entry.userId&&entry.userId===socialUser)continue;
    if(entry.userId)concordRememberVoiceName(entry.userId,entry.name);
    const name=String((entry.userId&&concordFriendNames.get(entry.userId))||entry.name||'Participante').trim().slice(0,28)||'Participante';
    if(!groups.has(entry.room))groups.set(entry.room,[]);
@@ -2838,10 +2838,11 @@ function concordSyncVoiceLobby(){
    // Short grace period prevents flicker on Realtime rejoin, never permanent ghosts.
    const now=Date.now();
    for(const member of actual)concordLobbySeenAt.set(member.id,now);
-   const previous=(roomRoster[room]||[]).filter(m=>!m.isMe&&m.id!==voicePeerId);
+   const previous=(roomRoster[room]||[]).filter(m=>!m.isMe&&m.id!==voicePeerId&&(!socialUser||m.userId!==socialUser));
    const grace=previous.filter(m=>!actual.some(a=>a.id===m.id)&&now-(concordLobbySeenAt.get(m.id)||0)<5000);
    for(const member of grace)if(!concordLobbySeenAt.has(member.id))concordLobbySeenAt.set(member.id,now);
-   roomRoster[room]=[...(activeRoom?[{id:voicePeerId,userId:socialUser,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream,speaking:concordIsLocallySpeaking,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted}]:[]),...actual,...grace];
+   const unique=new Map();for(const member of [...actual,...grace]){const key=member.userId?'user:'+member.userId:'peer:'+member.id;if(!unique.has(key))unique.set(key,member)}
+   roomRoster[room]=[...(activeRoom?[{id:voicePeerId,userId:socialUser,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream,speaking:concordIsLocallySpeaking,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted}]:[]),...unique.values()];
    if(grace.length&&!concordLobbyRefreshTimer)concordLobbyRefreshTimer=setTimeout(()=>{concordLobbyRefreshTimer=null;if(concordVoiceLobby)concordSyncVoiceLobby()},5200);
  }
  // Preserve the active WebRTC roster and update the speaking effects.
@@ -2938,7 +2939,7 @@ function stopVoiceNetwork(){
   voicePeers.clear();concordNegotiationBusy.clear();concordNegotiationPending.clear();concordVoiceLastSeen.clear();voicePendingIce.clear();for(const audio of voiceAudio.values())audio.remove();voiceAudio.clear();concordAudioUnlock.hidden=true;
   if(joinedRoom){
     // Leaving the audio session must not erase other people's server presence.
-    roomRoster[joinedRoom]=(roomRoster[joinedRoom]||[]).filter(member=>!member.isMe&&member.id!==voicePeerId);
+    roomRoster[joinedRoom]=(roomRoster[joinedRoom]||[]).filter(member=>!member.isMe&&member.id!==voicePeerId&&(!socialUser||member.userId!==socialUser));
     renderRooms();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();
   }
   if(concordVoiceLobby)concordSyncVoiceLobby();
@@ -2954,7 +2955,7 @@ joinCall=async function(){
 const localLeaveCall=leaveCall;
 leaveCall=function(){
  const previousRoom=joinedRoom;
- const remaining=(roomRoster[previousRoom]||[]).filter(member=>!member.isMe&&member.id!==voicePeerId);
+ const remaining=(roomRoster[previousRoom]||[]).filter(member=>!member.isMe&&member.id!==voicePeerId&&(!socialUser||member.userId!==socialUser));
  stopVoiceNetwork();localLeaveCall();
  if(previousRoom){
    // A presence sync can arrive later; until then keep the last remote roster visible.
