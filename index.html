@@ -3059,19 +3059,8 @@ async function refreshSocial(){
         if(panel)panel.title='Não foi possível carregar os nomes públicos. Verifique a tabela e as permissões concord_public_profiles no Supabase.';
       }
     }
-    // Try the account-profile records for names not published in the public profile table.
-    // Only display data the current authenticated user is permitted to read.
-    const missingNames=visibleIds.filter(id=>!concordFriendNames.has(id));
-    if(missingNames.length&&requestUser===socialUser){
-      const {data:accountProfiles,error:accountError}=await concordSupabase.from('concord_user_profiles').select('user_id,profile').in('user_id',missingNames);
-      if(!accountError&&requestUser===socialUser){
-        for(const record of accountProfiles||[]){
-          const profile=record.profile&&typeof record.profile==='object'?record.profile:{};
-          const name=typeof profile.name==='string'?profile.name.trim():'';
-          if(name&&name!=='Você')concordFriendNames.set(record.user_id,name.slice(0,28));
-        }
-      }else if(accountError)console.warn('Nomes de perfil de amigos indisponíveis:',accountError.message);
-    }
+    // The saved account profile lives in auth metadata, which cannot be read for other users.
+    // Use only publicly readable names; do not query an unverified profile table.
     // Reflect updated public names immediately in avatar initials and friend search.
     if(typeof voiceSignal!=='undefined'&&voiceSignal&&joinedRoom)voiceParticipants();
     if(typeof concordVoiceLobby!=='undefined'&&concordVoiceLobby)concordSyncVoiceLobby();
