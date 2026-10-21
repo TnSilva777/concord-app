@@ -2675,6 +2675,8 @@ async function voiceSignalReceived(packet){
 // This allows participants to appear in room lists before others join the same call.
 let concordVoiceLobby=null;
 const concordVoiceLobbyRooms=new Set();
+const concordLobbySeenAt=new Map();
+let concordLobbyRefreshTimer=null;
 function concordVoiceMemberSharing(id){return !!Object.values(concordVoiceLobby?.presenceState()||{}).flat().find(p=>p.id===id)?.sharing}
 function concordSyncVoiceLobby(){
  if(!concordVoiceLobby)return;
@@ -2690,12 +2692,14 @@ function concordSyncVoiceLobby(){
  for(const room of new Set([...concordVoiceLobbyRooms,...groups.keys()])){
    if(room===joinedRoom&&callJoined)continue;
    const actual=groups.get(room)||[];
-   // Apply authoritative presence without blanking peers during a transient resync.
-   if(actual.length||!roomRoster[room]?.length)roomRoster[room]=actual;
-   else{
-     const seen=roomRoster[room]||[];
-     roomRoster[room]=seen.filter(m=>!m.isMe&&m.id!==voicePeerId);
-   }
+   // Short grace period prevents flicker on Realtime rejoin, never permanent ghosts.
+   const now=Date.now();
+   for(const member of actual)concordLobbySeenAt.set(member.id,now);
+   const previous=(roomRoster[room]||[]).filter(m=>!m.isMe&&m.id!==voicePeerId);
+   const grace=previous.filter(m=>!actual.some(a=>a.id===m.id)&&now-(concordLobbySeenAt.get(m.id)||now)<8000);
+   for(const member of grace)if(!concordLobbySeenAt.has(member.id))concordLobbySeenAt.set(member.id,now);
+   roomRoster[room]=[...actual,...grace];
+   if(grace.length&&!concordLobbyRefreshTimer)concordLobbyRefreshTimer=setTimeout(()=>{concordLobbyRefreshTimer=null;if(concordVoiceLobby)concordSyncVoiceLobby()},8500);
  }
  // Preserve the active WebRTC roster and update the speaking effects.
  if(joinedRoom&&callJoined){
@@ -2731,6 +2735,7 @@ function concordLeaveVoiceLobby(){
  if(channel)concordSupabase.removeChannel(channel).catch(console.warn);
  for(const room of concordVoiceLobbyRooms)if(room!==joinedRoom)roomRoster[room]=[];
  concordVoiceLobbyRooms.clear();
+ concordLobbySeenAt.clear();if(concordLobbyRefreshTimer){clearTimeout(concordLobbyRefreshTimer);concordLobbyRefreshTimer=null}
  renderRooms();
  if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();
 }
