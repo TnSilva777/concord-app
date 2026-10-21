@@ -2769,7 +2769,11 @@ function stopVoiceNetwork(){
   for(const peer of voicePeers.values())peer.close();
   for(const id of [...concordRemoteSpeechMeters.keys()])concordStopRemoteSpeech(id);
   voicePeers.clear();concordNegotiationBusy.clear();concordNegotiationPending.clear();concordVoiceLastSeen.clear();voicePendingIce.clear();for(const audio of voiceAudio.values())audio.remove();voiceAudio.clear();concordAudioUnlock.hidden=true;
-  if(joinedRoom){roomRoster[joinedRoom]=[];renderRooms();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}
+  if(joinedRoom){
+    // Leaving the audio session must not erase other people's server presence.
+    roomRoster[joinedRoom]=(roomRoster[joinedRoom]||[]).filter(member=>!member.isMe&&member.id!==voicePeerId);
+    renderRooms();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();
+  }
   if(concordVoiceLobby)concordSyncVoiceLobby();
 }
 const localJoinCall=joinCall;
@@ -2778,7 +2782,19 @@ joinCall=async function(){
   if(callJoined&&joinedRoom)await startVoiceNetwork();
 };
 const localLeaveCall=leaveCall;
-leaveCall=function(){stopVoiceNetwork();localLeaveCall();if(concordVoiceLobby)concordSyncVoiceLobby()};
+leaveCall=function(){
+ const previousRoom=joinedRoom;
+ const remaining=(roomRoster[previousRoom]||[]).filter(member=>!member.isMe&&member.id!==voicePeerId);
+ stopVoiceNetwork();localLeaveCall();
+ if(previousRoom){
+   // A presence sync can arrive later; until then keep the last remote roster visible.
+   const current=roomRoster[previousRoom]||[];
+   roomRoster[previousRoom]=[...current.filter(member=>!member.isMe&&member.id!==voicePeerId),...remaining.filter(member=>!current.some(active=>active.id===member.id))];
+ }
+ if(concordVoiceLobby)concordSyncVoiceLobby();
+ renderRooms();renderCallRoster();
+ if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();
+};
 $('#joinCall').onclick=joinCall;
 $('#leaveCall').onclick=leaveCall;
 $('#headphoneToggle').onclick=()=>{
