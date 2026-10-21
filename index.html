@@ -2538,7 +2538,13 @@ function voiceParticipants(){
     voicePendingIce.delete(id);concordLiveStreams.delete(id);concordShareRepairRequested.delete(id);
     if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none'}
   }
-  roomRoster[joinedRoom]=[{id:voicePeerId,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream,speaking:concordIsLocallySpeaking,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted},...members];
+  // Presença global complementa a sala mesmo durante reconexão do canal WebRTC.
+  if(concordVoiceLobby){for(const entry of Object.values(concordVoiceLobby.presenceState()||{}).flat()){
+    if(entry?.room!==joinedRoom||!entry.id||entry.id===voicePeerId||members.some(m=>m.id===entry.id))continue;
+    const name=String((entry.userId&&concordFriendNames.get(entry.userId))||entry.name||'Participante').slice(0,28);
+    members.push({id:entry.id,userId:entry.userId||null,name,initial:name[0]?.toUpperCase()||'?',isMe:false,sharing:!!entry.sharing,speaking:!!entry.speaking,muted:!!entry.muted,deafened:!!entry.deafened});
+  }}
+  roomRoster[joinedRoom]=[{id:voicePeerId,userId:socialUser,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream,speaking:concordIsLocallySpeaking,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted},...members];
   renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();concordQueueVoiceAvatars(members);
   // A participant's chosen public name can arrive after presence sync.
   const unknownIds=[...new Set(members.filter(m=>m.userId&&!concordFriendNames.has(m.userId)&&!concordVoiceNameLookupAttempted.has(m.userId)).map(m=>m.userId))];
@@ -2755,7 +2761,8 @@ function concordSyncVoiceLobby(){
    if(!groups.get(entry.room).some(member=>member.id===entry.id))groups.get(entry.room).push({id:entry.id,userId:entry.userId||null,name,initial:name[0].toUpperCase(),isMe:false,sharing:!!entry.sharing,speaking:!!entry.speaking,muted:!!entry.muted,deafened:!!entry.deafened});
  }
  for(const room of new Set([...concordVoiceLobbyRooms,...groups.keys()])){
-   if(room===joinedRoom&&callJoined)continue;
+   // A lista da sala ativa também deve refletir a presença, independentemente do WebRTC.
+   const activeRoom=room===joinedRoom&&callJoined;
    const actual=groups.get(room)||[];
    // Short grace period prevents flicker on Realtime rejoin, never permanent ghosts.
    const now=Date.now();
@@ -2763,7 +2770,7 @@ function concordSyncVoiceLobby(){
    const previous=(roomRoster[room]||[]).filter(m=>!m.isMe&&m.id!==voicePeerId);
    const grace=previous.filter(m=>!actual.some(a=>a.id===m.id)&&now-(concordLobbySeenAt.get(m.id)||0)<1800);
    for(const member of grace)if(!concordLobbySeenAt.has(member.id))concordLobbySeenAt.set(member.id,now);
-   roomRoster[room]=[...actual,...grace];
+   roomRoster[room]=[...(activeRoom?[{id:voicePeerId,userId:socialUser,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream,speaking:concordIsLocallySpeaking,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted}]:[]),...actual,...grace];
    if(grace.length&&!concordLobbyRefreshTimer)concordLobbyRefreshTimer=setTimeout(()=>{concordLobbyRefreshTimer=null;if(concordVoiceLobby)concordSyncVoiceLobby()},2000);
  }
  // Preserve the active WebRTC roster and update the speaking effects.
@@ -2821,9 +2828,11 @@ async function startVoiceNetwork(){
     voiceSignal=channel;
     channel.on('broadcast',{event:'rtc'},voiceSignalReceived)
       .on('presence',{event:'sync'},voiceParticipants)
+      .on('presence',{event:'join'},voiceParticipants)
+      .on('presence',{event:'leave'},voiceParticipants)
       .subscribe(async status=>{
         if(status==='SUBSCRIBED'&&callJoined&&voiceSignal===channel){
-          try{await channel.track({id:voicePeerId,userId:session.user.id,name:voicePeerName(),sharing:!!stream});voiceStatus('Sala conectada. Aguardando seu amigo entrar na mesma sala.')}
+          try{await channel.track({id:voicePeerId,userId:session.user.id,name:voicePeerName(),sharing:!!stream,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted});voiceParticipants();voiceStatus('Sala conectada. Aguardando seu amigo entrar na mesma sala.')}
           catch(error){voiceStatus('Erro ao entrar na sala de voz: '+error.message)}
         }else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
           voiceStatus('Falha no Supabase Realtime. Tente sair e entrar novamente.');
