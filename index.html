@@ -1352,7 +1352,40 @@ function renderRooms(){
   });
   renderCallRoster();
 }
-function chooseRoom(room){if(callJoined&&joinedRoom&&joinedRoom!==room){simple('Você já está em uma call','Saia da sala '+joinedRoom+' antes de entrar em '+room+'.');return}activeRoom=room;renderRooms();$('#callSubtitle').textContent='Sala '+room;$('#voiceModal').classList.remove('show');if(callJoined){$('#voiceStatus').textContent='Você está conectado à sala '+room+'.';renderCallRoster()}else{joinCall()}}
+function concordVoiceRoomName(room){
+ if(!room)return 'Sala de voz';
+ const key=String(room);
+ if(!key.startsWith('srv-'))return key;
+ for(const community of concordData.communities||[]){
+  for(const channel of community.channels||[]){
+   if('srv-'+community.id+'-'+channel.id===key)return String(channel.name||'Sala de voz');
+  }
+ }
+ return 'Sala de voz';
+}
+let concordSwitchingRoom=false;
+async function chooseRoom(room){
+ if(concordSwitchingRoom||!room)return;
+ if(callJoined&&joinedRoom===room)return;
+ if(callJoined&&joinedRoom&&joinedRoom!==room){
+  if(!confirm('Trocar de '+concordVoiceRoomName(joinedRoom)+' para '+concordVoiceRoomName(room)+'?'))return;
+  concordSwitchingRoom=true;
+  try{
+   leaveCall();
+   activeRoom=room;
+   renderRooms();
+   $('#callSubtitle').textContent='Sala '+concordVoiceRoomName(room);
+   $('#voiceModal').classList.remove('show');
+   await joinCall();
+   if(!callJoined)voiceStatus('Não foi possível entrar em '+concordVoiceRoomName(room)+'.');
+  }catch(error){console.warn('Erro ao trocar de sala:',error);voiceStatus('Falha ao trocar de sala. Tente novamente.')}
+  finally{concordSwitchingRoom=false}
+  return;
+ }
+ activeRoom=room;renderRooms();$('#callSubtitle').textContent='Sala '+concordVoiceRoomName(room);$('#voiceModal').classList.remove('show');
+ if(callJoined){$('#voiceStatus').textContent='Conectado à sala '+concordVoiceRoomName(room)+'.';renderCallRoster()}
+ else await joinCall();
+}
 
 document.querySelectorAll('.voice-room').forEach(btn=>btn.addEventListener('click',()=>chooseRoom(btn.dataset.room)));
 function syncLocalPresence(){for(const room of Object.keys(roomRoster)){roomRoster[room]=roomRoster[room].filter(m=>!m.isMe)}if(callJoined&&joinedRoom){if(!roomRoster[joinedRoom])roomRoster[joinedRoom]=[];roomRoster[joinedRoom].push({name:concordData.profile?.name||'Você',initial:(concordData.profile?.name||'V').slice(0,1).toUpperCase(),cls:'',game:false,isMe:true})}renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}
@@ -3179,7 +3212,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
    dock.classList.toggle('connected',connected);
    if(!connected)return;
    const room=typeof joinedRoom!=='undefined'?joinedRoom:null;
-   $id('concordVoiceDockRoom').textContent=room||'Sala de voz';
+   $id('concordVoiceDockRoom').textContent=concordVoiceRoomName(room);
    const muted=$id('concordUserAudio')?.getAttribute('aria-pressed')==='true';
    $id('concordVoiceDockSound').textContent=muted?'🔇':'🎧';
  };
@@ -3267,7 +3300,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   if(!grid.classList.contains('open'))return;
   const room=typeof joinedRoom!=='undefined'?joinedRoom:null;
   const members=typeof roomRoster!=='undefined'?(roomRoster[room]||[]):[];
-  title.textContent='◉ '+(room||'Sala de voz')+' • '+members.length+' participante(s)';
+  title.textContent='◉ '+concordVoiceRoomName(room)+' • '+members.length+' participante(s)';
   const signature=JSON.stringify([room,members.map(m=>{
    const live=m.isMe?(typeof stream!=='undefined'?stream:null):(typeof concordLiveStreams!=='undefined'?concordLiveStreams.get(m.id):null);
    return [m.id,m.name,m.isMe,m.userId,typeof concordVoiceAvatarVersion!=='undefined'?concordVoiceAvatarVersion:0,live?.getVideoTracks().filter(t=>t.readyState==='live').map(t=>t.id)||[]];
