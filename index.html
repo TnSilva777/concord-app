@@ -2650,7 +2650,11 @@ function concordSyncVoiceLobby(){
  concordQueueVoiceAvatars([...groups.values()].flat());
 }
 async function concordJoinVoiceLobby(userId){
- if(concordVoiceLobby)return;
+ if(concordVoiceLobby){
+   const existing=concordVoiceLobby;
+   if(callJoined&&joinedRoom)await existing.track({id:voicePeerId,userId,room:joinedRoom,name:voicePeerName(),sharing:!!stream}).catch(console.warn);
+   return;
+ }
  const channel=concordSupabase.channel('concord-voice-lobby-v1',{config:{presence:{key:voicePeerId}}});
  concordVoiceLobby=channel;
  channel.on('presence',{event:'sync'},concordSyncVoiceLobby).subscribe(async status=>{
