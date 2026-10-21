@@ -835,6 +835,17 @@ body.concord-home-view #concordDmPane:not([hidden]){display:flex!important}
  #concordVoiceGrid .cvg-tiles{grid-template-columns:repeat(auto-fit,minmax(min(165px,100%),1fr))!important;grid-auto-rows:minmax(140px,1fr)!important}
  .voice-controls button,.voice-control{min-width:42px;min-height:42px}
 }
+
+/* CONCORD mobile: voice room uses call HUD, not an empty channel message page */
+@media(max-width:760px){
+ #voiceModal.show{display:flex!important;align-items:stretch!important;justify-content:center!important;padding:0!important;inset:0!important;z-index:1005!important;background:#06120e!important}
+ #voiceModal.show .voice-dialog{display:flex!important;flex-direction:column;width:100vw!important;max-width:100vw!important;height:100dvh!important;max-height:100dvh!important;margin:0!important;border:0!important;border-radius:0!important;overflow-y:auto!important;overscroll-behavior:contain}
+ #voiceModal .call-layout{display:flex!important;flex-direction:column!important;min-height:0!important;flex:1}
+ #voiceModal .call-roster{border-right:0!important;border-bottom:1px solid #294a3a;padding:12px!important;max-height:32dvh!important;overflow-y:auto!important}
+ #voiceModal .call-stage{flex:1;min-height:190px!important;padding:12px!important}
+ #voiceModal .voice-controls{display:flex;position:sticky;bottom:0;z-index:5;gap:10px;padding:12px max(12px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:#10231b;border-top:1px solid #315640}
+ #voiceModal .voice-controls button{min-height:44px;min-width:44px}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js'"></script>
 <script>
@@ -2106,7 +2117,7 @@ close();renderCommunityChannels();[...concordServerPanel.querySelectorAll('.conc
         $('#channelTitle').textContent=room.name;
         $('.topbar .sub').textContent=room.topic?' — '+room.topic:(kind==='text'?' — Canal deste servidor':' — Sala de voz deste servidor');
         const welcome=$('#messages .welcome');
-        if(welcome){welcome.querySelector('h1').textContent=room.name;welcome.querySelector('p').textContent=kind==='text'?'Este canal pertence ao servidor. Suas mensagens ficam salvas neste navegador.':'Entre na chamada para conversar. O servidor ainda não sincroniza membros entre contas.'}
+        if(welcome){welcome.querySelector('h1').textContent=room.name;welcome.querySelector('p').textContent=kind==='text'?'Este canal pertence ao servidor. Suas mensagens ficam salvas neste navegador.':'Participantes e controles desta sala ficam na interface de chamada.'}
         $('#messageList').replaceChildren();
         concordInlineStage.hidden=true;$('#concordInlineVideo').srcObject=null;
         $('#messages').hidden=false;
@@ -2129,7 +2140,13 @@ close();renderCommunityChannels();[...concordServerPanel.querySelectorAll('.conc
         if(kind==='voice'){
           const voiceKey='srv-'+concordSelectedCommunity+'-'+room.id;
           if(!Object.prototype.hasOwnProperty.call(roomRoster,voiceKey))roomRoster[voiceKey]=[];
-          chooseRoom(voiceKey);
+          chooseRoom(voiceKey).then(()=>{
+            if(window.innerWidth<=760){
+              document.body.classList.remove('concord-mobile-nav-open');
+              document.getElementById('concordMobileNavToggle')?.setAttribute('aria-expanded','false');
+              $('#voiceModal').classList.add('show');
+            }
+          }).catch(error=>console.warn('Falha ao abrir call:',error));
           $('#callSubtitle').textContent='Sala '+room.name+' · '+community.name;
           voiceStatus('Entre na chamada para conectar o microfone. O amigo precisa importar o convite do mesmo servidor e entrar nesta sala.');
         }
