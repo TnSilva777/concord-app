@@ -3078,7 +3078,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
     try {
       const email = document.getElementById('authEmail').value.trim();
       const password = document.getElementById('authPassword').value;
-      const chosenName=document.getElementById('authDisplayName').value.trim().replace(/\\s+/g,' ').slice(0,28);
+      const chosenName=document.getElementById('authDisplayName').value.trim().replace(/\s+/g,' ').slice(0,28);
       if(registering&&(chosenName.length<2||chosenName==='Você'||chosenName==='Perfil sem nome'))throw new Error('Escolha um nome de exibição com pelo menos 2 caracteres.');
       const { data, error } = registering
         ? await concordSupabase.auth.signUp({ email, password, options:{data:{display_name:chosenName,concord_profile:{name:chosenName,avatar:chosenName.slice(0,1).toUpperCase(),color:'#16865e',status:'',bio:''}}} })
