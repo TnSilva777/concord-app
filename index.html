@@ -1918,14 +1918,9 @@ async function concordInviteFriendsToCommunity(community){
   modal.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();modal.remove()}});
   copy.focus();
 }
-function concordInviteCommunity(community){
-  const snapshot={v:2,id:community.id,name:String(community.name||'Servidor').slice(0,40),icon:String(community.icon||'🎮').slice(0,4),description:String(community.description||'').slice(0,180),channels:(community.channels||[]).slice(0,40).map(item=>({id:item.id,name:String(item.name||'').slice(0,32),type:item.type==='voice'?'voice':'text'}))};
-  const encoded=btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(snapshot)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-  const link=location.origin+location.pathname+'#servidor='+encoded;
-  if(link.length>6000){simple('Convite muito grande','Este servidor tem canais demais para um link de modelo.');return}
-  const message='Convite copiado. Envie novamente após criar salas para que seus amigos possam atualizar a estrutura do servidor.';
-  if(navigator.clipboard?.writeText)navigator.clipboard.writeText(link).then(()=>showConcordToast('Convite copiado',message)).catch(()=>prompt('Copie o link do convite:',link));
-  else prompt('Copie o link do convite:',link);
+async function concordInviteCommunity(community){
+  // All invite entry points use the same signed membership flow.
+  return concordInviteFriendsToCommunity(community);
 }
 async function concordReceiveCommunityInvite(){
   const encoded=new URLSearchParams(location.hash.slice(1)).get('servidor');
@@ -1936,7 +1931,12 @@ async function concordReceiveCommunityInvite(){
     const data=JSON.parse(new TextDecoder().decode(Uint8Array.from(binary,c=>c.charCodeAt(0))));
     if(![1,2].includes(data.v)||typeof data.name!=='string'||!data.name.trim()||!Array.isArray(data.channels)||data.channels.length>40)throw Error('Convite inválido');
     const name=data.name.trim().slice(0,40);
-    if(!confirm('Entrar na estrutura do servidor "'+name+'"? As salas de voz poderão conectar vocês, mas canais novos e mensagens ainda não são sincronizados automaticamente.'))return;
+    if(data.v===2&&(!data.token||!(/^[0-9a-f-]{36}$/i.test(data.token)))){simple('Convite desatualizado','Este link não contém autorização para entrar no servidor. Peça ao dono para enviar um novo convite pelo menu Convidar pessoas.');return}
+    if(data.token){
+      const {data:{session}}=await concordSupabase.auth.getSession();
+      if(!session){simple('Entre na sua conta','Faça login para aceitar o convite. O link continuará disponível para tentar novamente.');return}
+    }
+    if(!confirm('Entrar no servidor "'+name+'"?'))return;
     const channels=data.channels.filter(item=>item&&typeof item.name==='string'&&item.name.trim()&&['text','voice'].includes(item.type)).map((item,index)=>({id:data.v===2&&/^ch[0-9]+(?:-[0-9]+)?$/.test(item.id||'')?item.id:'ch'+Date.now()+'-'+index,name:item.name.trim().slice(0,32),type:item.type}));
     if(data.token&&typeof data.token==='string'&&/^[0-9a-f-]{36}$/i.test(data.token)){
       const {data:joined,error:joinError}=await concordSupabase.rpc('concord_join_server',{p_server_key:data.id,p_token:data.token});
@@ -1962,6 +1962,10 @@ async function concordReceiveCommunityInvite(){
   }catch(error){simple('Convite inválido','Não foi possível ler este convite de servidor.')}
 }
 window.addEventListener('hashchange',concordReceiveCommunityInvite);
+concordSupabase.auth.onAuthStateChange((event,session)=>{
+  if(event==='SIGNED_IN'&&session&&new URLSearchParams(location.hash.slice(1)).has('servidor'))
+    setTimeout(()=>concordReceiveCommunityInvite().catch(console.warn),350);
+});
 function concordCanManageServer(community){return !!community&&!community.readOnlyMember&&(!community.ownerId||community.ownerId===socialUser)}
 let concordServerMenuController=new AbortController();
 function renderCommunityChannels(){
