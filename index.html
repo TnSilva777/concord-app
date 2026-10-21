@@ -542,6 +542,11 @@ body.concord-custom-server-view #concordInlineStage:not([hidden]){min-height:var
 @media(max-width:760px){#concordVoiceGrid{padding:8px}#concordVoiceGrid .cvg-tiles{grid-auto-rows:minmax(160px,1fr)}}
 
 
+/* CONCORD call grid: active speech and recovery controls */
+#concordVoiceGrid .cvg-tile.cvg-speaking{border-color:#4bd89b;box-shadow:inset 0 0 0 1px #4bd89b55,0 0 26px #1da56a22}
+#concordVoiceGrid .cvg-retry{position:absolute;top:44px;left:12px;z-index:4;font-size:11px;padding:6px 10px;background:#2b5138;border:1px solid #56a77c;border-radius:8px}
+#concordVoiceGrid .cvg-header{padding:8px 6px 11px;border-bottom:1px solid #244936}
+#concordVoiceGrid .cvg-header button{background:#1b3d2d;border-radius:10px}
 /* CONCORD call grid: clean responsive staging and explicit recovery state */
 #concordVoiceGrid .cvg-tiles{grid-template-columns:repeat(auto-fit,minmax(min(290px,100%),1fr));grid-auto-rows:minmax(210px,1fr);gap:12px;align-content:stretch}
 #concordVoiceGrid .cvg-tile{border-radius:18px;border:1px solid #376b50;box-shadow:inset 0 1px #ffffff0b,0 10px 26px #0002;transition:border-color .2s,box-shadow .2s}
@@ -1434,8 +1439,8 @@ function concordShowLive(id){
 }
 const concordShareRepairRequested=new Map();
 async function concordRequestShareRepair(id){
- if(!callJoined||!voiceSignal||!id||id===voicePeerId)return;
- const now=Date.now();if(now-(concordShareRepairRequested.get(id)||0)<12000)return;
+ if(!callJoined||!voiceSignal||!id||id===voicePeerId||!Object.values(voiceSignal.presenceState()||{}).flat().some(p=>p.id===id))return;
+ const now=Date.now();if(now-(concordShareRepairRequested.get(id)||0)<10000)return;
  concordShareRepairRequested.set(id,now);
  await voiceSend(id,'resync-share',{at:now}).catch(console.warn);
 }
@@ -2518,8 +2523,8 @@ async function voiceConnect(id,initiator){
       if(concordWatching===id){concordInlineSound.textContent='🔊 Ativar som';}
       e.track.onmute=()=>{if(concordWatching===id){$('#callSubtitle').textContent='Transmissão pausada ou reconectando';voiceStatus('O vídeo do amigo foi interrompido. Aguardando retorno…')}};
       e.track.onunmute=()=>{if(concordWatching===id){const player=$('#callScreenPreview');player.srcObject=live;player.style.display='block';$('#callStageMessage').style.display='none';$('#callSubtitle').textContent='Assistindo transmissão ao vivo';player.play().catch(()=>{})}};
-      e.track.onended=()=>{concordLiveStreams.delete(id);concordSyncInlineStage();if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block'}renderRooms()};
-      renderRooms();return;
+      e.track.onended=()=>{if(concordLiveStreams.get(id)===live)concordLiveStreams.delete(id);concordSyncInlineStage();if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block'}renderRooms()};
+      renderRooms();if(typeof renderCallRoster==='function')renderCallRoster();return;
     }
     const audioKey=id+':'+e.track.id;
     let audio=voiceAudio.get(audioKey);
@@ -3650,7 +3655,8 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
     tile.addEventListener('fullscreenchange',()=>{full.textContent=document.fullscreenElement===tile?'↙ Sair da tela cheia':'⛶ Tela cheia'});
     tile.append(zoom,full);
    }
-   if(member.sharing&&!live?.getVideoTracks().some(t=>t.readyState==='live')){const waiting=document.createElement('span');waiting.className='cvg-waiting';waiting.textContent='◌ Reconectando transmissão…';tile.append(waiting)}
+   if(member.sharing&&!live?.getVideoTracks().some(t=>t.readyState==='live')){const waiting=document.createElement('div');waiting.className='cvg-waiting';waiting.textContent='◌ Aguardando vídeo';const retry=document.createElement('button');retry.type='button';retry.className='cvg-retry';retry.textContent='↻ Tentar novamente';retry.onclick=()=>{concordShareRepairRequested.delete(member.id);concordRequestShareRepair(member.id);waiting.textContent='◌ Solicitando transmissão…'};tile.append(waiting,retry)}
+   if(!member.sharing&&member.speaking)tile.classList.add('cvg-speaking');
    tiles.append(tile);
   });
  }
