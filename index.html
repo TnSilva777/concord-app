@@ -771,6 +771,25 @@ body.concord-home-view #concordDmPane:not([hidden]){display:flex!important}
 #concordDmPane .concord-dm-header{gap:10px;flex-wrap:nowrap;min-width:0}
 #concordDmPane .concord-dm-header #dmPeerLabel{flex:1;min-width:0;font-size:17px;font-weight:750;color:#effaf4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #concordDmPane .concord-dm-header #concordDmHeaderAvatar{flex:0 0 36px;width:36px;height:36px;border-radius:50%;overflow:hidden}
+
+/* CONCORD refined HUDs — retain green identity, enhance hierarchy and focus. */
+#concordHud{backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px)}
+#concordHud>section{position:relative;background:linear-gradient(155deg,#1b382a 0%,#10241c 58%,#0d1d17 100%);border:1px solid #4a8868;border-radius:22px;box-shadow:0 26px 80px #000b,inset 0 1px 0 #b8ffcf16}
+#concordHud>section:before{content:"";position:absolute;top:0;left:24px;right:24px;height:2px;border-radius:4px;background:linear-gradient(90deg,transparent,#55d99a 45%,transparent);pointer-events:none}
+#concordHud .concord-hud-header{padding-bottom:15px;border-bottom:1px solid #47745650;align-items:center}
+#concordHud .concord-hud-header h2{font-size:clamp(19px,2vw,23px);letter-spacing:-.025em}
+#concordHud .concord-hud-field{color:#d9f0e2;letter-spacing:.005em}
+#concordHud .concord-hud-input{background:#0a1c15;border-color:#416c54;transition:border-color .18s ease,box-shadow .18s ease,background-color .18s ease}
+#concordHud .concord-hud-input:hover{border-color:#61a982}
+#concordHud .concord-hud-input:focus-visible{border-color:#79e6ae;outline:2px solid #79e6ae;outline-offset:1px;box-shadow:0 0 0 4px #47d48f1c}
+#concordHud .concord-hud-close:hover{background:#ffffff22;filter:none}
+#concordHud .concord-hud-actions button{min-height:41px;transition:transform .14s ease,filter .14s ease,background-color .14s ease}
+#concordHud .concord-hud-actions button:hover{transform:translateY(-1px)}
+#concordAuth .auth-box{border:1px solid #4c8c68;box-shadow:0 24px 75px #000a,inset 0 1px 0 #a8ffd117}
+#concordAuth .auth-field input{transition:border-color .16s ease,box-shadow .16s ease}
+#concordAuth .auth-field input:focus{box-shadow:0 0 0 3px #55cf8e24}
+@media(max-width:600px){#concordHud>section{border-radius:19px 19px 9px 9px}#concordHud .concord-hud-actions button{min-height:44px}}
+@media(prefers-reduced-motion:reduce){#concordHud .concord-hud-actions button:hover{transform:none}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js'"></script>
 <script>
