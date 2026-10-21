@@ -1,0 +1,37 @@
+name: CONCORD Desktop Windows
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'desktop-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+      - name: Compilar instalador de teste
+        if: github.event_name != 'push'
+        run: npm run desktop:build
+      - name: Publicar versao com atualizacao automatica
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        run: npm run desktop:release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Disponibilizar instalador de teste
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: CONCORD-Windows-Setup
+          path: dist/*.exe
+          if-no-files-found: error
