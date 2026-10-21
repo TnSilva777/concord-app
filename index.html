@@ -999,6 +999,38 @@ localChatNotice.setAttribute('role','note');
 localChatNotice.textContent='⚠ Chat público em teste: mensagens salvas apenas neste navegador. Seus amigos ainda não recebem essas mensagens.';
 const messageList=$('#messageList');
 if(messageList)messageList.parentNode.insertBefore(localChatNotice,messageList);
+let concordServerChatReady=false,concordServerChatRequest=0;
+async function concordLoadServerChat(serverId,channelId){
+ const request=++concordServerChatRequest;
+ concordServerChatReady=false;
+ const warning=document.getElementById('concordServerLocalWarning');
+ if(warning)warning.textContent='◌ Verificando acesso ao canal compartilhado…';
+ if(!socialUser||!serverId||!channelId)return;
+ try{
+  const {data,error}=await concordSupabase.from('concord_server_channel_messages').select('id,author_id,body,created_at').eq('server_key',serverId).eq('channel_key',channelId).order('created_at',{ascending:false}).limit(100);
+  if(error)throw error;
+  if(request!==concordServerChatRequest||concordSelectedCommunity!==serverId||concordSelectedTextRoom!==channelId)return;
+  concordServerChatReady=true;
+  const list=document.getElementById('messageList');list.replaceChildren();
+  const authorIds=[...new Set((data||[]).map(m=>m.author_id).filter(Boolean))];
+  if(authorIds.length){
+   const {data:profiles}=await concordSupabase.from('concord_public_profiles').select('user_id,display_name').in('user_id',authorIds);
+   for(const profile of profiles||[])if(profile.display_name)concordFriendNames.set(profile.user_id,profile.display_name);
+  }
+  if(request!==concordServerChatRequest)return;
+  for(const entry of (data||[]).reverse())appendChatMessage({name:entry.author_id===socialUser?concordData.profile.name:concordFriendDisplayName(entry.author_id),text:entry.body,date:new Date(entry.created_at).toLocaleString('pt-BR')});
+  if(warning)warning.textContent='✓ Canal protegido e sincronizado entre os membros do servidor.';
+  document.getElementById('messages').scrollTop=document.getElementById('messages').scrollHeight;
+ }catch(error){
+  if(request!==concordServerChatRequest)return;
+  concordServerChatReady=false;
+  if(warning)warning.textContent='⚠ Sem acesso ao canal compartilhado. Verifique seu convite de servidor. Suas mensagens locais não foram apagadas.';
+  console.warn('Falha ao sincronizar canal de servidor:',error);
+ }
+}
+setInterval(()=>{
+ if(document.visibilityState==='visible'&&document.body.classList.contains('concord-custom-server-view')&&concordSelectedCommunity&&concordSelectedTextRoom&&socialUser)concordLoadServerChat(concordSelectedCommunity,concordSelectedTextRoom);
+},6000);
 const concordServerLocalWarning=document.createElement('div');
 concordServerLocalWarning.id='concordServerLocalWarning';
 concordServerLocalWarning.setAttribute('role','status');
@@ -1090,6 +1122,15 @@ $('#chatForm').onsubmit=async event=>{
     const server=concordData.communities.find(item=>item.id===concordSelectedCommunity);
     const room=server?.channels?.find(item=>item.id===concordSelectedTextRoom&&item.type==='text');
     if(!room){simple('Selecione um canal','Abra um canal de texto para enviar mensagens.');return}
+    if(!concordServerChatReady){simple('Canal não sincronizado','Este canal ainda não confirmou seu acesso ao Supabase. Aguarde ou entre pelo convite autorizado; nenhuma mensagem foi enviada.');return}
+    publicChatSending=true;
+    try{
+      const {error}=await concordSupabase.from('concord_server_channel_messages').insert({server_key:concordSelectedCommunity,channel_key:room.id,author_id:socialUser,body:value});
+      if(error)throw error;
+      input.value='';await concordLoadServerChat(concordSelectedCommunity,room.id);
+    }catch(error){simple('Mensagem não enviada',error.message||'Falha de conexão ou permissão.')}
+    finally{publicChatSending=false}
+    return;
     const entry={name:(concordData.profile?.name||'Você').slice(0,60),text:value,date:new Date().toLocaleString('pt-BR')};
     const key='concord-server-chat:'+concordSelectedCommunity+':'+room.id;
     let messages=[];
@@ -1940,6 +1981,7 @@ close();renderCommunityChannels();[...concordServerPanel.querySelectorAll('.conc
         const input=$('#chatInput');input.disabled=kind!=='text';
         if(kind==='text'){
           input.placeholder='Mensagem em #'+room.name;
+          concordLoadServerChat(concordSelectedCommunity,room.id).catch(console.warn);
           const key='concord-server-chat:'+concordSelectedCommunity+':'+room.id;
           try{const saved=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(saved))saved.slice(-100).forEach(appendChatMessage)}catch(error){console.warn('Mensagens locais indisponíveis',error)}
           input.focus();
