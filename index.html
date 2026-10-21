@@ -3835,10 +3835,10 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  mode.append(gradeBtn,palcoBtn);header.append(title,mode,close);
  const tiles=document.createElement('div');tiles.className='cvg-tiles';grid.append(header,tiles);main.insertBefore(grid,messages);
  const open=()=>{if(document.body.classList.contains('concord-home-view')||document.getElementById('concordDmPane')?.hidden===false)return;if(!document.getElementById('joinCall')?.disabled)return;const stage=document.getElementById('concordInlineStage');if(stage)stage.hidden=true;messages.style.display='none';grid.classList.add('open');render()};
- const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=open;view.title='Ver participantes em grade'}
+ const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=()=>{if(grid.classList.contains('open'))close.click();else open()};view.title='Mostrar ou ocultar a grade da chamada';view.setAttribute('aria-label','Mostrar ou ocultar a grade da chamada')}
  const join=document.getElementById('joinCall');
- if(join)new MutationObserver(()=>{if(window.innerWidth>760&&join.disabled&&typeof joinedRoom!=='undefined'&&joinedRoom)open()}).observe(join,{attributes:true,attributeFilter:['disabled']});
- if(window.innerWidth>760&&join?.disabled&&!document.body.classList.contains('concord-home-view'))open();
+ // A grade só abre por ação explícita no botão de visualização, em qualquer dispositivo.
+ if(join)new MutationObserver(()=>{if(!join.disabled&&grid.classList.contains('open'))close.click()}).observe(join,{attributes:true,attributeFilter:['disabled']});
  const selectMode=modeName=>{grid.classList.toggle('cvg-stage-mode',modeName==='palco');gradeBtn.classList.toggle('selected',modeName==='grade');palcoBtn.classList.toggle('selected',modeName==='palco');lastGridSignature='';render()};
  gradeBtn.onclick=()=>selectMode('grade');palcoBtn.onclick=()=>selectMode('palco');
  let lastGridSignature='';
