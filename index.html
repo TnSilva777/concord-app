@@ -2978,11 +2978,12 @@ async function concordRefreshFriendAvatars(ids){
  concordVoiceAvatarVersion++;
 }
 const concordFriendNicknames=new Map();
-function concordFriendDisplayName(id){return concordFriendNicknames.get(id)||concordFriendNames.get(id)||'Amigo'}
+function concordFriendDisplayName(id){return concordFriendNames.get(id)||concordFriendNicknames.get(id)||'Nome ainda não definido'}
 function concordLoadFriendNicknames(){concordFriendNicknames.clear();try{for(const [id,name] of Object.entries(JSON.parse(localStorage.getItem('concord-nicknames-'+socialUser)||'{}')))if(typeof name==='string'&&name.trim())concordFriendNicknames.set(id,name.trim().slice(0,28))}catch(e){}}
 function concordRenameFriend(id){const name=prompt('Nome deste amigo para você (não altera o perfil dele):',concordFriendNicknames.get(id)||concordFriendNames.get(id)||'');if(name===null)return;const chosen=name.trim().slice(0,28);if(chosen)concordFriendNicknames.set(id,chosen);else concordFriendNicknames.delete(id);try{localStorage.setItem('concord-nicknames-'+socialUser,JSON.stringify(Object.fromEntries(concordFriendNicknames)))}catch(e){}refreshSocial().catch(console.warn)}
 function concordRefreshPublicNameLabels(){if(socialUser)refreshSocial().catch(console.warn)}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&socialUser)concordRefreshPublicNameLabels()});
+window.addEventListener('focus',()=>{if(socialUser)concordRefreshPublicNameLabels()});
 async function concordPublishPublicProfile(){
   if(!concordProfileUser)return false;
   const name=String(concordData.profile.name||'').trim().slice(0,28);
