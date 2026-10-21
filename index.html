@@ -2416,8 +2416,7 @@ function voiceParticipants(){
     if(voiceSignal&&joinedRoom)voiceParticipants();
     if(concordVoiceLobby)concordSyncVoiceLobby();
   });}
-  if(members.length>1)voiceStatus('Sala experimental: no máximo duas pessoas podem conversar por enquanto.');
-  const other=members.slice(0,1);
+  const other=members.filter(member=>member.id&&member.id!==voicePeerId);
   for(const member of other)if(voicePeerId<member.id&&!voicePeers.has(member.id))voiceConnect(member.id,true).catch(err=>console.warn('Falha na oferta de voz',err));
 }
 async function voiceSend(to,kind,payload){
@@ -2439,7 +2438,6 @@ async function concordTuneScreenSender(sender){
 }
 async function voiceConnect(id,initiator){
   if(!callJoined||!micStream||!voiceSignal)return;
-  if(voicePeers.size>=1&&!voicePeers.has(id))return;
   if(voicePeers.has(id))return voicePeers.get(id);
   const peer=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
   voicePeers.set(id,peer);
@@ -2472,7 +2470,7 @@ async function voiceConnect(id,initiator){
     voiceStatus('Áudio remoto recebido. Vocês já podem conversar.');
   };
   peer.onconnectionstatechange=()=>{
-    if(peer.connectionState==='connected')voiceStatus('Chamada conectada! Vocês podem conversar.');
+    if(peer.connectionState==='connected')voiceStatus('Participante conectado. Áudio da sala ativo.');
     else if(peer.connectionState==='disconnected')voiceStatus('Conexão instável. Tentando recuperar o áudio…');
     else if(peer.connectionState==='failed'){
       voiceStatus('Conexão falhou. Tentando reconectar a chamada…');
