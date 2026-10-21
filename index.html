@@ -1235,7 +1235,7 @@ $('#micMeter').style.width=Math.min(100,avg*1.8)+'%';
 const now=performance.now();
 if(!micEnabled||!callJoined){detectedVoiceUntil=0;if(concordIsLocallySpeaking)setLocalSpeaking(false)}
 else{
- if(avg>(concordNoiseMode==='strong'?24:18))detectedVoiceUntil=now+180;
+ if(avg>(concordNoiseMode==='strong'?9:7))detectedVoiceUntil=now+320;
  if(++voiceMeterFrame%5===0)setLocalSpeaking(now<detectedVoiceUntil);
 }
 micFrame=requestAnimationFrame(meter)};meter()}catch(e){} }catch(err){$('#voiceStatus').textContent=err.name==='NotAllowedError'?'Permissão do microfone negada. Clique no cadeado ao lado do endereço do site, permita o microfone e tente novamente.':'Não foi possível acessar o microfone. Verifique se ele está conectado e se outro aplicativo não o está bloqueando.'}}function concordUpdateUserMic(){
@@ -2287,7 +2287,7 @@ function concordWatchRemoteSpeech(peerId,track){
    if(stopped||track.readyState==='ended')return;
    analyser.getByteFrequencyData(values);
    const avg=values.reduce((sum,value)=>sum+value,0)/values.length;
-   if(avg>16)lastActivity=performance.now()+250;
+   if(avg>8)lastActivity=performance.now()+320;
    if(++frame%6===0){const active=performance.now()<lastActivity;if(active!==lastState){lastState=active;concordSetRemoteSpeaking(peerId,active)}}
    raf=requestAnimationFrame(tick);
   };
