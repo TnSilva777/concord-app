@@ -3006,7 +3006,7 @@ function concordLoadFriendNicknames(){concordFriendNicknames.clear();try{for(con
 function concordRenameFriend(id){const name=prompt('Nome deste amigo para você (não altera o perfil dele):',concordFriendNicknames.get(id)||concordFriendNames.get(id)||'');if(name===null)return;const chosen=name.trim().slice(0,28);if(chosen)concordFriendNicknames.set(id,chosen);else concordFriendNicknames.delete(id);try{localStorage.setItem('concord-nicknames-'+socialUser,JSON.stringify(Object.fromEntries(concordFriendNicknames)))}catch(e){}refreshSocial().catch(console.warn)}
 function concordRefreshPublicNameLabels(){if(socialUser)refreshSocial().catch(console.warn)}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&socialUser)concordRefreshPublicNameLabels()});
-window.addEventListener('focus',()=>{if(socialUser)concordRefreshPublicNameLabels()});
+window.addEventListener('focus',()=>{if(socialUser){concordPublishPublicProfile().catch(console.warn);concordRefreshPublicNameLabels()}});
 async function concordPublishPublicProfile(){
   if(!concordProfileUser)return false;
   const name=String(concordData.profile.name||'').trim().slice(0,28);
@@ -3085,6 +3085,18 @@ async function refreshSocial(){
     }
     // The saved account profile lives in auth metadata, which cannot be read for other users.
     // Use only publicly readable names; do not query an unverified profile table.
+    // Recover the names published by the friends even when a previous request
+    // was made before their public profile became available.
+    if(requestUser===socialUser){
+      const missing=visibleIds.filter(id=>!concordFriendNames.has(id));
+      if(missing.length){
+        const {data:retryProfiles,error:retryError}=await concordSupabase.from('concord_public_profiles').select('user_id,display_name').in('user_id',missing);
+        if(!retryError&&requestUser===socialUser)for(const profile of retryProfiles||[]){
+          const name=String(profile.display_name||'').trim().slice(0,28);
+          if(name)concordFriendNames.set(profile.user_id,name);
+        }
+      }
+    }
     // Reflect updated public names immediately in avatar initials and friend search.
     if(typeof voiceSignal!=='undefined'&&voiceSignal&&joinedRoom)voiceParticipants();
     if(typeof concordVoiceLobby!=='undefined'&&concordVoiceLobby)concordSyncVoiceLobby();
