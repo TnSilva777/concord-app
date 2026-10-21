@@ -2746,7 +2746,7 @@ async function concordRefreshFriendAvatars(ids){
  document.querySelectorAll('[data-concord-friend-avatar]').forEach(el=>concordApplyFriendAvatar(el,el.dataset.concordFriendAvatar));
  concordVoiceAvatarVersion++;
 }
-function concordFriendDisplayName(id){return concordFriendNames.get(id)||'Perfil sem nome'}
+function concordFriendDisplayName(id){return concordFriendNames.get(id)||('Amigo '+String(id||'').slice(0,6))}
 function concordRefreshPublicNameLabels(){if(socialUser)refreshSocial().catch(console.warn)}
 async function concordPublishPublicProfile(){
   if(!concordProfileUser)return false;
