@@ -857,6 +857,28 @@ body.concord-home-view #concordDmPane:not([hidden]){display:flex!important}
  body.concord-custom-server-view .concord-voice-dock{border-radius:12px;border:1px solid #3c7052;background:linear-gradient(150deg,#173a29,#10271d);padding:9px 8px}
  body.concord-custom-server-view #concordVoiceDockRoom{max-width:180px;overflow:hidden;text-overflow:ellipsis}
 }
+
+/* CONCORD Mobile Call Stage — grade de duas colunas e modo Palco opcional */
+#concordVoiceGrid .cvg-modes{display:flex;gap:3px;border:1px solid #345944;background:#0a1a13;padding:3px;border-radius:12px}
+#concordVoiceGrid .cvg-modes button{background:transparent;border:0;color:#9ec5ad;border-radius:9px;padding:7px 12px;font-size:12px;font-weight:650}
+#concordVoiceGrid .cvg-modes button.selected{background:#23754f;color:#f0fff4}
+#concordVoiceGrid .cvg-tile.cvg-speaking{border-color:#6de1a0;box-shadow:inset 0 0 0 1px #53c78e,0 0 0 2px #31ba7250}
+#concordVoiceGrid .cvg-voice-status{position:absolute;top:10px;right:10px;z-index:4;margin:0;background:#0c1b15de}
+#concordVoiceGrid.cvg-stage-mode .cvg-tile.cvg-sharing{grid-column:1/-1;min-height:240px}
+@media(max-width:760px){
+ #concordVoiceGrid{min-height:0;padding:10px!important;gap:8px}
+ #concordVoiceGrid .cvg-header{gap:8px;align-items:center}
+ #concordVoiceGrid .cvg-header strong{font-size:13px;flex:1 1 100%;max-width:100%}
+ #concordVoiceGrid .cvg-tiles{grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-auto-rows:minmax(120px,1fr)!important;gap:8px!important;align-content:start;padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+ #concordVoiceGrid .cvg-tile{min-width:0;min-height:130px!important;aspect-ratio:0.9;border-radius:15px}
+ #concordVoiceGrid .cvg-avatar{height:52px;width:52px;font-size:20px}
+ #concordVoiceGrid .cvg-name{bottom:8px;left:8px;right:8px;max-width:none!important;font-size:11px!important;padding:5px 7px}
+ #concordVoiceGrid .cvg-live{top:6px;left:7px;bottom:auto!important;right:auto!important;font-size:9px!important}
+ #concordVoiceGrid .cvg-voice-status{top:6px;right:6px;padding:3px 5px}
+ #concordVoiceGrid .cvg-zoom{top:34px;right:7px;font-size:10px;padding:5px}
+ #concordVoiceGrid .cvg-fullscreen{display:none}
+ #concordVoiceGrid.cvg-stage-mode .cvg-tile.cvg-sharing{grid-column:1/-1;min-height:220px!important;aspect-ratio:16/9}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js'"></script>
 <script>
@@ -3807,13 +3829,18 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  const close=document.createElement('button');close.type='button';close.textContent='Voltar ao chat';
  close.onclick=()=>{grid.classList.remove('open');messages.style.display='';lastGridSignature='';};
  window.concordCloseVoiceGrid=()=>{if(grid.classList.contains('open'))close.click();};
- header.append(title,close);
+ const mode=document.createElement('div');mode.className='cvg-modes';
+ const gradeBtn=document.createElement('button');gradeBtn.type='button';gradeBtn.textContent='Grade';gradeBtn.className='selected';
+ const palcoBtn=document.createElement('button');palcoBtn.type='button';palcoBtn.textContent='Palco';
+ mode.append(gradeBtn,palcoBtn);header.append(title,mode,close);
  const tiles=document.createElement('div');tiles.className='cvg-tiles';grid.append(header,tiles);main.insertBefore(grid,messages);
  const open=()=>{if(document.body.classList.contains('concord-home-view')||document.getElementById('concordDmPane')?.hidden===false)return;if(!document.getElementById('joinCall')?.disabled)return;const stage=document.getElementById('concordInlineStage');if(stage)stage.hidden=true;messages.style.display='none';grid.classList.add('open');render()};
  const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=open;view.title='Ver participantes em grade'}
  const join=document.getElementById('joinCall');
- if(join)new MutationObserver(()=>{if(join.disabled&&typeof joinedRoom!=='undefined'&&joinedRoom)open()}).observe(join,{attributes:true,attributeFilter:['disabled']});
- if(join?.disabled&&!document.body.classList.contains('concord-home-view'))open();
+ if(join)new MutationObserver(()=>{if(window.innerWidth>760&&join.disabled&&typeof joinedRoom!=='undefined'&&joinedRoom)open()}).observe(join,{attributes:true,attributeFilter:['disabled']});
+ if(window.innerWidth>760&&join?.disabled&&!document.body.classList.contains('concord-home-view'))open();
+ const selectMode=modeName=>{grid.classList.toggle('cvg-stage-mode',modeName==='palco');gradeBtn.classList.toggle('selected',modeName==='grade');palcoBtn.classList.toggle('selected',modeName==='palco');lastGridSignature='';render()};
+ gradeBtn.onclick=()=>selectMode('grade');palcoBtn.onclick=()=>selectMode('palco');
  let lastGridSignature='';
  function render(){
   if(!grid.classList.contains('open'))return;
@@ -3832,11 +3859,12 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   tiles.replaceChildren();
   if(!members.length){const p=document.createElement('p');p.textContent='Aguardando participantes nesta sala.';tiles.append(p);return}
   members.forEach(member=>{
-   const tile=document.createElement('div');tile.className='cvg-tile';tile.dataset.memberId=String(member.id||'');tile.dataset.concordSelf=String(!!member.isMe);
+   const tile=document.createElement('div');tile.className='cvg-tile';tile.dataset.memberId=String(member.id||'');tile.dataset.concordSelf=String(!!member.isMe);tile.classList.toggle('cvg-sharing',!!member.sharing);
    if(expanded===tile.dataset.memberId)tile.classList.add('cvg-expanded');
    const avatar=document.createElement('div');avatar.className='cvg-avatar';if(!member.sharing&&(member.isMe?concordIsLocallySpeaking:!!member.speaking))avatar.classList.add('speaking');avatar.textContent=String(member.name||'?').slice(0,1).toUpperCase();if(member.isMe)setConcordAvatar(avatar,concordData.profile);else concordVoiceAvatar(avatar,member);
    const name=document.createElement('span');name.className='cvg-name';name.textContent=(member.name||'Participante')+(member.isMe?' (você)':'');
    tile.append(avatar,name);
+   const state=typeof concordCallState==='function'?concordCallState(member):null;if(state){state.classList.add('cvg-voice-status');tile.append(state)}
    const live=member.isMe?(typeof stream!=='undefined'?stream:null):(typeof concordLiveStreams!=='undefined'?concordLiveStreams.get(member.id):null);
    if(live?.getVideoTracks().some(t=>t.readyState==='live'&&!t.muted)){
     const video=document.createElement('video');video.autoplay=true;video.playsInline=true;video.muted=true;video.srcObject=live;tile.prepend(video);
