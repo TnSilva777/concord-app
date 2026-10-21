@@ -1876,10 +1876,12 @@ function concordCommunityInviteLink(community){
   return location.origin+location.pathname+'#servidor='+encoded;
 }
 async function concordInviteFriendsToCommunity(community){
+  if(community.readOnlyMember&&!community.inviteToken){simple('Convite indisponível','Peça ao dono um convite atualizado para compartilhar este servidor.');return}
   if(!community.readOnlyMember&&!community.inviteToken){
     const registered=await concordRegisterOwnedServer(community);
     if(!registered){simple('Convite indisponível','Não foi possível autorizar convites deste servidor. Tente novamente.');return}
   }
+  if(!/^[0-9a-f-]{36}$/i.test(community.inviteToken||'')){simple('Convite indisponível','Não foi possível obter um token válido. Tente novamente ou peça ao dono para registrar o servidor.');return}
   const link=concordCommunityInviteLink(community);
   if(link.length>6000){simple('Convite muito grande','O servidor tem canais demais para este tipo de convite.');return}
   document.querySelector('.concord-friend-invite-overlay')?.remove();
@@ -1922,9 +1924,12 @@ async function concordInviteCommunity(community){
   // All invite entry points use the same signed membership flow.
   return concordInviteFriendsToCommunity(community);
 }
+let concordInviteAccepting=false;
 async function concordReceiveCommunityInvite(){
+  if(concordInviteAccepting)return;
   const encoded=new URLSearchParams(location.hash.slice(1)).get('servidor');
   if(!encoded)return;
+  concordInviteAccepting=true;
   try{
     if(encoded.length>6000)throw Error('Convite muito grande');
     const binary=atob(encoded.replace(/-/g,'+').replace(/_/g,'/'));
@@ -1957,9 +1962,10 @@ async function concordReceiveCommunityInvite(){
     }
     concordData.communities.push(imported);
     if(!saveConcordData()){concordData.communities.pop();simple('Falha ao importar','Não foi possível salvar o servidor neste navegador.');return}
-    renderCommunities();showConcordToast('Servidor adicionado','Para receber novas salas futuramente, abra um convite atualizado do mesmo servidor.');
+    renderCommunities();concordSelectedCommunity=imported.id;renderCommunityChannels();showConcordToast('Servidor adicionado','Servidor salvo. Você já pode abrir seus canais.');
     location.hash='';
-  }catch(error){simple('Convite inválido','Não foi possível ler este convite de servidor.')}
+  }catch(error){console.warn('Falha ao aceitar convite:',error);simple('Convite inválido','Não foi possível concluir a entrada neste servidor. Verifique o link e a conexão.')}
+  finally{concordInviteAccepting=false}
 }
 window.addEventListener('hashchange',concordReceiveCommunityInvite);
 concordSupabase.auth.onAuthStateChange((event,session)=>{
