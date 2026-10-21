@@ -2177,6 +2177,44 @@ function setLocalSpeaking(on){
 const voicePeerId=crypto.randomUUID();
 let voiceSignal=null,voicePeers=new Map(),voiceAudio=new Map(),voiceStarting=false;
 const voicePendingIce=new Map();
+const concordRemoteSpeechMeters=new Map();
+function concordSetRemoteSpeaking(peerId,speaking){
+ const members=roomRoster[joinedRoom]||[];
+ const member=members.find(m=>m.id===peerId);
+ if(member)member.speaking=!!speaking;
+ const allowed=!!speaking&&!concordVoiceMemberSharing(peerId);
+ document.querySelectorAll('#concordVoiceGrid .cvg-tile,.room-member,.concord-local-voice-person').forEach(tile=>{
+   if(tile.dataset.memberId!==peerId && tile.dataset.peerId!==peerId)return;
+   tile.querySelector('.cvg-avatar,.mini-avatar')?.classList.toggle('speaking',allowed);
+ });
+ if(typeof refreshConcordLocalVoiceMembers==='function'&&member)refreshConcordLocalVoiceMembers();
+}
+function concordStopRemoteSpeech(peerId){
+ const active=concordRemoteSpeechMeters.get(peerId);if(!active)return;
+ active.stop();concordRemoteSpeechMeters.delete(peerId);concordSetRemoteSpeaking(peerId,false);
+}
+function concordWatchRemoteSpeech(peerId,track){
+ concordStopRemoteSpeech(peerId);
+ try{
+  const Ctx=window.AudioContext||window.webkitAudioContext;
+  if(!Ctx)return;
+  const ctx=new Ctx(),source=ctx.createMediaStreamSource(new MediaStream([track])),analyser=ctx.createAnalyser();
+  analyser.fftSize=256;source.connect(analyser);
+  const values=new Uint8Array(analyser.frequencyBinCount);let raf=0,lastActivity=0,lastState=false,frame=0,stopped=false;
+  const tick=()=>{
+   if(stopped||track.readyState==='ended')return;
+   analyser.getByteFrequencyData(values);
+   const avg=values.reduce((sum,value)=>sum+value,0)/values.length;
+   if(avg>16)lastActivity=performance.now()+250;
+   if(++frame%6===0){const active=performance.now()<lastActivity;if(active!==lastState){lastState=active;concordSetRemoteSpeaking(peerId,active)}}
+   raf=requestAnimationFrame(tick);
+  };
+  ctx.resume().catch(()=>{});tick();
+  concordRemoteSpeechMeters.set(peerId,{stop(){stopped=true;cancelAnimationFrame(raf);source.disconnect();ctx.close().catch(()=>{})}});
+  track.addEventListener('ended',()=>concordStopRemoteSpeech(peerId),{once:true});
+ }catch(error){console.warn('Indicador de áudio remoto indisponível',error)}
+}
+
 let remoteAudioMuted=false;
 const concordAudioUnlock=document.createElement('button');
 concordAudioUnlock.type='button';
@@ -2295,6 +2333,7 @@ async function voiceConnect(id,initiator){
     let audio=voiceAudio.get(audioKey);
     if(!audio){audio=document.createElement('audio');audio.autoplay=true;audio.playsInline=true;audio.muted=remoteAudioMuted;audio.style.display='none';audio.volume=Math.min(1,concordPeerVolume(id)/100);document.body.append(audio);voiceAudio.set(audioKey,audio)}
     audio.srcObject=new MediaStream([e.track]);
+    concordWatchRemoteSpeech(id,e.track);
     if(concordWatching===id){concordInlineSound.textContent=remoteAudioMuted?'🔇 Som silenciado':'🔊 Ativar som';}
 
     e.track.addEventListener('ended',()=>{audio.remove();voiceAudio.delete(audioKey)},{once:true});
@@ -2441,6 +2480,7 @@ function stopVoiceNetwork(){
   const channel=voiceSignal;voiceSignal=null;
   if(channel)concordSupabase.removeChannel(channel).catch(console.warn);
   for(const peer of voicePeers.values())peer.close();
+  for(const id of [...concordRemoteSpeechMeters.keys()])concordStopRemoteSpeech(id);
   voicePeers.clear();voicePendingIce.clear();for(const audio of voiceAudio.values())audio.remove();voiceAudio.clear();concordAudioUnlock.hidden=true;
   if(joinedRoom){roomRoster[joinedRoom]=[];renderRooms();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}
 }
