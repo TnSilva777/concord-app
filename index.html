@@ -882,6 +882,17 @@ body.concord-home-view #concordDmPane:not([hidden]){display:flex!important}
 
 /* Mobile voice flow: remain on the server rooms, open grid only on its button */
 @media(max-width:760px){body.concord-custom-server-view #concordVoiceGrid.open{position:fixed!important;inset:0 0 0 56px!important;z-index:52!important;height:100dvh!important;width:calc(100vw - 56px)!important;display:flex!important;padding:12px!important;background:#081710!important}body.concord-custom-server-view #concordVoiceGrid .cvg-header button{min-height:38px}body.concord-custom-server-view #concordVoiceGrid .cvg-tiles{flex:1!important;overflow-y:auto!important;min-height:0!important}body.concord-mobile-nav-open #concordVoiceGrid:not(.open){display:none!important}}
+
+/* CONCORD Mobile: server channels are the primary screen, no blank welcome panel */
+@media(max-width:760px){
+ body.concord-custom-server-view:not(:has(#concordVoiceGrid.open)) .app>.sidebar{display:flex!important;position:fixed!important;left:56px!important;top:0!important;bottom:0!important;width:calc(100vw - 56px)!important;max-width:none!important;transform:none!important;visibility:visible!important;pointer-events:auto!important;z-index:41!important;box-shadow:none!important}
+ body.concord-custom-server-view:not(:has(#concordVoiceGrid.open)) #concordMobileNavBackdrop{display:none!important}
+ body.concord-custom-server-view:not(:has(#concordVoiceGrid.open)) .app>.main{visibility:hidden!important;pointer-events:none!important}
+ body.concord-custom-server-view:not(:has(#concordVoiceGrid.open)) #concordServerPanel{overflow-y:auto!important;flex:1 1 auto!important}
+ body.concord-custom-server-view #concordMobileNavToggle{display:none!important}
+ body.concord-custom-server-view:has(#concordVoiceGrid.open) .app>.main{visibility:visible!important;pointer-events:auto!important}
+ body.concord-custom-server-view:has(#concordVoiceGrid.open) .app>.sidebar{visibility:hidden!important;pointer-events:none!important}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js'"></script>
 <script>
@@ -2877,8 +2888,9 @@ async function startVoiceNetwork(){
     const {data:{session}}=await concordSupabase.auth.getSession();
     if(!session)throw Error('Entre na sua conta para usar a chamada.');
     if(!callJoined)return;
+    const requestedRoom=joinedRoom;
     await concordJoinVoiceLobby(session.user.id);
-    if(!callJoined||!joinedRoom||voiceSignal)return;
+    if(!callJoined||joinedRoom!==requestedRoom||voiceSignal)return;
     const topic='concord-voice-test-'+joinedRoom.toLowerCase().replace(/[^a-z0-9]/g,'-');
     const channel=concordSupabase.channel(topic,{config:{presence:{key:voicePeerId}}});
     voiceSignal=channel;
@@ -2887,7 +2899,7 @@ async function startVoiceNetwork(){
       .on('presence',{event:'join'},voiceParticipants)
       .on('presence',{event:'leave'},voiceParticipants)
       .subscribe(async status=>{
-        if(status==='SUBSCRIBED'&&callJoined&&voiceSignal===channel){
+        if(status==='SUBSCRIBED'&&callJoined&&voiceSignal===channel&&joinedRoom===requestedRoom){
           try{await channel.track({id:voicePeerId,userId:session.user.id,name:voicePeerName(),sharing:!!stream,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted});voiceParticipants();voiceStatus('Sala conectada. Aguardando seu amigo entrar na mesma sala.')}
           catch(error){voiceStatus('Erro ao entrar na sala de voz: '+error.message)}
         }else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
@@ -2916,7 +2928,7 @@ function stopVoiceNetwork(){
   if($('#headphoneToggle'))$('#headphoneToggle').textContent='🎧';
   concordIsLocallySpeaking=false;
   const channel=voiceSignal;voiceSignal=null;
-  if(channel)concordSupabase.removeChannel(channel).catch(console.warn);
+  if(channel){channel.untrack().catch(console.warn).finally(()=>concordSupabase.removeChannel(channel).catch(console.warn))}
   for(const peer of voicePeers.values())peer.close();
   for(const id of [...concordRemoteSpeechMeters.keys()])concordStopRemoteSpeech(id);
   voicePeers.clear();concordNegotiationBusy.clear();concordNegotiationPending.clear();concordVoiceLastSeen.clear();voicePendingIce.clear();for(const audio of voiceAudio.values())audio.remove();voiceAudio.clear();concordAudioUnlock.hidden=true;
