@@ -70,7 +70,13 @@ function createWindow() {
   });
   Menu.setApplicationMenu(null);
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (!isAppUrl(url)) openExternal(url);
+    // Links internos pertencem à janela do CONCORD, não ao navegador padrão.
+    if (isAppUrl(url)) {
+      mainWindow.loadURL(url).catch(err => console.warn('Navegação interna:', err.message));
+    } else {
+      // Links de terceiros continuam no navegador, sem acesso ao Electron.
+      openExternal(url);
+    }
     return { action: 'deny' };
   });
   mainWindow.webContents.on('will-navigate', (event, url) => {
