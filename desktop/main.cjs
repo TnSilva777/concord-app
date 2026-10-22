@@ -126,7 +126,7 @@ function createWindow() {
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, description, validatedURL, isMainFrame) => {
     if (isMainFrame) {
       console.warn('CONCORD offline:', errorCode, description, validatedURL);
-      if (errorCode !== -3) mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent('<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>CONCORD</title><style>body{background:#07110e;color:#d7fce4;font:16px system-ui;display:grid;place-items:center;min-height:90vh;text-align:center}button{padding:12px 24px;border:0;border-radius:10px;background:#168354;color:white;cursor:pointer}</style><main><h1>CONCORD</h1><p>Sem conexão com o servidor. Verifique a Internet.</p><button onclick="location.href=\\\'' + APP_URL + '\\\'">Tentar novamente</button></main></html>'));
+      if (errorCode !== -3) { const offlinePage = '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>CONCORD</title><style>body{background:#07110e;color:#d7fce4;font:16px system-ui;display:grid;place-items:center;min-height:90vh;text-align:center}a{padding:12px 24px;border-radius:10px;background:#168354;color:white;text-decoration:none}</style><main><h1>CONCORD</h1><p>Sem conexão com o servidor. Verifique a Internet.</p><a href="' + APP_URL + '">Tentar novamente</a></main></html>'; mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(offlinePage)).catch(console.warn); }
     }
   });
   mainWindow.loadURL(APP_URL);
