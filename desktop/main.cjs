@@ -4,6 +4,9 @@ const { autoUpdater } = require('electron-updater');
 const path = require('node:path');
 const APP_URL = 'https://concord-app-tn-silva777.vercel.app/';
 const APP_ORIGIN = new URL(APP_URL).origin;
+// Remote WebRTC audio may arrive before Windows grants a fresh interaction.
+// CONCORD handles microphone permission separately from speaker playback.
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 let mainWindow;
 let updateStarted = false;
 let lastMainUrl = APP_URL;
@@ -32,11 +35,12 @@ function openExternal(raw) {
 
 function installPermissions() {
   const ses = session.defaultSession;
-  const allowed = new Set(['media', 'mediaTypes', 'display-capture', 'fullscreen', 'notifications']);
+  const allowed = new Set(['media', 'display-capture', 'fullscreen', 'notifications']);
   // Windows screen-share support. A user chooses a window or screen before sharing.
   if (typeof ses.setDisplayMediaRequestHandler === 'function') {
     ses.setDisplayMediaRequestHandler(async (request, callback) => {
-      if (!isAppUrl(request.securityOrigin || request.frame?.url || '')) {
+      const origin = request.securityOrigin || request.frame?.url || '';
+      if (!isAppUrl(origin)) {
         callback({});
         return;
       }
