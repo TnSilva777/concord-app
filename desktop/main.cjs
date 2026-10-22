@@ -1,11 +1,19 @@
 'use strict';
-const { app, BrowserWindow, shell, session, dialog, Menu } = require('electron');
+const { app, BrowserWindow, shell, session, dialog, Menu, desktopCapturer } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('node:path');
 const APP_URL = 'https://concord-app-tn-silva777.vercel.app/';
 const APP_ORIGIN = new URL(APP_URL).origin;
 let mainWindow;
 let updateStarted = false;
+const lock = app.requestSingleInstanceLock();
+if (!lock) app.quit();
+app.on('second-instance', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+});
 
 function isAppUrl(raw) {
   try {
@@ -24,6 +32,30 @@ function openExternal(raw) {
 function installPermissions() {
   const ses = session.defaultSession;
   const allowed = new Set(['media', 'mediaTypes', 'display-capture', 'fullscreen', 'notifications']);
+  // Windows screen-share support. A user chooses a window or screen before sharing.
+  if (typeof ses.setDisplayMediaRequestHandler === 'function') {
+    ses.setDisplayMediaRequestHandler(async (request, callback) => {
+      if (!isAppUrl(request.securityOrigin || request.frame?.url || '')) {
+        callback({});
+        return;
+      }
+      try {
+        const sources = await desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 240, height: 150 } });
+        if (!sources.length) { callback({}); return; }
+        const selected = await dialog.showMessageBox(mainWindow, {
+          type: 'question',
+          title: 'CONCORD — Compartilhar tela',
+          message: 'Escolha o que deseja transmitir',
+          detail: 'Selecione uma tela ou janela. Compartilhe apenas conteúdo que você deseja mostrar.',
+          buttons: [...sources.slice(0, 15).map(source => source.name), 'Cancelar'],
+          cancelId: Math.min(sources.length, 15),
+          noLink: true
+        });
+        if (selected.response >= Math.min(sources.length, 15)) { callback({}); return; }
+        callback({ video: sources[selected.response] });
+      } catch (error) { console.warn('Captura de tela:', error.message); callback({}); }
+    });
+  }
   ses.setPermissionCheckHandler((webContents, permission, requestingOrigin) => {
     return allowed.has(permission) && isAppUrl(requestingOrigin || webContents?.getURL() || '');
   });
@@ -84,8 +116,18 @@ function createWindow() {
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (!isAppUrl(url)) { event.preventDefault(); openExternal(url); }
   });
+  // Retry when Internet access is restored; do not expose Node integration to the site.
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && (input.control || input.meta) && input.key.toLowerCase() === 'r') {
+      event.preventDefault();
+      mainWindow.reload();
+    }
+  });
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, description, validatedURL, isMainFrame) => {
-    if (isMainFrame) console.warn('CONCORD offline:', errorCode, description, validatedURL);
+    if (isMainFrame) {
+      console.warn('CONCORD offline:', errorCode, description, validatedURL);
+      if (errorCode !== -3) mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent('<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>CONCORD</title><style>body{background:#07110e;color:#d7fce4;font:16px system-ui;display:grid;place-items:center;min-height:90vh;text-align:center}button{padding:12px 24px;border:0;border-radius:10px;background:#168354;color:white;cursor:pointer}</style><main><h1>CONCORD</h1><p>Sem conexão com o servidor. Verifique a Internet.</p><button onclick="location.href=\\\'' + APP_URL + '\\\'">Tentar novamente</button></main></html>'));
+    }
   });
   mainWindow.loadURL(APP_URL);
   mainWindow.once('ready-to-show', startUpdates);
