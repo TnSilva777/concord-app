@@ -1,6 +1,7 @@
 'use strict';
 const { app, BrowserWindow, shell, session, dialog, Menu } = require('electron');
 const { autoUpdater } = require('electron-updater');
+const path = require('node:path');
 const APP_URL = 'https://concord-app-tn-silva777.vercel.app/';
 const APP_ORIGIN = new URL(APP_URL).origin;
 let mainWindow;
@@ -55,6 +56,7 @@ function startUpdates() {
 function createWindow() {
   mainWindow = new BrowserWindow({
     title: 'CONCORD',
+    icon: path.join(__dirname, 'assets', 'concord.png'),
     width: 1250,
     height: 820,
     minWidth: 760,
