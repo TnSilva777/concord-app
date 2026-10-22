@@ -12,15 +12,18 @@
   },
   "scripts": {
     "start": "electron .",
-    "desktop:build": "electron-builder --win nsis --publish never",
-    "desktop:release": "electron-builder --win nsis --publish always"
+    "desktop:build": "npm run desktop:icon && electron-builder --win nsis --publish never",
+    "desktop:release": "npm run desktop:icon && electron-builder --win nsis --publish always",
+    "desktop:icon": "node desktop/generate-icon.cjs"
   },
   "dependencies": {
     "electron-updater": "^6.6.2"
   },
   "devDependencies": {
     "electron": "^38.0.0",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.0.12",
+    "sharp": "^0.34.3",
+    "png-to-ico": "^2.1.8"
   },
   "build": {
     "appId": "app.concord.desktop",
@@ -41,14 +44,18 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "icon": "desktop/assets/concord.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "artifactName": "CONCORD-Setup-${version}.${ext}"
+      "artifactName": "CONCORD-Setup-${version}.${ext}",
+      "installerIcon": "desktop/assets/concord.ico",
+      "uninstallerIcon": "desktop/assets/concord.ico",
+      "installerHeaderIcon": "desktop/assets/concord.ico"
     },
     "publish": [
       {
