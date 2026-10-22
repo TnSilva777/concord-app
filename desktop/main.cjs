@@ -6,6 +6,7 @@ const APP_URL = 'https://concord-app-tn-silva777.vercel.app/';
 const APP_ORIGIN = new URL(APP_URL).origin;
 let mainWindow;
 let updateStarted = false;
+let lastMainUrl = APP_URL;
 const lock = app.requestSingleInstanceLock();
 if (!lock) app.quit();
 app.on('second-instance', () => {
@@ -116,20 +117,23 @@ function createWindow() {
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (!isAppUrl(url)) { event.preventDefault(); openExternal(url); }
   });
+  mainWindow.webContents.on('did-navigate', (_event, url) => { if (isAppUrl(url)) lastMainUrl = url; });
+  mainWindow.webContents.on('did-navigate-in-page', (_event, url) => { if (isAppUrl(url)) lastMainUrl = url; });
   // Retry when Internet access is restored; do not expose Node integration to the site.
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.type === 'keyDown' && (input.control || input.meta) && input.key.toLowerCase() === 'r') {
       event.preventDefault();
-      mainWindow.reload();
+      if (isAppUrl(mainWindow.webContents.getURL())) mainWindow.reload();
+      else mainWindow.loadURL(lastMainUrl).catch(console.warn);
     }
   });
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, description, validatedURL, isMainFrame) => {
     if (isMainFrame) {
       console.warn('CONCORD offline:', errorCode, description, validatedURL);
-      if (errorCode !== -3) { const offlinePage = '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>CONCORD</title><style>body{background:#07110e;color:#d7fce4;font:16px system-ui;display:grid;place-items:center;min-height:90vh;text-align:center}a{padding:12px 24px;border-radius:10px;background:#168354;color:white;text-decoration:none}</style><main><h1>CONCORD</h1><p>Sem conexão com o servidor. Verifique a Internet.</p><a href="' + APP_URL + '">Tentar novamente</a></main></html>'; mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(offlinePage)).catch(console.warn); }
+      if (errorCode !== -3 && isAppUrl(validatedURL)) { const offlinePage = '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>CONCORD</title><style>body{background:#07110e;color:#d7fce4;font:16px system-ui;display:grid;place-items:center;min-height:90vh;text-align:center}a{padding:12px 24px;border-radius:10px;background:#168354;color:white;text-decoration:none}</style><main><h1>CONCORD</h1><p>Sem conexão com o servidor. Verifique a Internet.</p><a href="' + APP_URL + '">Tentar novamente</a></main></html>'; mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(offlinePage)).catch(console.warn); }
     }
   });
-  mainWindow.loadURL(APP_URL);
+  mainWindow.loadURL(APP_URL).catch(err => console.warn('CONCORD inicialização:', err.message));
   mainWindow.once('ready-to-show', startUpdates);
   mainWindow.webContents.once('did-finish-load', startUpdates);
 }
