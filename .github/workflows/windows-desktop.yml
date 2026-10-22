@@ -20,6 +20,8 @@ jobs:
           node-version: '22'
       - name: Instalar dependencias
         run: npm install --no-audit --no-fund
+      - name: Validar codigo Electron
+        run: node --check desktop/main.cjs; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; node --check desktop/generate-icon.cjs; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Compilar instalador de teste
         if: github.event_name != 'push'
         run: npm run desktop:build
