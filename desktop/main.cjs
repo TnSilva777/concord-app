@@ -12,6 +12,7 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 let mainWindow;
 let updateStarted = false;
 let lastMainUrl = APP_URL;
+let usingBundledFallback = false;
 let localUrl = null;
 let localServer = null;
 function isLocalAppUrl(raw) { try { const url = new URL(raw); return !!localUrl && url.origin === new URL(localUrl).origin; } catch { return false; } }
@@ -145,7 +146,7 @@ function createWindow() {
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (!isAppUrl(url)) { event.preventDefault(); openExternal(url); }
   });
-  mainWindow.webContents.on('did-navigate', (_event, url) => { if (isAppUrl(url)) lastMainUrl = url; });
+  mainWindow.webContents.on('did-navigate', (_event, url) => { if (isAppUrl(url)) { lastMainUrl = url; if (new URL(url).origin === APP_ORIGIN) usingBundledFallback = false; } });
   mainWindow.webContents.on('did-navigate-in-page', (_event, url) => { if (isAppUrl(url)) lastMainUrl = url; });
   // Retry when Internet access is restored; do not expose Node integration to the site.
   mainWindow.webContents.on('before-input-event', (event, input) => {
@@ -158,10 +159,18 @@ function createWindow() {
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, description, validatedURL, isMainFrame) => {
     if (isMainFrame) {
       console.warn('CONCORD offline:', errorCode, description, validatedURL);
+      if (errorCode !== -3 && isAppUrl(validatedURL) && !usingBundledFallback && localUrl) {
+        usingBundledFallback = true;
+        console.warn('Usando interface local do CONCORD como alternativa.');
+        mainWindow.loadURL(localUrl).catch(console.warn);
+        return;
+      }
       if (errorCode !== -3 && isAppUrl(validatedURL)) { const offlinePage = '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>CONCORD</title><style>body{background:#07110e;color:#d7fce4;font:16px system-ui;display:grid;place-items:center;min-height:90vh;text-align:center}a{padding:12px 24px;border-radius:10px;background:#168354;color:white;text-decoration:none}</style><main><h1>CONCORD</h1><p>Sem conexão com o servidor. Verifique a Internet.</p><a href="' + lastMainUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '">Tentar novamente</a></main></html>'; mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(offlinePage)).catch(console.warn); }
     }
   });
-  mainWindow.loadURL(localUrl || APP_URL).catch(err => console.warn('CONCORD inicialização:', err.message));
+  // Updates to the Vercel UI arrive automatically in the installed window.
+  // The bundled UI is used only if the hosted app cannot be reached.
+  mainWindow.loadURL(APP_URL).catch(err => console.warn('CONCORD inicialização:', err.message));
   mainWindow.once('ready-to-show', startUpdates);
   mainWindow.webContents.once('did-finish-load', startUpdates);
 }
