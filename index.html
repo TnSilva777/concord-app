@@ -1122,7 +1122,7 @@ body.concord-custom-server-view .concord-server-room .concord-server-room-name{t
   <button class="voice-room" data-room="Resenha"><span class="room-icon">◖</span><span class="room-name">Resenha</span><span class="room-count" id="roomCountResenha">0</span></button>
   <div class="room-members" id="membersResenha"></div>
 </div>
-<div class="user"><div class="avatar">T</div><div class="concord-user-identity"><b>Thauwan</b><small>● Online</small></div><div class="concord-user-controls"><button class="gear concord-mic-control" id="concordUserMic" type="button" title="Entrar na chamada para usar o microfone" aria-label="Microfone: fora da chamada" aria-pressed="false">🎙</button><button class="gear concord-screen-control" id="shareBtn" title="Compartilhar tela" aria-label="Compartilhar tela"><svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></button><button class="gear" id="logoutBtn" title="Sair da conta" aria-label="Sair da conta">↪</button><button class="gear" id="profileBtn" title="Configurações do perfil" aria-label="Configurações do perfil">⚙</button></div></div></aside>
+<div class="user"><div class="avatar">T</div><div class="concord-user-identity"><b>Thauwan</b><small>● Online</small></div><div class="concord-user-controls"><button class="gear" id="concordSettings" type="button" title="Configurações do CONCORD" aria-label="Abrir configurações">⚙</button><button class="gear concord-mic-control" id="concordUserMic" type="button" title="Entrar na chamada para usar o microfone" aria-label="Microfone: fora da chamada" aria-pressed="false">🎙</button><button class="gear" type="button" id="concordUserHeadphones" title="Ativar ou silenciar áudio recebido" aria-label="Ativar ou silenciar áudio recebido">🎧</button><button class="gear concord-screen-control" id="shareBtn" title="Compartilhar tela" aria-label="Compartilhar tela"><svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></button><button class="gear" id="logoutBtn" title="Sair da conta" aria-label="Sair da conta">↪</button><button class="gear" id="profileBtn" title="Configurações do perfil" aria-label="Configurações do perfil">⚙</button></div></div></aside>
 <main class="main"><header class="topbar"><span class="hash">#</span><div><strong id="channelTitle">geral</strong><span class="sub"> — Converse com sua comunidade</span></div><div class="top-actions"><button class="pill hide-mobile" id="inviteBtn">＋ Convidar</button></div></header>
 <div class="messages" id="messages"><section class="welcome"><h1>Bem-vindo ao <span style="color:#54d79b">CONCORD</span> ✨</h1><p>Seu espaço para jogar, conversar e encontrar sua comunidade. Comece mandando uma mensagem ou entre em uma sala de voz.</p></section><div class="date">HOJE</div><div id="messageList"><article class="message"><div class="avatar">C</div><div><div class="msghead"><b>Concord Bot</b><time>agora</time></div><div class="msgbody">Fala, pessoal! 👋 Bem-vindos ao servidor oficial do Concord. Este é o começo de uma nova comunidade!</div></div></article><article class="message"><div class="avatar" style="background:linear-gradient(135deg,#e68a56,#7d365e)">L</div><div><div class="msghead"><b>Membro da comunidade</b><time>agora</time></div><div class="msgbody">Quem vai jogar hoje? 🎮</div></div></article></div></div>
 <div class="mobilebar"><button class="pill" id="mobileInvite">＋ Convidar</button></div><footer class="composer"><form class="composebox" id="chatForm"><button type="button" class="iconbtn" id="attachBtn" title="Anexar">＋</button><textarea id="chatInput" placeholder="Mensagem em #geral" autocomplete="off" maxlength="2000" rows="1" aria-label="Escrever mensagem"></textarea><button class="iconbtn" type="button" id="emojiBtn" title="Emoji">☺</button><button class="primary" type="submit">➤</button></form><div class="hint">CONCORD • Respeite a comunidade e divirta-se.</div></footer></main></div>
@@ -1488,12 +1488,12 @@ micFrame=requestAnimationFrame(meter)};meter()}catch(e){} }catch(err){$('#voiceS
   b.classList.toggle('concord-mic-active',active&&micEnabled);
   const label=$('.concord-user-identity small');
   if(label){label.textContent=active?(micEnabled?'● Em chamada · microfone ligado':'● Em chamada · silenciado'):'● Online';label.classList.toggle('concord-voice-muted',active&&!micEnabled)}
-}$('#concordUserMic').onclick=()=>{if(!callJoined||!micStream){openVoice();return}toggleMic()};concordUpdateUserMic();
+}$('#concordUserMic').onclick=()=>{if(!callJoined||!micStream){concordMicIdleNotice();return}toggleMic()};concordUpdateUserMic();
 document.addEventListener('keydown',event=>{
   if(!(event.ctrlKey&&event.shiftKey&&event.key.toLowerCase()==='m')||event.repeat)return;
   if(event.target?.closest?.('input,textarea,select,[contenteditable="true"]'))return;
   event.preventDefault();
-  if(callJoined&&micStream)toggleMic();else openVoice();
+  if(callJoined&&micStream)toggleMic();else concordMicIdleNotice();
 });
 function toggleMic(){if(!micStream)return;micEnabled=!micEnabled;micStream.getAudioTracks().forEach(t=>t.enabled=micEnabled&&!remoteAudioMuted);$('#micToggle').classList.toggle('on',micEnabled);$('#micToggle').textContent=micEnabled?'🎙':'🔇';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent=micEnabled?'Microfone ligado':'Microfone mutado';if($('#youRosterState'))$('#youRosterState').textContent=micEnabled?'🎙':'🔇';$('#audioStatus').textContent=micEnabled?'Microfone ligado':'Microfone mutado';concordUpdateUserMic();if(!micEnabled)setLocalSpeaking(false);$('#voiceStatus').textContent=micEnabled?'Microfone ligado. Fale para testar o indicador de nível.':'Microfone mutado.';concordRefreshVoiceState()}function leaveCall(){if(stream)stopShare();if(micFrame)cancelAnimationFrame(micFrame);micFrame=null;if(micStream)micStream.getTracks().forEach(t=>t.stop());micStream=null;if(micContext){micContext.close().catch(()=>{});micContext=null}micAnalyser=null;callJoined=false;micEnabled=true;concordUpdateUserMic();if(typeof setLocalSpeaking==='function')setLocalSpeaking(false);$('#micMeter').style.width='0';$('#callState').textContent='Não conectado';$('#callState').style.color='#9fbaaa';$('#callSubtitle').textContent='Pronto para conectar';$('#voiceStatus').textContent='Você saiu da sala. Entre novamente para testar o microfone.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Ainda não entrou';if($('#youRosterState'))$('#youRosterState').textContent='○';$('#audioStatus').textContent='Microfone desligado';$('#joinCall').textContent='Entrar na sala';$('#joinCall').disabled=false;$('#micToggle').disabled=true;$('#headphoneToggle').disabled=true;$('#callShare').disabled=true;$('#micToggle').classList.remove('on');$('#micToggle').textContent='🎙'}$('#joinCall').onclick=joinCall;$('#micToggle').onclick=toggleMic;$('#leaveCall').onclick=leaveCall;$('#headphoneToggle').onclick=()=>{if(!callJoined)return;remoteAudioMuted=!remoteAudioMuted;for(const audio of voiceAudio.values()){audio.muted=remoteAudioMuted;if(!remoteAudioMuted)audio.play().catch(()=>{concordAudioUnlock.hidden=false;voiceStatus('Clique em Ativar som para liberar áudio no navegador.')})}$('#headphoneToggle').textContent=remoteAudioMuted?'🔇':'🎧';$('#voiceStatus').textContent=remoteAudioMuted?'Áudio dos participantes silenciado.':'Áudio dos participantes ativado.';const inline=document.getElementById('concordInlineSound');if(inline)inline.textContent=remoteAudioMuted?'🔇 Som silenciado':'🔊 Som ativado';micStream?.getAudioTracks().forEach(t=>t.enabled=micEnabled&&!remoteAudioMuted);if(remoteAudioMuted)setLocalSpeaking(false);concordRefreshVoiceState();};$('#callShare').onclick=()=>{ $('#voiceModal').classList.remove('show');openShare()};$('#inviteBtn').onclick=$('#mobileInvite').onclick=async()=>{
   const room=typeof activeRoom==='string'?activeRoom:'Geral';
@@ -4231,4 +4231,73 @@ body:not(.concord-custom-server-view) #concordServerLocalWarning{display:none}
 .composebox textarea#chatInput{flex:1;min-width:0;max-height:136px;min-height:37px;resize:none;overflow-y:auto;background:transparent;border:0;outline:0;color:#f1fff7;padding:8px;line-height:1.5;font:inherit;box-sizing:border-box}
 .composebox:focus-within{border-color:#3ba979;box-shadow:0 0 0 2px rgba(54,185,120,.12)}
 .composebox button{flex-shrink:0}
-</style></body></html>                              
+</style>
+<script>
+(() => {
+ const styles=document.createElement('style');
+ styles.textContent=`
+ .concord-user-controls #profileBtn{display:none!important}
+ .concord-user-controls #concordSettings{order:-2;color:#82e8b0;background:#17372a;border:1px solid #347351}
+ .concord-user-controls #concordUserMic{order:-1}
+ .concord-user-controls #concordUserHeadphones{order:0}
+ .concord-user-controls #shareBtn{order:1}
+ .concord-user-controls #logoutBtn{order:2}
+ #concordSettingsOverlay{position:fixed;inset:0;z-index:99998;display:flex;align-items:center;justify-content:center;padding:16px;background:#030c09db}
+ .concord-settings-panel{width:min(900px,100%);height:min(650px,92dvh);display:grid;grid-template-columns:210px minmax(0,1fr);border:1px solid #39694f;border-radius:18px;background:#0e2118;overflow:hidden;box-shadow:0 22px 70px #000b;color:#ebfff1}
+ .concord-settings-menu{background:#102d20;border-right:1px solid #2a533b;padding:22px 12px;display:flex;flex-direction:column;gap:6px}
+ .concord-settings-menu strong{padding:0 12px 14px;font-size:15px}
+ .concord-settings-menu button{padding:12px;text-align:left;background:transparent;border-radius:9px;color:#b8d5c5}
+ .concord-settings-menu button.selected,.concord-settings-menu button:hover{background:#1b4c33;color:#edfff4}
+ .concord-settings-content{padding:25px;overflow-y:auto;display:flex;flex-direction:column;gap:15px}
+ .concord-settings-content h2{margin:0;font-size:22px}
+ .concord-settings-content p{color:#b5cfbf;line-height:1.55}
+ .concord-settings-content button{background:#246848;padding:12px;border-radius:10px;text-align:left;color:#fff}
+ .concord-settings-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+ #concordSettingsClose{background:#1c4531;padding:7px 12px}
+ @media(max-width:650px){.concord-settings-panel{grid-template-columns:115px minmax(0,1fr)}.concord-settings-menu{padding:14px 5px}.concord-settings-menu button{font-size:12px;padding:10px 7px}.concord-settings-content{padding:15px}}
+ `;
+ document.head.append(styles);
+ window.concordMicIdleNotice=()=>{
+   document.getElementById('concordIdleMicNotice')?.remove();
+   const note=document.createElement('div');note.id='concordIdleMicNotice';note.textContent='Entre em uma sala de voz para ativar o microfone.';
+   note.style.cssText='position:fixed;bottom:75px;left:50%;transform:translateX(-50%);z-index:99999;background:#194d35;color:#eaffef;padding:11px 17px;border:1px solid #45a879;border-radius:12px;box-shadow:0 8px 24px #0009;text-align:center;font-size:13px;max-width:90vw';
+   document.body.append(note);setTimeout(()=>note.remove(),2400);
+ };
+ const gear=document.getElementById('concordSettings');
+ function openSettings(){
+   document.getElementById('concordSettingsOverlay')?.remove();
+   const overlay=document.createElement('div');overlay.id='concordSettingsOverlay';
+   const panel=document.createElement('section');panel.className='concord-settings-panel';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label','Configurações do CONCORD');
+   const menu=document.createElement('nav');menu.className='concord-settings-menu';
+   const content=document.createElement('div');content.className='concord-settings-content';
+   const heading=document.createElement('strong');heading.textContent='⚙ CONCORD';menu.append(heading);
+   const sections=[['Perfil','Nome, foto e conta'],['Voz e vídeo','Microfone, fones e supressão'],['Transmissão','Captura de tela e áudio'],['Aparência','Identidade visual verde'],['Notificações','Avisos e alertas'],['Avançado','Conexão e desempenho']];
+   function show(section){
+     menu.querySelectorAll('button').forEach(btn=>btn.classList.toggle('selected',btn.dataset.section===section));
+     content.replaceChildren();
+     const top=document.createElement('div');top.className='concord-settings-top';
+     const title=document.createElement('h2');title.textContent=section;
+     const close=document.createElement('button');close.id='concordSettingsClose';close.textContent='✕ Fechar';close.onclick=()=>overlay.remove();top.append(title,close);content.append(top);
+     const addText=value=>{const p=document.createElement('p');p.textContent=value;content.append(p)};
+     const addButton=(label,action)=>{const button=document.createElement('button');button.textContent=label;button.onclick=action;content.append(button)};
+     if(section==='Perfil'){addText('Edite seu nome e foto usando as opções existentes do CONCORD.');addButton('Abrir personalização do perfil',()=>{overlay.remove();document.getElementById('profileBtn')?.click()})}
+     if(section==='Voz e vídeo'){addText('Escolha o microfone, a saída de som, o tratamento da voz e a supressão de ruído.');addButton('Selecionar dispositivos e configurar áudio',()=>{overlay.remove();if(typeof concordOpenAudioSettings==='function')concordOpenAudioSettings()})}
+     if(section==='Transmissão'){addText('Entre em uma sala de voz e escolha a tela ou janela usando o botão de compartilhar. No aplicativo Windows, a escolha pode incluir áudio do computador.');addButton('Abrir controles de compartilhamento',()=>{overlay.remove();document.getElementById('shareBtn')?.click()})}
+     if(section==='Aparência')addText('O CONCORD mantém seu tema verde-escuro e a interface original. Mais opções de aparência serão adicionadas posteriormente.');
+     if(section==='Notificações')addText('Os avisos de mensagens e chamadas seguem as permissões do aplicativo e do sistema.');
+     if(section==='Avançado'){addText('Para recuperar uma conexão instável, recarregue o CONCORD. Se estiver em uma call, saia e entre novamente para reconectar o microfone.');addButton('Recarregar CONCORD',()=>location.reload())}
+   }
+   sections.forEach(([label])=>{const btn=document.createElement('button');btn.type='button';btn.dataset.section=label;btn.textContent=label;btn.onclick=()=>show(label);menu.append(btn)});
+   panel.append(menu,content);overlay.append(panel);document.body.append(overlay);
+   overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};
+   const esc=e=>{if(e.key==='Escape'){overlay.remove();document.removeEventListener('keydown',esc)}};document.addEventListener('keydown',esc);
+   show('Voz e vídeo');
+ }
+ gear?.addEventListener('click',openSettings);
+ document.getElementById('concordUserHeadphones')?.addEventListener('click',()=>{
+   if(typeof callJoined!=='undefined'&&!callJoined){window.concordMicIdleNotice();return}
+   document.getElementById('headphoneToggle')?.click();
+ });
+})();
+</script>
+</body></html>                              
