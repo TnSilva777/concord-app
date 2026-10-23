@@ -16,7 +16,7 @@ let localUrl = null;
 let localServer = null;
 function isLocalAppUrl(raw) { try { const url = new URL(raw); return !!localUrl && url.origin === new URL(localUrl).origin; } catch { return false; } }
 async function startLocalServer() {
-  const root = path.join(app.getAppPath(), 'web');
+  const root = app.isPackaged ? path.join(process.resourcesPath, 'web') : app.getAppPath();
   if (!fs.existsSync(path.join(root, 'index.html'))) throw new Error('Interface CONCORD não incluída no instalador');
   localServer = http.createServer((req, res) => {
     const url = new URL(req.url || '/', 'http://localhost');
