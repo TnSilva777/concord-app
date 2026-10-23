@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const html=fs.readFileSync('index.html','utf8');
+const code=html.slice(html.indexOf('function concordCreateSpeechGate(){'),html.indexOf('let micStream=null'));
+const context={};vm.createContext(context);vm.runInContext(code,context);
+const sample=amplitude=>Float32Array.from({length:1024},(_,i)=>amplitude*Math.sin(i*0.2));
+const gate=context.concordCreateSpeechGate();
+for(let t=0;t<1500;t+=20)assert.equal(gate(sample(0.004),t),false,'Quiet background must stay off');
+assert.equal(gate(sample(0.08),1500),false,'Ignore a brief transient');
+assert.equal(gate(sample(0.08),1580),true,'Sustained speech activates');
+assert.equal(gate(sample(0),1800),false,'Silence releases within 180 ms');
+assert.equal(gate(sample(0.08),1900,false),false,'Mute resets immediately');
+const noisy=context.concordCreateSpeechGate();
+for(let t=0;t<3000;t+=20)assert.equal(noisy(sample(0.02),t),false,'Calibrated steady background stays off');
+console.log('PASS: silence, background noise, transient rejection, speech, release and mute');

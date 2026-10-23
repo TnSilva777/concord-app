@@ -1395,20 +1395,34 @@ if(concordShareAudioEnabled&&!stream.getAudioTracks().length){
 }
 $('#shareStatus').textContent=stream.getAudioTracks().length?'Transmitindo vídeo e áudio capturado. O áudio será enviado pela chamada de voz.':'Atenção: vídeo sem áudio do sistema. Reinicie o compartilhamento e marque “Compartilhar áudio” no seletor do navegador (quando disponível).';if(voiceSignal){voiceSignal.track({id:voicePeerId,userId:socialUser,name:voicePeerName(),sharing:true}).catch(console.warn);for(const [id,peer] of voicePeers)concordUpdatePeerShare(id,peer)}renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();const stageVideo=$('#callScreenPreview');stageVideo.srcObject=stream;stageVideo.style.display='block';$('#callStageMessage').style.display='none';$('#stageBadge').style.display='block';$('#callSubtitle').textContent='Captura de tela ativa';stream.getVideoTracks()[0].addEventListener('ended',stopShare)}catch(err){$('#shareStatus').textContent=err.name==='NotAllowedError'?'Compartilhamento cancelado. Você pode tentar novamente quando quiser.':'Não foi possível iniciar o compartilhamento: '+(err.message||'verifique as permissões do navegador.')}finally{concordShareStarting=false}}
 function stopShare(){if(voiceSignal)voiceSignal.track({id:voicePeerId,userId:socialUser,name:voicePeerName(),sharing:false}).catch(console.warn);for(const [id,peer] of voicePeers){for(const sender of peer.getSenders().filter(s=>s.track&&stream?.getTracks().includes(s.track))){sender.__concordScreenSender=true;peer.removeTrack(sender)}concordNegotiatePeer(id)}if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('#screenPreview').srcObject=null;$('#screenPreview').style.display='none';if(!concordWatching){$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block';$('#stageBadge').style.display='none';$('#callSubtitle').textContent=callJoined?'Microfone local ativo':'Pronto para conectar'}concordUpdateFullscreen();$('#stopShare').style.display='none';$('#shareStatus').textContent='Transmissão encerrada.';renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}document.querySelectorAll('[data-share]').forEach(b=>b.onclick=beginShare);$('#stopShare').onclick=stopShare;
+// Time-domain energy avoids treating FFT background noise as continuous speech.
+function concordCreateSpeechGate(){
+ let noise=0.002,started=null,until=0,attack=null;
+ return (samples,now,enabled=true)=>{
+  if(!enabled){until=0;attack=null;return false}
+  let mean=0;for(const value of samples)mean+=value;mean/=samples.length;
+  let energy=0;for(const value of samples)energy+=(value-mean)**2;
+  const rms=Math.sqrt(energy/samples.length);
+  if(started===null)started=now;
+  if(now-started<350){noise=Math.max(0.002,noise*0.8+rms*0.2);return false}
+  const threshold=Math.max(0.012,noise*3);
+  if(rms>threshold){
+   if(attack===null)attack=now;
+   if(now-attack>=60)until=now+180;
+  }else{attack=null;noise=noise*0.98+Math.min(rms,0.02)*0.02}
+  return now<until;
+ };
+}
 let micStream=null,micContext=null,micAnalyser=null,micFrame=null,micEnabled=true,callJoined=false;
 let concordNoiseSuppression=localStorage.getItem('concord-noise-suppression')!=='false';
 let concordNoiseMode=localStorage.getItem('concord-noise-mode')||'strong';
 function concordMicConstraints(){return {echoCancellation:true,noiseSuppression:concordNoiseSuppression,autoGainControl:true,channelCount:1,sampleRate:{ideal:48000}}}
-let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);function openVoice(){$('#voiceModal').classList.add('show')}$('#voiceBtn').onclick=openVoice;if($('#mobileVoice'))$('#mobileVoice').onclick=openVoice;$('#closeVoice').onclick=()=>$('#voiceModal').classList.remove('show');async function joinCall(){if(callJoined)return;$('#voiceStatus').textContent='Solicitando permissão do microfone…';if(!navigator.mediaDevices?.getUserMedia){$('#voiceStatus').textContent='Este navegador não permite acessar o microfone aqui. Abra o Concord em Chrome/Edge atualizado usando localhost ou HTTPS.';return}try{micStream=await navigator.mediaDevices.getUserMedia({audio:concordMicConstraints(),video:false});callJoined=true;micEnabled=true;concordUpdateUserMic();$('#callState').textContent='Áudio local ativo';$('#callState').style.color='#42dca4';$('#callSubtitle').textContent='Você entrou na sala';$('#voiceStatus').textContent='Você entrou na sala e o microfone está funcionando neste dispositivo. A lista à esquerda mostra participantes conectados nesta sessão. Para ouvir outras pessoas em outros dispositivos, é necessário conectar um servidor de chamadas.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Microfone ligado';if($('#youRosterState'))$('#youRosterState').textContent='🎙';$('#audioStatus').textContent='Microfone ligado';$('#joinCall').textContent='Conectado';$('#joinCall').disabled=true;$('#micToggle').disabled=false;$('#headphoneToggle').disabled=false;$('#callShare').disabled=false;$('#micToggle').classList.add('on');try{micContext=new(window.AudioContext||window.webkitAudioContext)();if(micContext.state==='suspended')await micContext.resume().catch(console.warn);const src=micContext.createMediaStreamSource(micStream);micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=256;src.connect(micAnalyser);const data=new Uint8Array(micAnalyser.frequencyBinCount);let detectedVoiceUntil=0,voiceMeterFrame=0;
-const meter=()=>{if(!micAnalyser)return;micAnalyser.getByteFrequencyData(data);
-const avg=data.reduce((a,b)=>a+b,0)/data.length;
-$('#micMeter').style.width=Math.min(100,avg*1.8)+'%';
-const now=performance.now();
-if(!micEnabled||!callJoined){detectedVoiceUntil=0;if(concordIsLocallySpeaking)setLocalSpeaking(false)}
-else{
- if(avg>(concordNoiseMode==='strong'?7:5))detectedVoiceUntil=now+450;
- if(++voiceMeterFrame%3===0)setLocalSpeaking(now<detectedVoiceUntil);
-}
+let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);function openVoice(){$('#voiceModal').classList.add('show')}$('#voiceBtn').onclick=openVoice;if($('#mobileVoice'))$('#mobileVoice').onclick=openVoice;$('#closeVoice').onclick=()=>$('#voiceModal').classList.remove('show');async function joinCall(){if(callJoined)return;$('#voiceStatus').textContent='Solicitando permissão do microfone…';if(!navigator.mediaDevices?.getUserMedia){$('#voiceStatus').textContent='Este navegador não permite acessar o microfone aqui. Abra o Concord em Chrome/Edge atualizado usando localhost ou HTTPS.';return}try{micStream=await navigator.mediaDevices.getUserMedia({audio:concordMicConstraints(),video:false});callJoined=true;micEnabled=true;concordUpdateUserMic();$('#callState').textContent='Áudio local ativo';$('#callState').style.color='#42dca4';$('#callSubtitle').textContent='Você entrou na sala';$('#voiceStatus').textContent='Você entrou na sala e o microfone está funcionando neste dispositivo. A lista à esquerda mostra participantes conectados nesta sessão. Para ouvir outras pessoas em outros dispositivos, é necessário conectar um servidor de chamadas.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Microfone ligado';if($('#youRosterState'))$('#youRosterState').textContent='🎙';$('#audioStatus').textContent='Microfone ligado';$('#joinCall').textContent='Conectado';$('#joinCall').disabled=true;$('#micToggle').disabled=false;$('#headphoneToggle').disabled=false;$('#callShare').disabled=false;$('#micToggle').classList.add('on');try{micContext=new(window.AudioContext||window.webkitAudioContext)();if(micContext.state==='suspended')await micContext.resume().catch(console.warn);const src=micContext.createMediaStreamSource(micStream);micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=1024;micAnalyser.smoothingTimeConstant=0;src.connect(micAnalyser);const data=new Float32Array(micAnalyser.fftSize),speechGate=concordCreateSpeechGate();
+const meter=()=>{if(!micAnalyser)return;micAnalyser.getFloatTimeDomainData(data);
+const enabled=callJoined&&micEnabled&&micContext?.state==='running'&&micStream?.getAudioTracks().some(t=>t.enabled&&!t.muted&&t.readyState==='live');
+setLocalSpeaking(speechGate(data,performance.now(),enabled));
+const rms=Math.sqrt(data.reduce((sum,value)=>sum+value*value,0)/data.length);
+$('#micMeter').style.width=(enabled?Math.min(100,rms*500):0)+'%';
 micFrame=requestAnimationFrame(meter)};meter()}catch(e){} }catch(err){$('#voiceStatus').textContent=err.name==='NotAllowedError'?'Permissão do microfone negada. Clique no cadeado ao lado do endereço do site, permita o microfone e tente novamente.':'Não foi possível acessar o microfone. Verifique se ele está conectado e se outro aplicativo não o está bloqueando.'}}function concordUpdateUserMic(){
   const b=$('#concordUserMic');if(!b)return;
   const active=!!(callJoined&&micStream);
@@ -2458,6 +2472,7 @@ function setLocalSpeaking(on){
  document.querySelectorAll('.user .avatar,.roster-person.me .avatar,.room-member.you-in-room .mini-avatar,.concord-local-voice-person[data-concord-self-voice="true"] .mini-avatar').forEach(el=>el.classList.toggle('speaking',on));
  document.querySelectorAll('.room-member.you-in-room,.concord-local-voice-person[data-concord-self-voice="true"]').forEach(el=>el.classList.toggle('concord-member-speaking',on));
  document.querySelectorAll('#concordVoiceGrid .cvg-tile[data-concord-self="true"]').forEach(tile=>tile.querySelector('.cvg-avatar')?.classList.toggle('speaking',on&&!stream?.getVideoTracks().some(t=>t.readyState==='live')));
+ for(const members of Object.values(roomRoster))for(const member of members)if(member.isMe)member.speaking=on;
  if(on===concordIsLocallySpeaking)return;
  concordIsLocallySpeaking=on;
  if(concordVoiceLobby&&callJoined&&joinedRoom){
@@ -2495,18 +2510,18 @@ function concordWatchRemoteSpeech(peerId,track){
   const Ctx=window.AudioContext||window.webkitAudioContext;
   if(!Ctx)return;
   const ctx=new Ctx(),source=ctx.createMediaStreamSource(new MediaStream([track])),analyser=ctx.createAnalyser();
-  analyser.fftSize=256;source.connect(analyser);
-  const values=new Uint8Array(analyser.frequencyBinCount);let raf=0,lastActivity=0,lastState=false,frame=0,stopped=false;
+  analyser.fftSize=1024;analyser.smoothingTimeConstant=0;source.connect(analyser);
+  const values=new Float32Array(analyser.fftSize),speechGate=concordCreateSpeechGate();let raf=0,stopped=false,lastPaint=0;
+  const meterState={speaking:false,stop(){stopped=true;cancelAnimationFrame(raf);source.disconnect();ctx.close().catch(()=>{})}};
   const tick=()=>{
    if(stopped||track.readyState==='ended')return;
-   analyser.getByteFrequencyData(values);
-   const avg=values.reduce((sum,value)=>sum+value,0)/values.length;
-   if(avg>8)lastActivity=performance.now()+320;
-   if(++frame%6===0){const active=performance.now()<lastActivity;if(active!==lastState){lastState=active;concordSetRemoteSpeaking(peerId,active)}}
+   analyser.getFloatTimeDomainData(values);
+   meterState.speaking=speechGate(values,performance.now(),ctx.state==='running'&&!track.muted&&track.enabled);
+   if(performance.now()-lastPaint>=100){lastPaint=performance.now();concordSetRemoteSpeaking(peerId,meterState.speaking)}
    raf=requestAnimationFrame(tick);
   };
   ctx.resume().catch(()=>{});tick();
-  concordRemoteSpeechMeters.set(peerId,{stop(){stopped=true;cancelAnimationFrame(raf);source.disconnect();ctx.close().catch(()=>{})}});
+  concordRemoteSpeechMeters.set(peerId,meterState);
   track.addEventListener('ended',()=>concordStopRemoteSpeech(peerId),{once:true});
  }catch(error){console.warn('Indicador de áudio remoto indisponível',error)}
 }
@@ -2578,10 +2593,10 @@ function voiceParticipants(){
   if(!voiceSignal||!joinedRoom)return;
   const state=voiceSignal.presenceState(),members=[];
    const speakingByPeer=new Map();
-   if(concordVoiceLobby)for(const entry of Object.values(concordVoiceLobby.presenceState()).flat())if(entry?.id)speakingByPeer.set(entry.id,!!entry.speaking);
+   if(concordVoiceLobby)for(const entry of Object.values(concordVoiceLobby.presenceState()).flat())if(entry?.id)speakingByPeer.set(entry.id,(concordRemoteSpeechMeters.get(entry.id)?.speaking??!!entry.speaking));
   Object.values(state).flat().forEach(p=>{
     if(!p||!p.id||p.id===voicePeerId||p.userId&&p.userId===socialUser)return;
-    if(!members.some(m=>m.id===p.id)){if(p.userId)concordRememberVoiceName(p.userId,p.name);const publicName=p.userId&&concordFriendNames.get(p.userId);const name=String(publicName||p.name||'Participante').trim().slice(0,28)||'Participante';members.push({id:p.id,userId:p.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!p.sharing,speaking:speakingByPeer.get(p.id)===true,muted:!!p.muted,deafened:!!p.deafened})};
+    if(!members.some(m=>m.id===p.id)){if(p.userId)concordRememberVoiceName(p.userId,p.name);const publicName=p.userId&&concordFriendNames.get(p.userId);const name=String(publicName||p.name||'Participante').trim().slice(0,28)||'Participante';members.push({id:p.id,userId:p.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!p.sharing,speaking:concordRemoteSpeechMeters.get(p.id)?.speaking??speakingByPeer.get(p.id)===true,muted:!!p.muted,deafened:!!p.deafened})};
   });
   // Oscilações de presença durante renegociação de vídeo não são saídas confirmadas.
   const now=Date.now();
@@ -2592,7 +2607,7 @@ function voiceParticipants(){
     concordVoiceLastSeen.set(entry.id,now);
     if(!members.some(m=>m.id===entry.id)){
       const name=String((entry.userId&&concordFriendNames.get(entry.userId))||entry.name||'Participante').slice(0,28);
-      members.push({id:entry.id,userId:entry.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!entry.sharing,speaking:!!entry.speaking,muted:!!entry.muted,deafened:!!entry.deafened});
+      members.push({id:entry.id,userId:entry.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!entry.sharing,speaking:(concordRemoteSpeechMeters.get(entry.id)?.speaking??!!entry.speaking),muted:!!entry.muted,deafened:!!entry.deafened});
     }
   }
   for(const [id,peer] of voicePeers)if(!members.some(m=>m.id===id)){
@@ -2611,7 +2626,7 @@ function voiceParticipants(){
   if(concordVoiceLobby){for(const entry of Object.values(concordVoiceLobby.presenceState()||{}).flat()){
     if(entry?.room!==joinedRoom||!entry.id||entry.id===voicePeerId||members.some(m=>m.id===entry.id))continue;
     const name=String((entry.userId&&concordFriendNames.get(entry.userId))||entry.name||'Participante').slice(0,28);
-    members.push({id:entry.id,userId:entry.userId||null,name,initial:name[0]?.toUpperCase()||'?',isMe:false,sharing:!!entry.sharing,speaking:!!entry.speaking,muted:!!entry.muted,deafened:!!entry.deafened});
+    members.push({id:entry.id,userId:entry.userId||null,name,initial:name[0]?.toUpperCase()||'?',isMe:false,sharing:!!entry.sharing,speaking:(concordRemoteSpeechMeters.get(entry.id)?.speaking??!!entry.speaking),muted:!!entry.muted,deafened:!!entry.deafened});
   }}
   roomRoster[joinedRoom]=[{id:voicePeerId,userId:socialUser,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream,speaking:concordIsLocallySpeaking,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted},...members];
   renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();concordQueueVoiceAvatars(members);
@@ -2831,7 +2846,7 @@ function concordSyncVoiceLobby(){
    if(entry.userId)concordRememberVoiceName(entry.userId,entry.name);
    const name=String((entry.userId&&concordFriendNames.get(entry.userId))||entry.name||'Participante').trim().slice(0,28)||'Participante';
    if(!groups.has(entry.room))groups.set(entry.room,[]);
-   if(!groups.get(entry.room).some(member=>member.id===entry.id))groups.get(entry.room).push({id:entry.id,userId:entry.userId||null,name,initial:name[0].toUpperCase(),isMe:false,sharing:!!entry.sharing,speaking:!!entry.speaking,muted:!!entry.muted,deafened:!!entry.deafened});
+   if(!groups.get(entry.room).some(member=>member.id===entry.id))groups.get(entry.room).push({id:entry.id,userId:entry.userId||null,name,initial:name[0].toUpperCase(),isMe:false,sharing:!!entry.sharing,speaking:(concordRemoteSpeechMeters.get(entry.id)?.speaking??!!entry.speaking),muted:!!entry.muted,deafened:!!entry.deafened});
  }
  for(const room of new Set([...concordVoiceLobbyRooms,...groups.keys()])){
    // A lista da sala ativa também deve refletir a presença, independentemente do WebRTC.
@@ -2849,7 +2864,7 @@ function concordSyncVoiceLobby(){
  }
  // Preserve the active WebRTC roster and update the speaking effects.
  if(joinedRoom&&callJoined){
-   const speaking=new Map((groups.get(joinedRoom)||[]).map(member=>[member.id,!!member.speaking]));
+   const speaking=new Map((groups.get(joinedRoom)||[]).map(member=>[member.id,(concordRemoteSpeechMeters.get(member.id)?.speaking??!!member.speaking)]));
    for(const member of roomRoster[joinedRoom]||[])if(!member.isMe)member.speaking=speaking.get(member.id)===true;
    document.querySelectorAll('#concordVoiceGrid .cvg-tile[data-concord-self="false"]').forEach(tile=>{
     tile.querySelector('.cvg-avatar')?.classList.toggle('speaking',speaking.get(tile.dataset.memberId)===true&&!concordVoiceMemberSharing(tile.dataset.memberId));
