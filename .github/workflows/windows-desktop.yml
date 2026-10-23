@@ -25,6 +25,13 @@ jobs:
       - name: Compilar instalador de teste
         if: github.event_name != 'push'
         run: npm run desktop:build
+      - name: Conferir versão da tag
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: pwsh
+        run: |
+          $expected = (node -p "require('./package.json').version").Trim()
+          $tag = "${{ github.ref_name }}"
+          if ($tag -ne "desktop-v$expected") { throw "Tag $tag diferente da versão desktop-v$expected" }
       - name: Publicar versao com atualizacao automatica
         if: startsWith(github.ref, 'refs/tags/desktop-v')
         run: npm run desktop:release
@@ -35,5 +42,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: CONCORD-Windows-Setup
-          path: dist/*.exe
+          path: |
+            dist/*.exe
+            dist/latest.yml
           if-no-files-found: error
