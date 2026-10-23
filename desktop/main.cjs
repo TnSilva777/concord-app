@@ -82,7 +82,20 @@ function installPermissions() {
           noLink: true
         });
         if (selected.response >= Math.min(sources.length, 15)) { callback({}); return; }
-        callback({ video: sources[selected.response] });
+        // Windows Chromium supports loopback audio for screen capture when available.
+        const audioChoice = await dialog.showMessageBox(mainWindow, {
+          type: 'question',
+          title: 'CONCORD — Áudio da transmissão',
+          message: 'Deseja compartilhar também o áudio do computador?',
+          detail: 'O compartilhamento de áudio do sistema depende do Windows e da versão do Electron.',
+          buttons: ['Compartilhar com áudio', 'Somente vídeo'],
+          defaultId: 0,
+          cancelId: 1,
+          noLink: true
+        });
+        callback(audioChoice.response === 0
+          ? { video: sources[selected.response], audio: 'loopback' }
+          : { video: sources[selected.response] });
       } catch (error) { console.warn('Captura de tela:', error.message); callback({}); }
     });
   }
