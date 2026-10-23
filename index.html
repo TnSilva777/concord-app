@@ -1393,10 +1393,43 @@ function concordOpenAudioSettings(){
  modeSelect.value=concordNoiseMode;
  modeSelect.onchange=async()=>{concordNoiseMode=modeSelect.value;localStorage.setItem('concord-noise-mode',concordNoiseMode);if(micStream)for(const track of micStream.getAudioTracks())try{await track.applyConstraints(concordMicConstraints())}catch(e){console.warn('Ajustes de microfone não suportados',e)}};
  modeLabel.append(modeSelect);
+ const deviceRow=document.createElement('div');deviceRow.style.cssText='display:grid;gap:10px';
+ const makeDeviceSelect=(title)=>{const label=document.createElement('label');label.style.cssText='display:grid;gap:6px;font-size:13px';label.textContent=title;const select=document.createElement('select');select.style.cssText='background:#0e2b20;color:#e9fff0;border:1px solid #428261;border-radius:8px;padding:10px;width:100%';label.append(select);deviceRow.append(label);return select};
+ const inputSelect=makeDeviceSelect('Microfone (entrada)');
+ const outputSelect=makeDeviceSelect('Alto-falante / fone (saída)');
+ const deviceStatus=document.createElement('small');deviceStatus.style.color='#b5d9c3';deviceRow.append(deviceStatus);
+ const loadDevices=async()=>{
+   inputSelect.replaceChildren();outputSelect.replaceChildren();
+   const defaultInput=new Option('Microfone padrão do Windows','');
+   const defaultOutput=new Option('Saída padrão do Windows','');
+   inputSelect.add(defaultInput);outputSelect.add(defaultOutput);
+   if(!navigator.mediaDevices?.enumerateDevices){deviceStatus.textContent='Este navegador não permite listar dispositivos.';return}
+   try{
+     const list=await navigator.mediaDevices.enumerateDevices();
+     for(const device of list){
+       if(!device.deviceId||device.deviceId==='default'||device.deviceId==='communications')continue;
+       if(device.kind==='audioinput')inputSelect.add(new Option(device.label||'Microfone '+inputSelect.length,device.deviceId));
+       if(device.kind==='audiooutput')outputSelect.add(new Option(device.label||'Saída '+outputSelect.length,device.deviceId));
+     }
+     inputSelect.value=localStorage.getItem('concord-input-device')||'';
+     outputSelect.value=localStorage.getItem('concord-output-device')||'';
+     if(inputSelect.selectedIndex<0)inputSelect.value='';
+     if(outputSelect.selectedIndex<0)outputSelect.value='';
+     if(typeof HTMLMediaElement.prototype.setSinkId!=='function'){outputSelect.disabled=true;deviceStatus.textContent='A troca da saída de áudio não é suportada neste sistema.'}
+   }catch(error){deviceStatus.textContent='Não foi possível listar os dispositivos: '+error.message}
+ };
+ inputSelect.onchange=()=>{localStorage.setItem('concord-input-device',inputSelect.value);deviceStatus.textContent=callJoined?'Microfone salvo. Saia da call e entre novamente para aplicar com segurança.':'Microfone selecionado para a próxima call.'};
+ outputSelect.onchange=async()=>{
+   localStorage.setItem('concord-output-device',outputSelect.value);
+   const players=[...document.querySelectorAll('audio')].filter(el=>el.srcObject);
+   const results=await Promise.allSettled(players.map(el=>el.setSinkId?.(outputSelect.value)));
+   deviceStatus.textContent=results.some(result=>result.status==='rejected')?'Algumas saídas foram bloqueadas pelo Windows. Confira permissões.':'Saída de áudio aplicada aos participantes conectados.';
+ };
+ loadDevices();
  const help=document.createElement('small');help.textContent='Foco na voz usa supressão nativa e maior limiar para a animação. Dependendo do navegador, ruídos fortes ainda podem ser ouvidos. Para isolamento avançado seria necessário um modelo de áudio dedicado.';help.style.color='#aecab9';
  const tip=document.createElement('p');tip.textContent='Para ouvir o jogo compartilhado: quem transmite precisa marcar “Compartilhar áudio” no seletor do navegador. No Windows, prefira compartilhar a tela inteira com áudio do sistema, ou uma aba do Chrome com áudio.';tip.style.cssText='font-size:12px;line-height:1.55;color:#bcd5c4;margin:0';
  const close=document.createElement('button');close.textContent='Concluído';close.style.cssText='padding:10px;background:#246547;color:#fff;border-radius:9px';close.onclick=()=>overlay.remove();
- box.append(heading,noise,modeLabel,help,tip,close);overlay.append(box);document.body.append(overlay);overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};close.focus();
+ box.append(heading,noise,modeLabel,deviceRow,help,tip,close);overlay.append(box);document.body.append(overlay);overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};close.focus();
 }
 const concordAudioHelp=document.createElement('small');
 concordAudioHelp.style.cssText='display:block;color:#a7d3b7;line-height:1.5;margin-bottom:10px';
@@ -1438,7 +1471,7 @@ let micStream=null,micContext=null,micAnalyser=null,micFrame=null,micEnabled=tru
 let concordNoiseSuppression=localStorage.getItem('concord-noise-suppression')!=='false';
 let concordNoiseMode=localStorage.getItem('concord-noise-mode')||'strong';
 function concordMicConstraints(){return {echoCancellation:true,noiseSuppression:concordNoiseSuppression,autoGainControl:true,channelCount:1,sampleRate:{ideal:48000}}}
-let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);function openVoice(){$('#voiceModal').classList.add('show')}$('#voiceBtn').onclick=openVoice;if($('#mobileVoice'))$('#mobileVoice').onclick=openVoice;$('#closeVoice').onclick=()=>$('#voiceModal').classList.remove('show');async function joinCall(){if(callJoined)return;$('#voiceStatus').textContent='Solicitando permissão do microfone…';if(!navigator.mediaDevices?.getUserMedia){$('#voiceStatus').textContent='Este navegador não permite acessar o microfone aqui. Abra o Concord em Chrome/Edge atualizado usando localhost ou HTTPS.';return}try{micStream=await navigator.mediaDevices.getUserMedia({audio:concordMicConstraints(),video:false});callJoined=true;micEnabled=true;concordUpdateUserMic();$('#callState').textContent='Áudio local ativo';$('#callState').style.color='#42dca4';$('#callSubtitle').textContent='Você entrou na sala';$('#voiceStatus').textContent='Você entrou na sala e o microfone está funcionando neste dispositivo. A lista à esquerda mostra participantes conectados nesta sessão. Para ouvir outras pessoas em outros dispositivos, é necessário conectar um servidor de chamadas.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Microfone ligado';if($('#youRosterState'))$('#youRosterState').textContent='🎙';$('#audioStatus').textContent='Microfone ligado';$('#joinCall').textContent='Conectado';$('#joinCall').disabled=true;$('#micToggle').disabled=false;$('#headphoneToggle').disabled=false;$('#callShare').disabled=false;$('#micToggle').classList.add('on');try{micContext=new(window.AudioContext||window.webkitAudioContext)();if(micContext.state==='suspended')await micContext.resume().catch(console.warn);const src=micContext.createMediaStreamSource(micStream);micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=1024;micAnalyser.smoothingTimeConstant=0;src.connect(micAnalyser);const data=new Float32Array(micAnalyser.fftSize),speechGate=concordCreateSpeechGate();
+let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);function openVoice(){$('#voiceModal').classList.add('show')}$('#voiceBtn').onclick=openVoice;if($('#mobileVoice'))$('#mobileVoice').onclick=openVoice;$('#closeVoice').onclick=()=>$('#voiceModal').classList.remove('show');async function joinCall(){if(callJoined)return;$('#voiceStatus').textContent='Solicitando permissão do microfone…';if(!navigator.mediaDevices?.getUserMedia){$('#voiceStatus').textContent='Este navegador não permite acessar o microfone aqui. Abra o Concord em Chrome/Edge atualizado usando localhost ou HTTPS.';return}try{micStream=await navigator.mediaDevices.getUserMedia({audio:{...concordMicConstraints(),...(localStorage.getItem('concord-input-device')?{deviceId:{ideal:localStorage.getItem('concord-input-device')}}:{})},video:false});callJoined=true;micEnabled=true;concordUpdateUserMic();$('#callState').textContent='Áudio local ativo';$('#callState').style.color='#42dca4';$('#callSubtitle').textContent='Você entrou na sala';$('#voiceStatus').textContent='Você entrou na sala e o microfone está funcionando neste dispositivo. A lista à esquerda mostra participantes conectados nesta sessão. Para ouvir outras pessoas em outros dispositivos, é necessário conectar um servidor de chamadas.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Microfone ligado';if($('#youRosterState'))$('#youRosterState').textContent='🎙';$('#audioStatus').textContent='Microfone ligado';$('#joinCall').textContent='Conectado';$('#joinCall').disabled=true;$('#micToggle').disabled=false;$('#headphoneToggle').disabled=false;$('#callShare').disabled=false;$('#micToggle').classList.add('on');try{micContext=new(window.AudioContext||window.webkitAudioContext)();if(micContext.state==='suspended')await micContext.resume().catch(console.warn);const src=micContext.createMediaStreamSource(micStream);micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=1024;micAnalyser.smoothingTimeConstant=0;src.connect(micAnalyser);const data=new Float32Array(micAnalyser.fftSize),speechGate=concordCreateSpeechGate();
 const meter=()=>{if(!micAnalyser)return;micAnalyser.getFloatTimeDomainData(data);
 const enabled=callJoined&&micEnabled&&micContext?.state==='running'&&micStream?.getAudioTracks().some(t=>t.enabled&&!t.muted&&t.readyState==='live');
 setLocalSpeaking(speechGate(data,performance.now(),enabled));
@@ -2753,6 +2786,7 @@ async function voiceConnect(id,initiator){
     let audio=voiceAudio.get(audioKey);
     if(!audio){audio=document.createElement('audio');audio.autoplay=true;audio.playsInline=true;audio.muted=remoteAudioMuted;audio.style.display='none';audio.volume=Math.min(1,concordPeerVolume(id)/100);document.body.append(audio);voiceAudio.set(audioKey,audio)}
     audio.srcObject=new MediaStream([e.track]);
+    if(typeof audio.setSinkId==='function')audio.setSinkId(localStorage.getItem('concord-output-device')||'').catch(error=>console.warn('Saída de áudio:',error));
     audio.setAttribute('playsinline','');
     // iOS may defer remote playback until a user gesture. Keep the stream attached
     // and expose the existing sound-unlock control instead of treating it as a disconnect.
