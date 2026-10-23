@@ -1470,7 +1470,7 @@ function concordCreateSpeechGate(){
 let micStream=null,micContext=null,micAnalyser=null,micFrame=null,micEnabled=true,callJoined=false;
 let concordNoiseSuppression=localStorage.getItem('concord-noise-suppression')!=='false';
 let concordNoiseMode=localStorage.getItem('concord-noise-mode')||'strong';
-function concordMicConstraints(){return {echoCancellation:true,noiseSuppression:concordNoiseSuppression,autoGainControl:true,channelCount:1,sampleRate:{ideal:48000}}}
+function concordMicConstraints(){return {echoCancellation:localStorage.getItem('concord-echo-cancellation')!=='false',noiseSuppression:concordNoiseSuppression,autoGainControl:localStorage.getItem('concord-auto-gain')!=='false',channelCount:1,sampleRate:{ideal:48000}}}
 let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);function openVoice(){$('#voiceModal').classList.add('show')}$('#voiceBtn').onclick=openVoice;if($('#mobileVoice'))$('#mobileVoice').onclick=openVoice;$('#closeVoice').onclick=()=>$('#voiceModal').classList.remove('show');async function joinCall(){if(callJoined)return;$('#voiceStatus').textContent='Solicitando permissão do microfone…';if(!navigator.mediaDevices?.getUserMedia){$('#voiceStatus').textContent='Este navegador não permite acessar o microfone aqui. Abra o Concord em Chrome/Edge atualizado usando localhost ou HTTPS.';return}try{micStream=await navigator.mediaDevices.getUserMedia({audio:{...concordMicConstraints(),...(localStorage.getItem('concord-input-device')?{deviceId:{ideal:localStorage.getItem('concord-input-device')}}:{})},video:false});callJoined=true;micEnabled=true;concordUpdateUserMic();$('#callState').textContent='Áudio local ativo';$('#callState').style.color='#42dca4';$('#callSubtitle').textContent='Você entrou na sala';$('#voiceStatus').textContent='Você entrou na sala e o microfone está funcionando neste dispositivo. A lista à esquerda mostra participantes conectados nesta sessão. Para ouvir outras pessoas em outros dispositivos, é necessário conectar um servidor de chamadas.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Microfone ligado';if($('#youRosterState'))$('#youRosterState').textContent='🎙';$('#audioStatus').textContent='Microfone ligado';$('#joinCall').textContent='Conectado';$('#joinCall').disabled=true;$('#micToggle').disabled=false;$('#headphoneToggle').disabled=false;$('#callShare').disabled=false;$('#micToggle').classList.add('on');try{micContext=new(window.AudioContext||window.webkitAudioContext)();if(micContext.state==='suspended')await micContext.resume().catch(console.warn);const src=micContext.createMediaStreamSource(micStream);micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=1024;micAnalyser.smoothingTimeConstant=0;src.connect(micAnalyser);const data=new Float32Array(micAnalyser.fftSize),speechGate=concordCreateSpeechGate();
 const meter=()=>{if(!micAnalyser)return;micAnalyser.getFloatTimeDomainData(data);
 const enabled=callJoined&&micEnabled&&micContext?.state==='running'&&micStream?.getAudioTracks().some(t=>t.enabled&&!t.muted&&t.readyState==='live');
@@ -4281,7 +4281,85 @@ body:not(.concord-custom-server-view) #concordServerLocalWarning{display:none}
      const addText=value=>{const p=document.createElement('p');p.textContent=value;content.append(p)};
      const addButton=(label,action)=>{const button=document.createElement('button');button.textContent=label;button.onclick=action;content.append(button)};
      if(section==='Perfil'){addText('Edite seu nome e foto usando as opções existentes do CONCORD.');addButton('Abrir personalização do perfil',()=>{overlay.remove();document.getElementById('profileBtn')?.click()})}
-     if(section==='Voz e vídeo'){addText('Escolha o microfone, a saída de som, o tratamento da voz e a supressão de ruído.');addButton('Selecionar dispositivos e configurar áudio',()=>{overlay.remove();if(typeof concordOpenAudioSettings==='function')concordOpenAudioSettings()})}
+     if(section==='Voz e vídeo'){
+       addText('Escolha seus dispositivos, ajuste o áudio e teste o microfone sem sair das configurações.');
+       const group=(heading)=>{const sectionBox=document.createElement('section');sectionBox.style.cssText='display:grid;gap:12px;padding:17px;border:1px solid #315a43;border-radius:13px;background:#133023';const h=document.createElement('strong');h.textContent=heading;h.style.fontSize='15px';sectionBox.append(h);content.append(sectionBox);return sectionBox};
+       const inputs=group('Entrada e saída de áudio');
+       const notice=document.createElement('small');notice.style.color='#a9d7bb';
+       const devicePicker=(parent,label,storageKey,kind)=>{
+         const wrap=document.createElement('label');wrap.style.cssText='display:grid;gap:8px;font-size:13px';
+         wrap.append(document.createTextNode(label));const select=document.createElement('select');select.style.cssText='width:100%;max-width:100%;padding:12px;border-radius:9px;border:1px solid #407556;background:#0c2119;color:#eafff0';
+         select.add(new Option(kind==='audioinput'?'Microfone padrão do sistema':'Alto-falante padrão do sistema',''));
+         select.value='';wrap.append(select);parent.append(wrap);
+         select.onchange=async()=>{
+           localStorage.setItem(storageKey,select.value);
+           if(kind==='audioinput'){notice.textContent='Microfone salvo. Para aplicar durante uma call, saia e entre novamente.';return}
+           const players=[...document.querySelectorAll('audio')].filter(el=>el.srcObject&&typeof el.setSinkId==='function');
+           const result=await Promise.allSettled(players.map(el=>el.setSinkId(select.value)));
+           notice.textContent=result.some(r=>r.status==='rejected')?'O sistema não permitiu trocar a saída em alguns áudios.':'Saída de som aplicada aos áudios ativos.';
+         };
+         return select;
+       };
+       const micSelect=devicePicker(inputs,'Microfone (entrada)','concord-input-device','audioinput');
+       const speakerSelect=devicePicker(inputs,'Alto-falante / fone (saída)','concord-output-device','audiooutput');
+       inputs.append(notice);
+       const fillDevices=async()=>{
+         try{
+           const devices=await navigator.mediaDevices.enumerateDevices();
+           for(const item of devices){if(!item.deviceId||item.deviceId==='default'||item.deviceId==='communications')continue;
+             const dest=item.kind==='audioinput'?micSelect:item.kind==='audiooutput'?speakerSelect:null;
+             if(dest)dest.add(new Option(item.label||((item.kind==='audioinput'?'Microfone ':'Saída ')+dest.options.length),item.deviceId));
+           }
+           micSelect.value=localStorage.getItem('concord-input-device')||'';
+           speakerSelect.value=localStorage.getItem('concord-output-device')||'';
+           if(micSelect.selectedIndex<0)micSelect.value='';
+           if(speakerSelect.selectedIndex<0)speakerSelect.value='';
+           if(typeof HTMLMediaElement.prototype.setSinkId!=='function'){speakerSelect.disabled=true;notice.textContent='Este navegador não permite escolher a saída de som.'}
+         }catch(err){notice.textContent='Não foi possível listar os dispositivos. Verifique as permissões do navegador.'}
+       };
+       if(navigator.mediaDevices?.enumerateDevices)fillDevices();else notice.textContent='Seleção de dispositivos indisponível neste navegador.';
+       navigator.mediaDevices?.addEventListener?.('devicechange',fillDevices,{once:true});
+       const sliders=group('Volume e teste');
+       const range=(parent,label,key,initial,onValue)=>{
+         const wrap=document.createElement('label');wrap.style.cssText='display:grid;gap:7px;font-size:13px';
+         const line=document.createElement('div');line.style.cssText='display:flex;justify-content:space-between;gap:10px';
+         const title=document.createElement('span');title.textContent=label;const val=document.createElement('b');val.textContent=initial+'%';line.append(title,val);
+         const input=document.createElement('input');input.type='range';input.min='0';input.max='100';input.value=initial;input.style.cssText='width:100%;accent-color:#49d999';
+         input.oninput=()=>{val.textContent=input.value+'%';localStorage.setItem(key,input.value);onValue?.(Number(input.value))};
+         wrap.append(line,input);parent.append(wrap);return input;
+       };
+       range(sliders,'Volume de saída','concord-output-volume',Number(localStorage.getItem('concord-output-volume')||100),value=>{document.querySelectorAll('audio').forEach(a=>{if(a.srcObject&&!a.dataset.concordSystemAudio)a.volume=value/100})});
+       range(sliders,'Sensibilidade do indicador de voz','concord-voice-sensitivity',Number(localStorage.getItem('concord-voice-sensitivity')||65));
+       const test=document.createElement('button');test.textContent='🎙 Testar microfone';sliders.append(test);
+       const meter=document.createElement('div');meter.style.cssText='height:9px;background:#092016;border-radius:20px;overflow:hidden';const bar=document.createElement('div');bar.style.cssText='width:0%;height:100%;background:#47df9a;transition:width .1s';meter.append(bar);sliders.append(meter);
+       const feedback=document.createElement('small');feedback.style.color='#badaca';sliders.append(feedback);
+       let testStream=null,testCtx=null,testRaf=null;
+       const stopTest=()=>{if(testRaf)cancelAnimationFrame(testRaf);testRaf=null;testStream?.getTracks().forEach(t=>t.stop());testStream=null;testCtx?.close().catch(()=>{});testCtx=null;bar.style.width='0%';test.textContent='🎙 Testar microfone'};
+       test.onclick=async()=>{
+         if(testStream){stopTest();feedback.textContent='Teste encerrado.';return}
+         try{
+           const selected=micSelect.value;
+           testStream=await navigator.mediaDevices.getUserMedia({audio:selected?{deviceId:{ideal:selected},echoCancellation:true,noiseSuppression:true}:true});
+           const Ctx=window.AudioContext||window.webkitAudioContext;testCtx=new Ctx();await testCtx.resume();
+           const source=testCtx.createMediaStreamSource(testStream);const analyser=testCtx.createAnalyser();analyser.fftSize=256;source.connect(analyser);
+           const values=new Uint8Array(analyser.frequencyBinCount);
+           const tick=()=>{if(!testStream)return;analyser.getByteFrequencyData(values);const level=values.reduce((sum,v)=>sum+v,0)/values.length;bar.style.width=Math.min(100,level*2.7)+'%';testRaf=requestAnimationFrame(tick)};tick();
+           test.textContent='■ Parar teste';feedback.textContent='Fale no microfone: a barra verde deve reagir somente quando houver som.';
+         }catch(err){stopTest();feedback.textContent='Microfone não disponível. Confira as permissões e o dispositivo selecionado.'}
+       };
+       const treatment=group('Tratamento da voz');
+       const toggle=(label,key,defaultValue,apply)=>{
+         const row=document.createElement('label');row.style.cssText='display:flex;align-items:center;gap:10px;font-size:13px';
+         const input=document.createElement('input');input.type='checkbox';input.checked=(localStorage.getItem(key)??String(defaultValue))==='true';input.style.accentColor='#48df9d';
+         input.onchange=()=>{localStorage.setItem(key,String(input.checked));apply?.(input.checked)};
+         row.append(input,document.createTextNode(label));treatment.append(row);
+       };
+       toggle('Supressão de ruído','concord-noise-suppression',true,value=>{if(typeof concordNoiseSuppression!=='undefined')concordNoiseSuppression=value});
+       toggle('Cancelamento de eco','concord-echo-cancellation',true);
+       toggle('Ajuste automático de ganho','concord-auto-gain',true);
+       const info=document.createElement('small');info.style.cssText='color:#a7cbb6;line-height:1.5';info.textContent='As opções de tratamento serão usadas na próxima captura do microfone. O teste de entrada é local: sua voz não é enviada à call.';treatment.append(info);
+       const originalRemove=overlay.remove.bind(overlay);overlay.remove=()=>{stopTest();originalRemove()};
+     }
      if(section==='Transmissão'){addText('Entre em uma sala de voz e escolha a tela ou janela usando o botão de compartilhar. No aplicativo Windows, a escolha pode incluir áudio do computador.');addButton('Abrir controles de compartilhamento',()=>{overlay.remove();document.getElementById('shareBtn')?.click()})}
      if(section==='Aparência')addText('O CONCORD mantém seu tema verde-escuro e a interface original. Mais opções de aparência serão adicionadas posteriormente.');
      if(section==='Notificações')addText('Os avisos de mensagens e chamadas seguem as permissões do aplicativo e do sistema.');
