@@ -2,6 +2,8 @@
 const { app, BrowserWindow, shell, session, dialog, Menu, desktopCapturer } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('node:path');
+const fs = require('node:fs');
+const http = require('node:http');
 const APP_URL = 'https://concord-app-tn-silva777.vercel.app/';
 const APP_ORIGIN = new URL(APP_URL).origin;
 // Remote WebRTC audio may arrive before Windows grants a fresh interaction.
@@ -10,6 +12,28 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 let mainWindow;
 let updateStarted = false;
 let lastMainUrl = APP_URL;
+let localUrl = null;
+let localServer = null;
+function isLocalAppUrl(raw) { try { const url = new URL(raw); return !!localUrl && url.origin === new URL(localUrl).origin; } catch { return false; } }
+async function startLocalServer() {
+  const root = path.join(app.getAppPath(), 'web');
+  if (!fs.existsSync(path.join(root, 'index.html'))) throw new Error('Interface CONCORD não incluída no instalador');
+  localServer = http.createServer((req, res) => {
+    const url = new URL(req.url || '/', 'http://localhost');
+    const pages = { '/': 'index.html', '/index.html': 'index.html', '/manifest.json': 'manifest.json' };
+    const filename = pages[url.pathname];
+    if (!filename) { res.writeHead(404); res.end('Not found'); return; }
+    const type = filename.endsWith('.json') ? 'application/manifest+json' : 'text/html; charset=utf-8';
+    fs.readFile(path.join(root, filename), (err, contents) => {
+      if (err) { res.writeHead(500); res.end('Unavailable'); return; }
+      res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }); res.end(contents);
+    });
+  });
+  await new Promise((resolve, reject) => { localServer.once('error', reject); localServer.listen(0, '127.0.0.1', resolve); });
+  localUrl = 'http://127.0.0.1:' + localServer.address().port + '/';
+  lastMainUrl = localUrl;
+}
+
 const lock = app.requestSingleInstanceLock();
 if (!lock) app.quit();
 app.on('second-instance', () => {
@@ -22,7 +46,7 @@ app.on('second-instance', () => {
 function isAppUrl(raw) {
   try {
     const url = new URL(raw);
-    return url.protocol === 'https:' && url.origin === APP_ORIGIN;
+    return (url.protocol === 'https:' && url.origin === APP_ORIGIN) || isLocalAppUrl(raw);
   } catch { return false; }
 }
 
@@ -137,13 +161,15 @@ function createWindow() {
       if (errorCode !== -3 && isAppUrl(validatedURL)) { const offlinePage = '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>CONCORD</title><style>body{background:#07110e;color:#d7fce4;font:16px system-ui;display:grid;place-items:center;min-height:90vh;text-align:center}a{padding:12px 24px;border-radius:10px;background:#168354;color:white;text-decoration:none}</style><main><h1>CONCORD</h1><p>Sem conexão com o servidor. Verifique a Internet.</p><a href="' + lastMainUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '">Tentar novamente</a></main></html>'; mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(offlinePage)).catch(console.warn); }
     }
   });
-  mainWindow.loadURL(APP_URL).catch(err => console.warn('CONCORD inicialização:', err.message));
+  mainWindow.loadURL(localUrl || APP_URL).catch(err => console.warn('CONCORD inicialização:', err.message));
   mainWindow.once('ready-to-show', startUpdates);
   mainWindow.webContents.once('did-finish-load', startUpdates);
 }
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  try { await startLocalServer(); } catch (error) { console.warn('Interface local:', error.message); }
   installPermissions();
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('before-quit', () => { if (localServer) localServer.close(); });
