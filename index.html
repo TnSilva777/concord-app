@@ -2470,6 +2470,7 @@ function setLocalSpeaking(on){
 // Salas publicas de teste: nao use para conversas confidenciais ate adicionar autorizacao privada.
 const voicePeerId=crypto.randomUUID();
 let voiceSignal=null,voicePeers=new Map(),voiceAudio=new Map(),voiceStarting=false;
+let concordVoiceNetworkGeneration=0;
 const voicePendingIce=new Map();
 const concordRemoteSpeechMeters=new Map();
 function concordSetRemoteSpeaking(peerId,speaking){
@@ -2890,13 +2891,13 @@ function concordLeaveVoiceLobby(){
 async function startVoiceNetwork(){
   if(voiceStarting||voiceSignal||!callJoined||!joinedRoom)return;
   voiceStarting=true;
+  const generation=concordVoiceNetworkGeneration,requestedRoom=joinedRoom;
   try{
     const {data:{session}}=await concordSupabase.auth.getSession();
     if(!session)throw Error('Entre na sua conta para usar a chamada.');
-    if(!callJoined)return;
-    const requestedRoom=joinedRoom;
+    if(!callJoined||generation!==concordVoiceNetworkGeneration||joinedRoom!==requestedRoom)return;
     await concordJoinVoiceLobby(session.user.id);
-    if(!callJoined||joinedRoom!==requestedRoom||voiceSignal)return;
+    if(!callJoined||generation!==concordVoiceNetworkGeneration||joinedRoom!==requestedRoom||voiceSignal)return;
     const topic='concord-voice-test-'+joinedRoom.toLowerCase().replace(/[^a-z0-9]/g,'-');
     const channel=concordSupabase.channel(topic,{config:{presence:{key:voicePeerId}}});
     voiceSignal=channel;
@@ -2913,10 +2914,11 @@ async function startVoiceNetwork(){
         }
       });
     voiceStatus('Conectando à sala de voz online…');
-  }catch(error){voiceStatus('Não foi possível conectar a chamada: '+error.message);stopVoiceNetwork()}
-  finally{voiceStarting=false}
+  }catch(error){if(generation===concordVoiceNetworkGeneration){voiceStatus('Não foi possível conectar a chamada: '+error.message);stopVoiceNetwork()}}
+  finally{if(generation===concordVoiceNetworkGeneration)voiceStarting=false}
 }
 function stopVoiceNetwork(){
+  concordVoiceNetworkGeneration++;voiceStarting=false;
   if(joinedRoom){const old=joinedRoom;roomRoster[old]=(roomRoster[old]||[]).filter(m=>!m.isMe&&m.id!==voicePeerId&&(!socialUser||m.userId!==socialUser));renderRooms();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}
   if(concordVoiceLobby){const lobby=concordVoiceLobby;
     if(joinedRoom)lobby.send({type:'broadcast',event:'voice-exit',payload:{id:voicePeerId,room:joinedRoom}}).catch(console.warn);
@@ -2985,6 +2987,8 @@ async function concordReconnect(){
  if(concordReconnectBusy||!navigator.onLine)return;
  concordReconnectBusy=true;
  try{
+   // Voice recovery must not wait for unrelated social requests.
+   if(typeof callJoined!=='undefined'&&callJoined&&joinedRoom&&!voiceSignal)await startVoiceNetwork();
    if(typeof socialUser!=='undefined'&&socialUser){
      await refreshSocial();
      if(typeof dmOpen!=='undefined'&&dmOpen&&dmPeer)dmLoad();
@@ -2993,6 +2997,7 @@ async function concordReconnect(){
  }catch(error){console.warn('CONCORD reconexão:',error)}
  finally{concordReconnectBusy=false}
 }
+window.addEventListener('offline',()=>{if(callJoined){setLocalSpeaking(false);voiceStatus('Sem internet. Aguardando reconexão…')}});
 window.addEventListener('online',concordReconnect);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)concordReconnect()});
 window.addEventListener('pagehide',stopVoiceNetwork);
