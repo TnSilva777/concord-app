@@ -125,7 +125,14 @@ function startUpdates() {
       buttons: ['Entendi']
     }).catch(() => {});
   });
-  autoUpdater.checkForUpdatesAndNotify().catch(err => console.warn('Busca de atualização:', err.message));
+  // Check on launch and periodically while the app remains open.
+  const check = () => {
+    if (!app.isPackaged || !mainWindow || mainWindow.isDestroyed()) return;
+    autoUpdater.checkForUpdatesAndNotify().catch(err => console.warn('Busca de atualização:', err.message));
+  };
+  check();
+  const updateInterval = setInterval(check, 4 * 60 * 60 * 1000);
+  updateInterval.unref?.();
 }
 
 function createWindow() {
