@@ -914,6 +914,26 @@ body.concord-home-view #concordDmPane:not([hidden]){display:flex!important}
 button:focus-visible,[role="button"]:focus-visible{outline:2px solid var(--concord-focus);outline-offset:2px}
 @media(max-width:760px){.concord-server-heading{padding:11px 9px 13px}.concord-local-voice-person{min-height:39px}#concordVoiceGrid .cvg-tile{border-radius:14px}}
 
+
+/* CONCORD — adaptive voice lounge on desktop, own dark-green identity */
+@media(min-width:761px){
+ #concordVoiceGrid.open{background:#08130f;gap:14px;padding:15px 20px}
+ #concordVoiceGrid .cvg-tiles{width:100%;margin:auto;max-height:100%;gap:10px;align-content:center;justify-content:center;grid-auto-rows:minmax(180px,1fr)}
+ #concordVoiceGrid .cvg-tiles[data-count="1"]{max-width:min(100%,1060px);grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(260px, min(60vh,610px));flex:1}
+ #concordVoiceGrid .cvg-tiles[data-count="2"]{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:minmax(240px,min(62vh,620px))}
+ #concordVoiceGrid .cvg-tiles[data-count="3"]{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:minmax(220px,min(60vh,590px))}
+ #concordVoiceGrid .cvg-tiles[data-count="4"]{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(180px,1fr))}
+ #concordVoiceGrid .cvg-tiles[data-count="5"],#concordVoiceGrid .cvg-tiles[data-count="6"]{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(160px,1fr))}
+ #concordVoiceGrid .cvg-tile{border-radius:15px;background:linear-gradient(145deg,#274c3b,#183124);box-shadow:inset 0 1px 0 #ffffff0b;min-height:0}
+ #concordVoiceGrid .cvg-avatar{width:76px;height:76px;font-size:29px}
+ #concordVoiceGrid .cvg-name{bottom:14px;left:14px;background:#07130fcf;padding:7px 11px}
+ #concordVoiceGrid .cvg-header{padding-bottom:6px;border-bottom:1px solid #1e4331}
+}
+@media(min-width:761px) and (max-width:1100px){
+ #concordVoiceGrid .cvg-tiles[data-count="3"]{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(150px,1fr))}
+ #concordVoiceGrid .cvg-tiles[data-count="3"] .cvg-tile:last-child{grid-column:1/-1;max-width:55%;width:100%;justify-self:center}
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js'"></script>
 <script>
@@ -3937,7 +3957,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=()=>{if(grid.classList.contains('open'))close.click();else open()};view.title='Mostrar ou ocultar a grade da chamada';view.setAttribute('aria-label','Mostrar ou ocultar a grade da chamada')}
  const join=document.getElementById('joinCall');
  // A grade só abre por ação explícita no botão de visualização, em qualquer dispositivo.
- if(join)new MutationObserver(()=>{if(!join.disabled&&grid.classList.contains('open'))close.click()}).observe(join,{attributes:true,attributeFilter:['disabled']});
+ if(join)new MutationObserver(()=>{if(!join.disabled&&grid.classList.contains('open'))close.click();else if(window.innerWidth>760&&join.disabled&&document.body.classList.contains('concord-custom-server-view'))open()}).observe(join,{attributes:true,attributeFilter:['disabled']});
  const selectMode=modeName=>{grid.classList.toggle('cvg-stage-mode',modeName==='palco');gradeBtn.classList.toggle('selected',modeName==='grade');palcoBtn.classList.toggle('selected',modeName==='palco');lastGridSignature='';render()};
  gradeBtn.onclick=()=>selectMode('grade');palcoBtn.onclick=()=>selectMode('palco');
  let lastGridSignature='';
@@ -3945,6 +3965,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   if(!grid.classList.contains('open'))return;
   const room=typeof joinedRoom!=='undefined'?joinedRoom:null;
   const members=typeof roomRoster!=='undefined'?(roomRoster[room]||[]):[];
+  tiles.dataset.count=String(members.length);
   title.textContent='◉ '+concordVoiceRoomName(room)+' • '+members.length+' participante(s)';
   for(const member of members){if(!member.isMe&&member.sharing&&!concordLiveStreams.get(member.id)?.getVideoTracks().some(t=>t.readyState==='live'))concordRequestShareRepair(member.id)}
   const signature=JSON.stringify([room,members.map(m=>{
