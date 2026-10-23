@@ -893,6 +893,27 @@ body.concord-home-view #concordDmPane:not([hidden]){display:flex!important}
  body.concord-custom-server-view:has(#concordVoiceGrid.open) .app>.main{visibility:visible!important;pointer-events:auto!important}
  body.concord-custom-server-view:has(#concordVoiceGrid.open) .app>.sidebar{visibility:hidden!important;pointer-events:none!important}
 }
+
+/* CONCORD Visual Refresh 01 — progressive polish, preserving existing layout and behavior */
+:root{--concord-soft-border:#2b5542;--concord-focus:#58e3a2;--concord-card:#12271e}
+.app>.servers{background:linear-gradient(180deg,#071b15 0%,#07130f 100%);border-right:1px solid #1f4533}
+.app>.sidebar{background:linear-gradient(180deg,#10261c 0%,#0c1d16 100%);border-right:1px solid #284936}
+.concord-server-heading{padding:12px 10px 15px;margin-bottom:5px;border-bottom:1px solid #264635}
+.concord-server-heading strong{font-size:15px;letter-spacing:.2px;color:#e9fff1}
+.concord-server-section{color:#8cd5ac;letter-spacing:1.15px}
+.concord-local-voice-person{background:#163828;border:1px solid transparent;transition:border-color .14s ease,background .14s ease}
+.concord-local-voice-person:hover{background:#1b4230;border-color:#315f45}
+.concord-local-voice-person.concord-member-speaking,.concord-local-voice-person:has(.mini-avatar.speaking){border-color:#49db95;background:#19442f;box-shadow:inset 0 0 0 1px #1c7450}
+.concord-local-voice-person .mini-avatar.speaking{outline:2px solid #4bf0a2;outline-offset:2px;box-shadow:0 0 12px #30bf7866}
+.concord-voice-dock.connected{border-color:#34785a;border-radius:15px;background:linear-gradient(140deg,#173c2b,#0e251b);box-shadow:0 8px 22px #0004}
+.concord-voice-dock .voice-dock-label{letter-spacing:.15px}
+#concordVoiceGrid .cvg-tile{border-color:#2c634b;border-radius:16px;background:linear-gradient(145deg,#183d2d,#0b1d16);transition:border-color .15s ease,box-shadow .15s ease}
+#concordVoiceGrid .cvg-tile:has(.cvg-avatar.speaking){border-color:#4beaa0;box-shadow:0 0 0 1px #3dd38e,0 0 22px #36d89224}
+#concordVoiceGrid .cvg-avatar.speaking{box-shadow:0 0 0 3px #45dc96,0 0 22px #35d38c66}
+#concordVoiceGrid .cvg-modes button.selected{background:#1b744e!important;color:#f2fff7!important;border-color:#4dd69a!important}
+button:focus-visible,[role="button"]:focus-visible{outline:2px solid var(--concord-focus);outline-offset:2px}
+@media(max-width:760px){.concord-server-heading{padding:11px 9px 13px}.concord-local-voice-person{min-height:39px}#concordVoiceGrid .cvg-tile{border-radius:14px}}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js'"></script>
 <script>
