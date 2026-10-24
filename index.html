@@ -1284,7 +1284,7 @@ body{background:radial-gradient(ellipse 70% 55% at 95% 8%,#144839 0%,transparent
 #concordVoiceGrid .cvg-modes button.selected{background:linear-gradient(110deg,#4abb8a,#1f7956)!important;color:#062517!important}
 #concordVoiceGrid .cvg-tile{background:radial-gradient(circle at 50% 35%,#2a5341,#142c22 70%)!important;border:1px solid #4c7d62!important;border-radius:22px 12px 22px 12px!important}
 #concordVoiceGrid .cvg-tile.cvg-speaking{border-color:#9cf1bf!important;box-shadow:inset 0 0 0 2px #4ed995,0 0 24px #4ac98930!important}
-#concordVoiceGrid .cvg-avatar{border:3px solid #7fcba0!important;background:#286346!important}
+#concordVoiceGrid .cvg-avatar{border:3px solid #7fcba0!important;background-color:#286346}
 #concordVoiceGrid .cvg-name{border-radius:12px!important;background:#0a2219e9!important}
 #concordEmbeddedVoice .cev-person{border-radius:22px 12px 22px 12px!important;background:radial-gradient(circle at 50% 30%,#315c46,#162f25)!important}
 #concordEmbeddedVoice .cev-head{border-bottom:1px solid #315e47;padding-bottom:10px}
@@ -2106,7 +2106,7 @@ async function syncConcordAvatarFromCloud(id){
     const url=data?.publicUrl;if(!url)return;
     const response=await fetch(url+'?v='+Date.now(),{cache:'no-store'});
     if(id!==concordProfileUser)return;
-    if(response.ok){concordData.profile.cloudPhoto=url+'?v='+Date.now();updateProfileUI();renderRooms()}
+    if(response.ok){concordData.profile.cloudPhoto=url+'?v='+Date.now();updateProfileUI();renderRooms();saveConcordProfileForUser()}
     else if(response.status===404){concordData.profile.cloudPhoto='';updateProfileUI();renderRooms()}
   }catch(error){console.warn('Avatar remoto indisponível',error)}
 }
@@ -2152,6 +2152,7 @@ function updateProfileUI(){const name=concordData.profile.name||'Você';const us
   if(typeof callJoined!=='undefined'&&callJoined&&typeof joinedRoom!=='undefined'&&joinedRoom){
     const own=(roomRoster[joinedRoom]||[]).find(member=>member.isMe);
     if(own){own.name=name;own.initial=name.slice(0,1).toUpperCase();renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}
+    document.querySelectorAll('#concordVoiceGrid .cvg-tile[data-concord-self="true"] .cvg-avatar').forEach(el=>setConcordAvatar(el,concordData.profile));
     if(typeof voiceSignal!=='undefined'&&voiceSignal)voiceSignal.track({id:voicePeerId,userId:socialUser,name:voicePeerName(),sharing:!!stream,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted}).catch(console.warn);
     if(typeof concordVoiceLobby!=='undefined'&&concordVoiceLobby)concordVoiceLobby.track({id:voicePeerId,userId:socialUser,room:joinedRoom,name:voicePeerName(),sharing:!!stream,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted}).catch(console.warn);
   }
