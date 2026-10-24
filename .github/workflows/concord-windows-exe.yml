@@ -1,4 +1,5 @@
 name: CONCORD Desktop - Windows EXE
+# Compilacao do instalador 0.4.0 solicitada em 2026-10-24
 on:
   workflow_dispatch:
   push:
