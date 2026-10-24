@@ -2410,7 +2410,22 @@ function concordOpenServerSettingsHub(id){
  // A grade é sempre o modo inicial da call; Palco continua disponível na própria chamada.
  field('Permissão padrão para convites (modelo local)','invitePolicy',[['everyone','Todos'],['staff','Somente equipe']]);
  const warning=document.createElement('p');warning.style.cssText='font-size:12px;color:#efc88c;margin-top:10px';warning.textContent='Estas preferências são armazenadas como rascunho local e algumas ainda não afetam o comportamento da interface. Cargos, convites e moderação reais exigem integração e permissões no Supabase.';section.append(warning);
- panel.append(section);overlay.append(panel);document.body.append(overlay);overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};
+ panel.append(section);overlay.append(panel);document.body.append(overlay);
+ const previousFocus=document.activeElement;
+ const dismiss=()=>{overlay.remove();document.removeEventListener('keydown',onKey);if(previousFocus?.isConnected)previousFocus.focus()};
+ close.onclick=dismiss;
+ overlay.onclick=e=>{if(e.target===overlay)dismiss()};
+ const onKey=e=>{
+   if(!overlay.isConnected){document.removeEventListener('keydown',onKey);return}
+   if(e.key==='Escape'){e.preventDefault();dismiss();return}
+   if(e.key!=='Tab')return;
+   const focusable=[...panel.querySelectorAll('button,select,input,textarea,[tabindex]')].filter(el=>!el.disabled&&el.getClientRects().length&&el.tabIndex!==-1);
+   if(!focusable.length)return;
+   if(e.shiftKey&&document.activeElement===focusable[0]){e.preventDefault();focusable[focusable.length-1].focus()}
+   else if(!e.shiftKey&&document.activeElement===focusable[focusable.length-1]){e.preventDefault();focusable[0].focus()}
+ };
+ document.addEventListener('keydown',onKey);
+ close.focus();
 }
 
 function editLocalCommunity(id){
@@ -3898,8 +3913,10 @@ const concordAvatarCheckedAt=new Map();
 async function concordRefreshFriendAvatars(ids){
  const account=socialUser;
  const now=Date.now();
- const pending=[...new Set(ids)].filter(id=>typeof id==='string'&&id&&!(!concordAvatarCheckedAt.has(id)?false:now-concordAvatarCheckedAt.get(id)<=60000));
+ const pending=[...new Set(ids)].filter(id=>typeof id==='string'&&id&&(now-(concordAvatarCheckedAt.get(id)||0)>60000));
  if(!pending.length)return; // Sem fotos novas, não forçar reconstrução de todas as tiles da chamada.
+ // Reservar IDs antes do primeiro await evita requisições repetidas no mesmo ciclo de presença.
+ pending.forEach(id=>concordAvatarCheckedAt.set(id,now));
  for(let offset=0;offset<pending.length;offset+=6){
  await Promise.all(pending.slice(offset,offset+6).map(async id=>{
    concordAvatarCheckedAt.set(id,now);
