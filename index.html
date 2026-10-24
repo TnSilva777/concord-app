@@ -1205,7 +1205,47 @@ body.concord-custom-server-view .concord-server-room .concord-server-room-name{t
 .concord-dm-invite-action{display:inline-flex;margin-top:10px;padding:10px 14px;background:#23764e;color:#fff!important;border-radius:8px;font-weight:700;text-decoration:none}
 .concord-dm-invite-action:hover{background:#2c9a66}
 @media(max-width:420px){.concord-friend-invite-link{flex-wrap:wrap}.concord-friend-invite-link button{width:100%}}
-</style></head><body>
+</style><style>
+/* CONCORD HUD refresh — visual only; preserve existing controls and identity. */
+:root{--hud-accent:#4bda96;--hud-border:#315844;--hud-radius:13px;--hud-panel:#14271e}
+.app>.servers{border-right:1px solid #2a503c;box-shadow:inset -1px 0 #ffffff06}
+.app>.servers button,.app>.servers .server{transition:transform .15s ease,background .15s ease,box-shadow .15s ease}
+.app>.servers button:hover,.app>.servers .server:hover{transform:translateY(-1px)}
+.app>.sidebar{background:linear-gradient(180deg,#162820,#101d17 85%)!important}
+.app>.sidebar .user{background:#12261d;border-top:1px solid #325840;box-shadow:0 -6px 22px #07120c50}
+.concord-server-room{border-radius:11px;transition:background .14s ease,border-color .14s ease}
+.concord-server-room:hover{background:#264536!important}
+.concord-server-room.concord-room-selected{background:#315643!important;box-shadow:inset 3px 0 0 #68dea3}
+.concord-server-room-name{min-height:35px;text-align:left;overflow:hidden;text-overflow:ellipsis}
+.concord-server-section{letter-spacing:.9px;color:#8ee5b8!important}
+.concord-local-voice-person{border-radius:9px;transition:background .15s ease}
+.concord-local-voice-person:hover{background:#23543b!important}
+.concord-voice-dock{border:1px solid #386f51!important;border-radius:15px!important;background:linear-gradient(135deg,#123b28,#0c281c)!important;box-shadow:0 8px 22px #0003}
+.concord-voice-dock button,.concord-user-controls .gear{border-radius:10px!important;transition:background .15s ease,border-color .15s ease,transform .15s ease}
+.concord-voice-dock button:hover,.concord-user-controls .gear:hover{transform:translateY(-1px)}
+.app>.main .topbar{background:#0e2119;border-bottom:1px solid #31503f;min-height:52px}
+.app>.main .topbar .pill{border-radius:10px;background:#1d4431;border:1px solid #376b4d}
+.app>.main .topbar .pill:hover{background:#276242}
+#concordVoiceGrid .cvg-header{border-bottom:1px solid #285340!important}
+#concordVoiceGrid .cvg-modes{border-radius:12px;background:#0e251b;border:1px solid #315c43}
+#concordVoiceGrid .cvg-modes button.selected{background:#207b51!important;color:#fff;box-shadow:0 2px 8px #04120a66}
+#concordVoiceGrid .cvg-tile{border-color:#365a48!important;border-radius:17px!important;box-shadow:inset 0 1px #ffffff0c,0 5px 18px #0003}
+#concordVoiceGrid .cvg-tile.cvg-speaking{border-color:#50d997!important;box-shadow:inset 0 0 0 1px #49d28b,0 0 20px #49d28b20!important}
+#concordVoiceGrid .cvg-name{backdrop-filter:blur(8px);background:#071a13db!important}
+#concordVoiceGrid .cvg-header>button{border-radius:10px}
+#concordEmbeddedVoice .cev-person{border-color:#3b6750;border-radius:16px;box-shadow:inset 0 1px #ffffff0b}
+#concordEmbeddedVoice .cev-person.cev-talking{border-color:#51d996}
+button:focus-visible,[role="button"]:focus-visible{outline:2px solid #8befbb!important;outline-offset:2px}
+@media(max-width:760px){
+ .app>.sidebar .user{padding:9px 8px!important}
+ #concordVoiceGrid .cvg-modes button{min-height:42px!important}
+ #concordVoiceGrid .cvg-tile{border-radius:13px!important}
+ .concord-server-room-name{min-height:40px}
+ .concord-user-controls .gear{min-width:32px;min-height:32px}
+}
+@media(prefers-reduced-motion:reduce){.app>.servers button,.app>.servers .server,.concord-server-room,.concord-local-voice-person,.concord-voice-dock button,.concord-user-controls .gear{transition:none!important;transform:none!important}}
+</style>
+</head><body>
 <div class="app"><aside class="servers"><div class="logo concord-brand-mark" aria-label="Logo CONCORD" title="CONCORD">C</div><button type="button" class="server" id="concordFriendsNav" title="Amigos e conversas privadas" aria-label="Abrir amigos e conversas privadas">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
 <aside class="sidebar"><div class="brand"><strong>CONCORD</strong><small>SUA COMUNIDADE. SEU ESPAÇO.</small></div><button class="search" id="searchBtn">⌕ &nbsp; Buscar canais</button><div class="section">CONCORD OFICIAL</div><button class="channel active" data-channel="geral"><span>#</span> geral</button><button class="channel" data-channel="regras"><span>#</span> regras</button><button class="channel" data-channel="anuncios"><span>#</span> anúncios</button><div class="section">COMUNIDADES</div><button class="channel" data-channel="jogos"><span>#</span> jogos</button><button class="channel" data-channel="tecnologia"><span>#</span> tecnologia</button><button class="channel" data-channel="memes"><span>#</span> memes</button><div class="section">CANAIS DE VOZ</div><button class="channel" id="voiceBtn"><span>◖</span> Sala de voz <span class="online"></span></button><div class="section voice-section-title">SALAS DE VOZ <button id="addVoiceRoom" title="Criar sala de voz">＋</button></div>
 <div class="voice-room-list" id="voiceRoomList">
