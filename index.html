@@ -2098,7 +2098,7 @@ function concordRenderEmbeddedVoice(){
    const avatar=tile.querySelector('.cev-avatar');
    avatar.textContent=(member.initial||name[0]||'?').toUpperCase();
    if(member.isMe)setConcordAvatar(avatar,concordData.profile);else concordVoiceAvatar(avatar,member);
-   tile.querySelector('.cev-state').textContent=member.sharing?'● AO VIVO':member.muted?'⌁ Microfone desligado':'';
+   tile.querySelector('.cev-state').textContent=member.muted?'⌁ Microfone desligado':'';
  });
  if(!people.length){const empty=document.createElement('div');empty.className='cev-empty';empty.textContent='Nenhum participante conectado';grid.append(empty)}
 }
@@ -4091,26 +4091,27 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   const members=typeof roomRoster!=='undefined'?(roomRoster[room]||[]):[];
   tiles.dataset.count=String(members.length);
   title.textContent='◉ '+concordVoiceRoomName(room)+' • '+members.length+' participante(s)';
-  for(const member of members){if(!member.isMe&&member.sharing&&!concordLiveStreams.get(member.id)?.getVideoTracks().some(t=>t.readyState==='live'))concordRequestShareRepair(member.id)}
-  const signature=JSON.stringify([room,members.map(m=>{
+  const stageMode=grid.classList.contains('cvg-stage-mode');
+  if(stageMode)for(const member of members){if(!member.isMe&&member.sharing&&!concordLiveStreams.get(member.id)?.getVideoTracks().some(t=>t.readyState==='live'))concordRequestShareRepair(member.id)}
+  const signature=JSON.stringify([room,stageMode,members.map(m=>{
    const live=m.isMe?(typeof stream!=='undefined'?stream:null):(typeof concordLiveStreams!=='undefined'?concordLiveStreams.get(m.id):null);
    return [m.id,m.name,m.isMe,m.userId,typeof concordVoiceAvatarVersion!=='undefined'?concordVoiceAvatarVersion:0,live?.getVideoTracks().filter(t=>t.readyState==='live'&&!t.muted).map(t=>t.id)||[],!!m.sharing];
   })]);
-  if(signature===lastGridSignature){for(const m of members){const tile=[...tiles.children].find(t=>t.dataset.memberId===String(m.id));if(tile){tile.classList.toggle('cvg-speaking',!!m.speaking&&!m.sharing);tile.querySelector('.cvg-avatar')?.classList.toggle('speaking',!!(m.isMe?concordIsLocallySpeaking:m.speaking)&&!m.sharing)}}return;}
+  if(signature===lastGridSignature){for(const m of members){const tile=[...tiles.children].find(t=>t.dataset.memberId===String(m.id));if(tile){tile.classList.toggle('cvg-speaking',!!m.speaking&&(!stageMode||!m.sharing));tile.querySelector('.cvg-avatar')?.classList.toggle('speaking',!!(m.isMe?concordIsLocallySpeaking:m.speaking)&&(!stageMode||!m.sharing))}}return;}
   if(document.fullscreenElement?.classList?.contains('cvg-tile'))return;
   lastGridSignature=signature;
   const expanded=tiles.querySelector('.cvg-expanded')?.dataset.memberId||null;
   tiles.replaceChildren();
   if(!members.length){const p=document.createElement('p');p.textContent='Aguardando participantes nesta sala.';tiles.append(p);return}
   members.forEach(member=>{
-   const tile=document.createElement('div');tile.className='cvg-tile';tile.dataset.memberId=String(member.id||'');tile.dataset.concordSelf=String(!!member.isMe);tile.classList.toggle('cvg-sharing',!!member.sharing);
+   const tile=document.createElement('div');tile.className='cvg-tile';tile.dataset.memberId=String(member.id||'');tile.dataset.concordSelf=String(!!member.isMe);tile.classList.toggle('cvg-sharing',stageMode&&!!member.sharing);
    if(expanded===tile.dataset.memberId)tile.classList.add('cvg-expanded');
-   const avatar=document.createElement('div');avatar.className='cvg-avatar';if(!member.sharing&&(member.isMe?concordIsLocallySpeaking:!!member.speaking))avatar.classList.add('speaking');avatar.textContent=String(member.name||'?').slice(0,1).toUpperCase();if(member.isMe)setConcordAvatar(avatar,concordData.profile);else concordVoiceAvatar(avatar,member);
+   const avatar=document.createElement('div');avatar.className='cvg-avatar';if((!stageMode||!member.sharing)&&(member.isMe?concordIsLocallySpeaking:!!member.speaking))avatar.classList.add('speaking');avatar.textContent=String(member.name||'?').slice(0,1).toUpperCase();if(member.isMe)setConcordAvatar(avatar,concordData.profile);else concordVoiceAvatar(avatar,member);
    const name=document.createElement('span');name.className='cvg-name';name.textContent=(member.name||'Participante')+(member.isMe?' (você)':'');
    tile.append(avatar,name);
    const state=typeof concordCallState==='function'?concordCallState(member):null;if(state){state.classList.add('cvg-voice-status');tile.append(state)}
    const live=member.isMe?(typeof stream!=='undefined'?stream:null):(typeof concordLiveStreams!=='undefined'?concordLiveStreams.get(member.id):null);
-   if(live?.getVideoTracks().some(t=>t.readyState==='live'&&!t.muted)){
+   if(stageMode&&live?.getVideoTracks().some(t=>t.readyState==='live'&&!t.muted)){
     const video=document.createElement('video');video.autoplay=true;video.playsInline=true;video.muted=true;video.srcObject=live;tile.prepend(video);
     video.play().catch(()=>{});
     const badge=document.createElement('span');badge.className='cvg-live';badge.textContent='● AO VIVO';tile.append(badge);
@@ -4123,8 +4124,8 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
     tile.addEventListener('fullscreenchange',()=>{full.textContent=document.fullscreenElement===tile?'↙ Sair da tela cheia':'⛶ Tela cheia'});
     tile.append(zoom,full);
    }
-   if(member.sharing&&!live?.getVideoTracks().some(t=>t.readyState==='live'&&!t.muted)){const waiting=document.createElement('div');waiting.className='cvg-waiting';waiting.textContent='◌ Aguardando vídeo';const retry=document.createElement('button');retry.type='button';retry.className='cvg-retry';retry.textContent='↻ Tentar novamente';retry.onclick=()=>{concordShareRepairRequested.delete(member.id);concordRequestShareRepair(member.id);waiting.textContent='◌ Solicitando transmissão…'};tile.append(waiting,retry)}
-   if(!member.sharing&&member.speaking)tile.classList.add('cvg-speaking');
+   if(stageMode&&member.sharing&&!live?.getVideoTracks().some(t=>t.readyState==='live'&&!t.muted)){const waiting=document.createElement('div');waiting.className='cvg-waiting';waiting.textContent='◌ Aguardando vídeo';const retry=document.createElement('button');retry.type='button';retry.className='cvg-retry';retry.textContent='↻ Tentar novamente';retry.onclick=()=>{concordShareRepairRequested.delete(member.id);concordRequestShareRepair(member.id);waiting.textContent='◌ Solicitando transmissão…'};tile.append(waiting,retry)}
+   if(member.speaking&&(!stageMode||!member.sharing))tile.classList.add('cvg-speaking');
    tiles.append(tile);
   });
  }
