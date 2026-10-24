@@ -1944,7 +1944,10 @@ function concordShowLive(id){
 }
 const concordShareRepairRequested=new Map();
 async function concordRequestShareRepair(id){
- if(!callJoined||!voiceSignal||!id||id===voicePeerId||!Object.values(voiceSignal.presenceState()||{}).flat().some(p=>p.id===id))return;
+ if(!callJoined||!voiceSignal||!id||id===voicePeerId)return;
+  const inRoom=Object.values(voiceSignal.presenceState()||{}).flat().some(p=>p.id===id);
+  const inLobby=Object.values(concordVoiceLobby?.presenceState()||{}).flat().some(p=>p.id===id&&p.room===joinedRoom);
+  if(!inRoom&&!inLobby&&!voicePeers.has(id))return;
  const now=Date.now();if(now-(concordShareRepairRequested.get(id)||0)<10000)return;
  concordShareRepairRequested.set(id,now);
  await voiceSend(id,'resync-share',{at:now}).catch(console.warn);
@@ -3413,8 +3416,7 @@ async function voiceSignalReceived(packet){
       const peer=voicePeers.get(msg.from);
       if(peer&&stream?.getVideoTracks().some(track=>track.readyState==='live')&&peer.signalingState==='stable'&&peer.connectionState!=='closed'){
         const videoTrack=stream.getVideoTracks().find(track=>track.readyState==='live');
-        if(videoTrack&&!peer.getSenders().some(sender=>sender.track===videoTrack))concordTuneScreenSender(peer.addTrack(videoTrack,stream));
-        for(const audioTrack of stream.getAudioTracks())if(!peer.getSenders().some(sender=>sender.track===audioTrack))peer.addTrack(audioTrack,stream);
+        concordUpdatePeerShare(msg.from,peer);
         await concordNegotiatePeer(msg.from);
       }
     }else if(msg.kind==='ice'){
@@ -3460,7 +3462,7 @@ function concordSyncVoiceLobby(){
    const now=Date.now();
    for(const member of actual)concordLobbySeenAt.set(member.id,now);
    const previous=(roomRoster[room]||[]).filter(m=>!m.isMe&&m.id!==voicePeerId&&(!socialUser||m.userId!==socialUser));
-   const grace=previous.filter(m=>!actual.some(a=>a.id===m.id)&&now-(concordLobbySeenAt.get(m.id)||0)<5000);
+   const grace=previous.filter(m=>!actual.some(a=>a.id===m.id)&&(now-(concordLobbySeenAt.get(m.id)||0)<9000||(activeRoom&&voicePeers.has(m.id)&&voicePeers.get(m.id)?.connectionState!=='closed')));
    for(const member of grace)if(!concordLobbySeenAt.has(member.id))concordLobbySeenAt.set(member.id,now);
    const unique=new Map();for(const member of [...actual,...grace]){const key=member.userId?'user:'+member.userId:'peer:'+member.id;if(!unique.has(key))unique.set(key,member)}
    roomRoster[room]=[...(activeRoom?[{id:voicePeerId,userId:socialUser,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream,speaking:concordIsLocallySpeaking,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted}]:[]),...unique.values()];
@@ -3540,6 +3542,11 @@ async function startVoiceNetwork(){
               // Recover the global roster too, so people outside our WebRTC
               // channel remain visible during transient presence sync gaps.
               if(concordVoiceLobby)concordSyncVoiceLobby();
+              for(const member of roomRoster[requestedRoom]||[]){
+                if(member.isMe||!member.sharing)continue;
+                const live=concordLiveStreams.get(member.id);
+                if(!live?.getVideoTracks().some(track=>track.readyState==='live'&&!track.muted))concordRequestShareRepair(member.id).catch(console.warn);
+              }
             },4000);
           }
           catch(error){voiceStatus('Erro ao entrar na sala de voz: '+error.message)}
