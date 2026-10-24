@@ -1698,22 +1698,26 @@ $('#shareStatus').textContent=stream.getAudioTracks().length?'Transmitindo víde
 function stopShare(){if(voiceSignal)voiceSignal.track({id:voicePeerId,userId:socialUser,name:voicePeerName(),sharing:false}).catch(console.warn);for(const [id,peer] of voicePeers){for(const sender of peer.getSenders().filter(s=>s.track&&stream?.getTracks().includes(s.track))){sender.__concordScreenSender=true;peer.removeTrack(sender)}concordNegotiatePeer(id)}if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('#screenPreview').srcObject=null;$('#screenPreview').style.display='none';if(!concordWatching){$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block';$('#stageBadge').style.display='none';$('#callSubtitle').textContent=callJoined?'Microfone local ativo':'Pronto para conectar'}concordUpdateFullscreen();$('#stopShare').style.display='none';$('#shareStatus').textContent='Transmissão encerrada.';renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}document.querySelectorAll('[data-share]').forEach(b=>b.onclick=beginShare);$('#stopShare').onclick=stopShare;
 // Time-domain energy avoids treating FFT background noise as continuous speech.
 function concordCreateSpeechGate(){
- // Calibrated short/long-term energy VAD for low-gain USB headsets.
- let floor=0.00015, activeUntil=0, started=0;
+ // Calibrate ambient noise and require sustained voice above the noise floor.
+ let floor=0.00015,activeUntil=0,started=null,risingSince=null;
  return (samples,now,enabled=true)=>{
-  if(!enabled){floor=0.00015;activeUntil=0;started=0;return false}
-  let sum=0,peak=0;
-  for(let i=0;i<samples.length;i++){const v=samples[i];sum+=v*v;peak=Math.max(peak,Math.abs(v))}
-  const rms=Math.sqrt(sum/samples.length);
-  if(!started)started=now;
+  if(!enabled){floor=0.00015;activeUntil=0;started=null;risingSince=null;return false}
+  let energy=0,peak=0;
+  for(let i=0;i<samples.length;i++){const value=samples[i];energy+=value*value;peak=Math.max(peak,Math.abs(value))}
+  const rms=Math.sqrt(energy/Math.max(1,samples.length));
+  if(started===null)started=now;
   const sensitivity=Math.max(0,Math.min(100,Number(localStorage.getItem('concord-voice-sensitivity')||65)));
-  // Speak immediately on a meaningful rise; update floor slowly to avoid following speech.
-  const margin=0.00018+(100-sensitivity)*0.000006;
-  const threshold=Math.max(0.00035,floor+margin);
-  const detected=rms>threshold && (peak>Math.max(0.004,threshold*2.8)); // Evita acender o indicador só por um pico isolado de vento/ruído.
-  if(now-started<250){floor=floor*.96+rms*.04;return false}
-  if(detected){activeUntil=now+165}
-  else if(now>=activeUntil){floor=floor*.998+rms*.002}
+  const margin=1.9+(100-sensitivity)*0.013;
+  const threshold=Math.max(0.007,floor*margin);
+  if(now-started<300){floor=floor*0.88+rms*0.12;return false}
+  const voice=rms>threshold&&peak>threshold*1.15;
+  if(voice){
+    if(risingSince===null)risingSince=now;
+    if(now-risingSince>=60)activeUntil=now+145;
+  }else{
+    risingSince=null;
+    if(now>=activeUntil)floor=floor*0.995+rms*0.005;
+  }
   return now<activeUntil;
  };
 }
