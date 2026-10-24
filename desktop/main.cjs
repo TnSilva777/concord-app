@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, shell, session, dialog, Menu, desktopCapturer } = require('electron');
+const { app, BrowserWindow, shell, session, dialog, Menu, desktopCapturer, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -10,6 +10,38 @@ const APP_ORIGIN = new URL(APP_URL).origin;
 // CONCORD handles microphone permission separately from speaker playback.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 let mainWindow;
+const OAUTH_SCHEME = 'concord';
+let pendingOAuthUrl = null;
+function handleDesktopOAuth(raw) {
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== OAUTH_SCHEME + ':' || url.hostname !== 'auth' || url.pathname !== '/callback') return;
+    if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isLoading()) { pendingOAuthUrl = raw; return; }
+    mainWindow.show();
+    mainWindow.focus();
+    mainWindow.webContents.send('concord-oauth-callback', {
+      code: url.searchParams.get('code') || '',
+      error: url.searchParams.get('error_description') || url.searchParams.get('error') || ''
+    });
+  } catch (error) { console.warn('Callback OAuth inválido', error.message); }
+}
+if (process.defaultApp && process.argv[1]) {
+  app.setAsDefaultProtocolClient(OAUTH_SCHEME, process.execPath, [path.resolve(process.argv[1])]);
+} else {
+  app.setAsDefaultProtocolClient(OAUTH_SCHEME);
+}
+app.on('open-url', (event, url) => { event.preventDefault(); handleDesktopOAuth(url); });
+for (const arg of process.argv.slice(1)) if (arg.startsWith(OAUTH_SCHEME + '://')) pendingOAuthUrl = arg;
+ipcMain.handle('concord-open-google-oauth', (_event, raw) => {
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== 'https:' || u.origin !== 'https://mthrcsfxyzswcaokzrvq.supabase.co' || u.pathname !== '/auth/v1/authorize' || u.searchParams.get('provider') !== 'google') return false;
+    if (u.searchParams.get('redirect_to') !== 'concord://auth/callback') return false;
+    shell.openExternal(u.href).catch(error => console.warn('Navegador OAuth',error.message));
+    return true;
+  } catch { return false; }
+});
+
 let updateStarted = false;
 let lastMainUrl = APP_URL;
 let usingBundledFallback = false;
@@ -37,7 +69,9 @@ async function startLocalServer() {
 
 const lock = app.requestSingleInstanceLock();
 if (!lock) app.quit();
-app.on('second-instance', () => {
+app.on('second-instance', (_event, argv) => {
+  const url = argv.find(a => a.startsWith(OAUTH_SCHEME+'://'));
+  if (url) handleDesktopOAuth(url);
   if (!mainWindow || mainWindow.isDestroyed()) return;
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
@@ -149,6 +183,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      preload: path.join(__dirname, 'preload.cjs'),
       webSecurity: true
     }
   });
@@ -192,7 +227,7 @@ function createWindow() {
   // The bundled UI is used only if the hosted app cannot be reached.
   mainWindow.loadURL(APP_URL).catch(err => console.warn('CONCORD inicialização:', err.message));
   mainWindow.once('ready-to-show', startUpdates);
-  mainWindow.webContents.once('did-finish-load', startUpdates);
+  mainWindow.webContents.once('did-finish-load', () => { startUpdates(); if (pendingOAuthUrl) { const url = pendingOAuthUrl; pendingOAuthUrl = null; handleDesktopOAuth(url); } });
 }
 app.whenReady().then(async () => {
   try { await startLocalServer(); } catch (error) { console.warn('Interface local:', error.message); }
