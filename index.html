@@ -1658,19 +1658,27 @@ $('#shareStatus').textContent=stream.getAudioTracks().length?'Transmitindo víde
 function stopShare(){if(voiceSignal)voiceSignal.track({id:voicePeerId,userId:socialUser,name:voicePeerName(),sharing:false}).catch(console.warn);for(const [id,peer] of voicePeers){for(const sender of peer.getSenders().filter(s=>s.track&&stream?.getTracks().includes(s.track))){sender.__concordScreenSender=true;peer.removeTrack(sender)}concordNegotiatePeer(id)}if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('#screenPreview').srcObject=null;$('#screenPreview').style.display='none';if(!concordWatching){$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block';$('#stageBadge').style.display='none';$('#callSubtitle').textContent=callJoined?'Microfone local ativo':'Pronto para conectar'}concordUpdateFullscreen();$('#stopShare').style.display='none';$('#shareStatus').textContent='Transmissão encerrada.';renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}document.querySelectorAll('[data-share]').forEach(b=>b.onclick=beginShare);$('#stopShare').onclick=stopShare;
 // Time-domain energy avoids treating FFT background noise as continuous speech.
 function concordCreateSpeechGate(){
- let noise=0.002,started=null,until=0,attack=null;
+ // Calibrate to the actual device: low-output USB headsets may report RMS < 0.003.
+ let noise=null,started=null,until=0,attack=null;
  return (samples,now,enabled=true)=>{
-  if(!enabled){until=0;attack=null;return false}
+  if(!enabled){until=0;attack=null;started=null;noise=null;return false}
   let mean=0;for(const value of samples)mean+=value;mean/=samples.length;
   let energy=0;for(const value of samples)energy+=(value-mean)**2;
   const rms=Math.sqrt(energy/samples.length);
   if(started===null)started=now;
-  if(now-started<350){noise=Math.max(0.002,noise*0.8+rms*0.2);return false}
-  const threshold=Math.max(0.012,noise*3);
+  if(noise===null)noise=rms;
+  if(now-started<450){noise=noise*0.95+rms*0.05;return false}
+  const sensitivity=Math.max(0,Math.min(100,Number(localStorage.getItem('concord-voice-sensitivity')||65)));
+  const multiplier=2.6-(sensitivity/100)*1.3;
+  const floor=0.0005+(100-sensitivity)*0.000012;
+  const threshold=Math.max(floor,noise*multiplier);
   if(rms>threshold){
    if(attack===null)attack=now;
-   if(now-attack>=60)until=now+180;
-  }else{attack=null;noise=noise*0.98+Math.min(rms,0.02)*0.02}
+   if(now-attack>=55)until=now+220;
+  }else{
+   attack=null;
+   if(now>=until)noise=noise*0.993+rms*0.007;
+  }
   return now<until;
  };
 }
