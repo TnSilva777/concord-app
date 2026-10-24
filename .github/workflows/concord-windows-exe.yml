@@ -1,0 +1,44 @@
+name: CONCORD Desktop - Windows EXE
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/concord-windows-exe.yml"
+      - "desktop/**"
+      - "package.json"
+      - "index.html"
+      - "manifest.json"
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Gerar instalador CONCORD para Windows
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Baixar codigo
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+
+      - name: Montar aplicativo e instalador .exe
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run desktop:build
+
+      - name: Guardar instalador para download
+        uses: actions/upload-artifact@v4
+        with:
+          name: CONCORD-Windows-Setup
+          path: dist/CONCORD-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 30
