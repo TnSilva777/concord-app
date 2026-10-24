@@ -1710,8 +1710,8 @@ let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);functio
 // Actual outgoing WebRTC processing, separate from the speaking animation.
 // High-pass reduces rumble/wind. Expander reduces quiet background sounds.
 try{
- const highpass=micContext.createBiquadFilter();highpass.type='highpass';highpass.frequency.value=170;highpass.Q.value=0.7;
- const lowpass=micContext.createBiquadFilter();lowpass.type='lowpass';lowpass.frequency.value=6100;lowpass.Q.value=0.7;
+ const highpass=micContext.createBiquadFilter();highpass.type='highpass';highpass.frequency.value=145;highpass.Q.value=0.7;
+ const lowpass=micContext.createBiquadFilter();lowpass.type='lowpass';lowpass.frequency.value=6800;lowpass.Q.value=0.7;
  const gate=micContext.createGain();gate.gain.value=1; // fail-open: never hard-mute a live microphone solely on voice activity detection
  const destination=micContext.createMediaStreamDestination();src.connect(highpass);highpass.connect(lowpass);lowpass.connect(gate);gate.connect(destination);
  concordProcessedMic=destination.stream;concordMicNoiseGate=gate;
@@ -1732,7 +1732,9 @@ setLocalSpeaking(speaking);
 if(concordMicNoiseGate&&micContext?.state==='running'){
  const now=micContext.currentTime;
  const strong=localStorage.getItem('concord-noise-mode')!=='normal';
- const target=!enabled?0:!concordNoiseSuppression?1:speaking?1:strong?0.10:0.38;
+ const noiseProfile=localStorage.getItem('concord-background-filter')||'balanced';
+ const quietGain=noiseProfile==='maximum'?0.025:noiseProfile==='strong'?0.09:0.22;
+ const target=!enabled?0:!concordNoiseSuppression?1:speaking?1:quietGain;
  concordMicNoiseGate.gain.setTargetAtTime(target,now,speaking?0.008:0.18);
 }
 const rms=Math.sqrt(data.reduce((sum,value)=>sum+value*value,0)/data.length);
@@ -4915,6 +4917,13 @@ body:not(.concord-custom-server-view) #concordServerLocalWarning{display:none}
        toggle('Supressão de ruído','concord-noise-suppression',true,value=>{if(typeof concordNoiseSuppression!=='undefined')concordNoiseSuppression=value});
        toggle('Cancelamento de eco','concord-echo-cancellation',true);
        toggle('Ajuste automático de ganho','concord-auto-gain',true);
+       const profileLabel=document.createElement('label');profileLabel.style.cssText='display:grid;gap:8px;font-size:13px';
+       profileLabel.textContent='Redução de som de fundo';
+       const profileSelect=document.createElement('select');profileSelect.style.cssText='padding:11px;border-radius:9px;background:#0c2119;color:#eafff0;border:1px solid #407556';
+       [['balanced','Equilibrada (preserva a voz)'],['strong','Forte (menos ruído)'],['maximum','Máxima (pode cortar a fala)']].forEach(([value,label])=>profileSelect.add(new Option(label,value)));
+       profileSelect.value=localStorage.getItem('concord-background-filter')||'balanced';
+       profileSelect.onchange=()=>{localStorage.setItem('concord-background-filter',profileSelect.value);notice.textContent='Filtro ajustado para a chamada atual. Caso a voz fique cortada, use Equilibrada.'};
+       profileLabel.append(profileSelect);treatment.append(profileLabel);
        const info=document.createElement('small');info.style.cssText='color:#a7cbb6;line-height:1.5';info.textContent='As opções de tratamento serão usadas na próxima captura do microfone. O teste de entrada é local: sua voz não é enviada à call.';treatment.append(info);
        const originalRemove=overlay.remove.bind(overlay);overlay.remove=()=>{stopTest();originalRemove()};
      }
