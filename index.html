@@ -1317,7 +1317,7 @@ body.concord-home-view #concordVoiceGrid,body.concord-home-view #concordInlineSt
 #concordAuth .concord-google-divider:before,#concordAuth .concord-google-divider:after{content:"";height:1px;background:#42624f;flex:1}
 #concordGoogleLogin{width:100%;display:flex;justify-content:center;align-items:center;gap:11px;min-height:46px;padding:12px;border:1px solid #66846f;border-radius:11px;background:#f8fcf9;color:#23382b;font-weight:700;margin-top:13px;transition:background .15s}
 #concordGoogleLogin:hover{background:#e6f7eb}#concordGoogleLogin:disabled{opacity:.65;cursor:wait}
-</style></head><body>
+</style><style>body:not(.concord-custom-server-view):not(.concord-voice-expanded) #concordVoiceGrid{display:none!important}</style></head><body>
 <div class="app"><aside class="servers"><div class="logo concord-brand-mark" aria-label="Logo CONCORD" title="CONCORD">C</div><button type="button" class="server" id="concordFriendsNav" title="Amigos e conversas privadas" aria-label="Abrir amigos e conversas privadas">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
 <aside class="sidebar"><div class="brand"><strong>CONCORD</strong><small>SUA COMUNIDADE. SEU ESPAÇO.</small></div><button class="search" id="searchBtn">⌕ &nbsp; Buscar canais</button><div class="section">CONCORD OFICIAL</div><button class="channel active" data-channel="geral"><span>#</span> geral</button><button class="channel" data-channel="regras"><span>#</span> regras</button><button class="channel" data-channel="anuncios"><span>#</span> anúncios</button><div class="section">COMUNIDADES</div><button class="channel" data-channel="jogos"><span>#</span> jogos</button><button class="channel" data-channel="tecnologia"><span>#</span> tecnologia</button><button class="channel" data-channel="memes"><span>#</span> memes</button><div class="section">CANAIS DE VOZ</div><button class="channel" id="voiceBtn"><span>◖</span> Sala de voz <span class="online"></span></button><div class="section voice-section-title">SALAS DE VOZ <button id="addVoiceRoom" title="Criar sala de voz">＋</button></div>
 <div class="voice-room-list" id="voiceRoomList">
@@ -1644,7 +1644,32 @@ concordAudioHelp.textContent='Para transmitir o som do jogo ou vídeo, selecione
 concordShareAudioLabel.after(concordAudioHelp);
 
 let concordShareStarting=false;
-async function beginShare(){if(concordShareStarting){$('#shareStatus').textContent='Uma solicitação de compartilhamento já está em andamento.';return}if(stream){$('#shareStatus').textContent='Você já está compartilhando a tela. Encerre a transmissão atual antes de iniciar outra.';return}if(!callJoined){$('#shareStatus').textContent='Entre em uma sala de voz antes de compartilhar sua tela.';return}if(!navigator.mediaDevices?.getDisplayMedia){$('#shareStatus').textContent='Seu navegador não oferece compartilhamento de tela. Tente uma versão atualizada do Chrome ou Edge em um computador.';return}concordShareStarting=true;try{const preset=concordShareQuality==='performance'?{width:1280,height:720,frameRate:30}:concordShareQuality==='quality'?{width:1920,height:1080,frameRate:60}:{width:1920,height:1080,frameRate:30};
+async function concordChooseDesktopSource(){
+ if(!window.concordDesktop?.listShareSources)return true;
+ const sources=await window.concordDesktop.listShareSources();
+ if(!sources?.length)throw new Error('Nenhuma tela ou janela disponível.');
+ return new Promise(resolve=>{
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;z-index:100001;display:grid;place-items:center;background:#030b08e8;padding:20px';
+  const panel=document.createElement('section');panel.style.cssText='width:min(850px,96vw);max-height:85vh;overflow:auto;background:#10271c;border:1px solid #3c8863;border-radius:18px;padding:22px;color:#eafff3;box-shadow:0 24px 70px #000b';
+  const heading=document.createElement('h2');heading.textContent='Compartilhar tela • CONCORD';panel.append(heading);
+  const subtitle=document.createElement('p');subtitle.textContent='Selecione o monitor ou a janela que deseja transmitir.';panel.append(subtitle);
+  const options=document.createElement('div');options.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;max-height:55vh;overflow:auto';
+  const close=(result)=>{overlay.remove();resolve(result)};
+  for(const source of sources){
+   const button=document.createElement('button');button.type='button';button.style.cssText='background:#173b2a;border:1px solid #42785b;border-radius:12px;overflow:hidden;padding:8px;color:white;text-align:left;cursor:pointer';
+   const preview=document.createElement('img');preview.src=source.thumbnail;preview.alt='Prévia de '+source.name;preview.style.cssText='width:100%;aspect-ratio:16/9;object-fit:contain;background:#07150f;border-radius:8px';
+   const caption=document.createElement('div');caption.style.cssText='margin-top:8px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';caption.textContent=(source.type==='screen'?'🖥 ':'▣ ')+source.name;
+   button.append(preview,caption);button.onclick=async()=>{button.disabled=true;try{if(await window.concordDesktop.selectShareSource(source.id))close(true);else close(false)}catch(err){console.warn(err);close(false)}};
+   options.append(button);
+  }
+  panel.append(options);
+  const cancel=document.createElement('button');cancel.textContent='Cancelar';cancel.style.cssText='margin-top:16px;background:#244d37;padding:10px 18px;border-radius:10px;color:white';cancel.onclick=()=>close(false);panel.append(cancel);
+  overlay.append(panel);document.body.append(overlay);
+  overlay.addEventListener('click',event=>{if(event.target===overlay)close(false)});
+ });
+}
+async function beginShare(){if(concordShareStarting){$('#shareStatus').textContent='Uma solicitação de compartilhamento já está em andamento.';return}if(stream){$('#shareStatus').textContent='Você já está compartilhando a tela. Encerre a transmissão atual antes de iniciar outra.';return}if(!callJoined){$('#shareStatus').textContent='Entre em uma sala de voz antes de compartilhar sua tela.';return}if(!navigator.mediaDevices?.getDisplayMedia){$('#shareStatus').textContent='Seu navegador não oferece compartilhamento de tela. Tente uma versão atualizada do Chrome ou Edge em um computador.';return}concordShareStarting=true;try{if(window.concordDesktop?.listShareSources){const chosen=await concordChooseDesktopSource();if(!chosen){$('#shareStatus').textContent='Compartilhamento cancelado.';return}}const preset=concordShareQuality==='performance'?{width:1280,height:720,frameRate:30}:concordShareQuality==='quality'?{width:1920,height:1080,frameRate:60}:{width:1920,height:1080,frameRate:30};
 const capturedStream=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:preset.width},height:{ideal:preset.height},frameRate:{ideal:preset.frameRate,max:preset.frameRate}},audio:concordShareAudioEnabled?{echoCancellation:false,noiseSuppression:false,autoGainControl:false}:false,systemAudio:concordShareAudioEnabled?'include':'exclude',windowAudio:concordShareAudioEnabled?'system':'exclude',surfaceSwitching:'include'});if(!callJoined||stream){capturedStream.getTracks().forEach(track=>track.stop());$('#shareStatus').textContent='Compartilhamento cancelado: a chamada foi encerrada ou já existe uma transmissão.';return}stream=capturedStream;
 stream.getVideoTracks()[0]?.applyConstraints({frameRate:{ideal:preset.frameRate,max:preset.frameRate}}).catch(()=>{});if(stream.getVideoTracks()[0])stream.getVideoTracks()[0].contentHint=concordShareQuality==='quality'?'detail':'motion';const video=$('#screenPreview');video.srcObject=stream;video.style.display='block';$('#stopShare').style.display='inline-block';if(document.body.classList.contains('concord-custom-server-view')){
   $('#shareModal').classList.remove('show');
@@ -4411,15 +4436,15 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  const header=document.createElement('div');header.className='cvg-header';
  const title=document.createElement('strong');title.textContent='◉ Sala de voz • CONCORD';
  const close=document.createElement('button');close.type='button';close.textContent='Voltar às salas';
- close.onclick=()=>{grid.classList.remove('open');messages.style.display='';lastGridSignature='';if(window.innerWidth<=760&&document.body.classList.contains('concord-custom-server-view')){document.body.classList.add('concord-mobile-nav-open');document.getElementById('concordMobileNavToggle')?.setAttribute('aria-expanded','true')}};
+ close.onclick=()=>{document.body.classList.remove('concord-voice-expanded');grid.classList.remove('open');messages.style.display='';lastGridSignature='';if(window.innerWidth<=760&&document.body.classList.contains('concord-custom-server-view')){document.body.classList.add('concord-mobile-nav-open');document.getElementById('concordMobileNavToggle')?.setAttribute('aria-expanded','true')}};
  window.concordCloseVoiceGrid=()=>{if(grid.classList.contains('open'))close.click();};
  const mode=document.createElement('div');mode.className='cvg-modes';
  const gradeBtn=document.createElement('button');gradeBtn.type='button';gradeBtn.textContent='Grade';gradeBtn.className='selected';
  const palcoBtn=document.createElement('button');palcoBtn.type='button';palcoBtn.textContent='Palco';
  mode.append(gradeBtn,palcoBtn);header.append(title,mode,close);
  const tiles=document.createElement('div');tiles.className='cvg-tiles';grid.append(header,tiles);main.insertBefore(grid,messages);
- const open=()=>{if(!document.getElementById('joinCall')?.disabled)return;if(!document.body.classList.contains('concord-custom-server-view')&&document.getElementById('concordDmPane')?.hidden===false)return;const stage=document.getElementById('concordInlineStage');if(stage)stage.hidden=true;messages.style.display='none';if(window.innerWidth<=760){document.body.classList.remove('concord-mobile-nav-open');document.getElementById('concordMobileNavToggle')?.setAttribute('aria-expanded','false')}grid.classList.add('open');selectMode('grade')};
- const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=()=>{if(grid.classList.contains('open'))close.click();else open()};view.title='Mostrar ou ocultar a grade da chamada';view.setAttribute('aria-label','Mostrar ou ocultar a grade da chamada')}
+ const open=()=>{if(!document.body.classList.contains('concord-custom-server-view')&&!document.body.classList.contains('concord-voice-expanded'))return;if(!document.getElementById('joinCall')?.disabled)return;if(!document.body.classList.contains('concord-custom-server-view')&&document.getElementById('concordDmPane')?.hidden===false)return;const stage=document.getElementById('concordInlineStage');if(stage)stage.hidden=true;messages.style.display='none';if(window.innerWidth<=760){document.body.classList.remove('concord-mobile-nav-open');document.getElementById('concordMobileNavToggle')?.setAttribute('aria-expanded','false')}grid.classList.add('open');selectMode('grade')};
+ const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=()=>{if(grid.classList.contains('open'))close.click();else {document.body.classList.add('concord-voice-expanded');open()}};view.title='Mostrar ou ocultar a grade da chamada';view.setAttribute('aria-label','Mostrar ou ocultar a grade da chamada')}
  const join=document.getElementById('joinCall');
  // A grade só abre por ação explícita no botão de visualização, em qualquer dispositivo.
  if(join){new MutationObserver(()=>{if(!join.disabled&&grid.classList.contains('open'))close.click();else if(join.disabled&&document.body.classList.contains('concord-custom-server-view'))open()}).observe(join,{attributes:true,attributeFilter:['disabled']});if(join.disabled&&document.body.classList.contains('concord-custom-server-view'))open();}
