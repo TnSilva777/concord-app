@@ -1029,7 +1029,8 @@ body:has(#concordVoiceGrid.open) #concordVoiceGrid{display:flex!important;flex:1
   if(!window.supabase?.createClient)throw new Error('Supabase não carregou: verifique a conexão ou o bloqueador de scripts.');
   const concordSupabase = window.supabase.createClient(
     SUPABASE_URL,
-    SUPABASE_PUBLISHABLE_KEY
+    SUPABASE_PUBLISHABLE_KEY,
+    {auth:{flowType:'pkce',detectSessionInUrl:true}}
   );
 </script>
   <style>
@@ -4033,21 +4034,37 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   const message = document.getElementById('authMessage');
   const submit = document.getElementById('authSubmit');
   let registering = false;
+  if(window.concordDesktop?.onOAuthCallback){
+    window.concordDesktop.onOAuthCallback(async ({code,error})=>{
+      if(error){message.textContent='Não foi possível entrar com Google: '+error;return;}
+      if(!code){message.textContent='O Google não retornou o código de acesso.';return;}
+      message.textContent='Concluindo login Google…';
+      try{
+        const {error:exchangeError}=await concordSupabase.auth.exchangeCodeForSession(code);
+        if(exchangeError)throw exchangeError;
+        overlay.style.display='none';
+      }catch(e){message.textContent=e.message||'Erro ao concluir login Google.';}
+    });
+  }
   document.getElementById('concordGoogleLogin').onclick=async()=>{
     const button=document.getElementById('concordGoogleLogin');
     button.disabled=true;
-    message.textContent='Abrindo o login do Google…';
+    message.textContent='Abrindo login Google…';
     try{
-      // OAuth redirects back to the same trusted site, not an arbitrary URL.
-      // Google does not support sign-in inside embedded Electron webviews.
-      if(navigator.userAgent.includes('Electron')){
-        message.textContent='No aplicativo Windows, o login Google precisa ser concluído no navegador externo. Por enquanto, utilize e-mail e senha.';
-        return;
+      if(window.concordDesktop?.startGoogleLogin){
+        const {data,error}=await concordSupabase.auth.signInWithOAuth({
+          provider:'google',options:{redirectTo:'concord://auth/callback',skipBrowserRedirect:true}
+        });
+        if(error)throw error;
+        if(!data?.url || !await window.concordDesktop.startGoogleLogin(data.url))throw Error('Não foi possível abrir o navegador para login Google.');
+        message.textContent='Conclua o login no navegador. O CONCORD abrirá automaticamente.';
+      }else{
+        const {error}=await concordSupabase.auth.signInWithOAuth({
+          provider:'google',options:{redirectTo:location.origin+location.pathname}
+        });
+        if(error)throw error;
       }
-      const redirectTo=location.origin+location.pathname;
-      const {error}=await concordSupabase.auth.signInWithOAuth({provider:'google',options:{redirectTo}});
-      if(error)throw error;
-    }catch(error){message.textContent=error.message||'Não foi possível entrar com Google. Confira se o provedor está configurado no Supabase.'}
+    }catch(e){message.textContent=e.message||'Não foi possível iniciar o login Google.';}
     finally{button.disabled=false}
   };
 
