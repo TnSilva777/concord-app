@@ -5019,7 +5019,11 @@ body.concord-home-view #messages:not([hidden]){display:none!important}
 /* Keep the full call UI confined to server voice views. */
 (()=>{
  const hidePrivateCallStage=()=>{
-  if(!document.body.classList.contains('concord-home-view'))return;
+  if(!document.body.classList.contains('concord-home-view')){
+   const stage=document.getElementById('concordVoiceGrid');
+   if(stage){stage.hidden=false;stage.style.removeProperty('display')}
+   return;
+  }
   const stage=document.getElementById('concordVoiceGrid');
   if(stage){stage.classList.remove('open');stage.hidden=true;stage.style.setProperty('display','none','important')}
   const inline=document.getElementById('concordInlineStage');
