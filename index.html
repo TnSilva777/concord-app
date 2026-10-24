@@ -1658,29 +1658,23 @@ $('#shareStatus').textContent=stream.getAudioTracks().length?'Transmitindo víde
 function stopShare(){if(voiceSignal)voiceSignal.track({id:voicePeerId,userId:socialUser,name:voicePeerName(),sharing:false}).catch(console.warn);for(const [id,peer] of voicePeers){for(const sender of peer.getSenders().filter(s=>s.track&&stream?.getTracks().includes(s.track))){sender.__concordScreenSender=true;peer.removeTrack(sender)}concordNegotiatePeer(id)}if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('#screenPreview').srcObject=null;$('#screenPreview').style.display='none';if(!concordWatching){$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block';$('#stageBadge').style.display='none';$('#callSubtitle').textContent=callJoined?'Microfone local ativo':'Pronto para conectar'}concordUpdateFullscreen();$('#stopShare').style.display='none';$('#shareStatus').textContent='Transmissão encerrada.';renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}document.querySelectorAll('[data-share]').forEach(b=>b.onclick=beginShare);$('#stopShare').onclick=stopShare;
 // Time-domain energy avoids treating FFT background noise as continuous speech.
 function concordCreateSpeechGate(){
- // Calibrate to the actual device: low-output USB headsets may report RMS < 0.003.
- let noise=null,started=null,until=0,attack=null;
+ // Calibrated short/long-term energy VAD for low-gain USB headsets.
+ let floor=0.00015, activeUntil=0, started=0;
  return (samples,now,enabled=true)=>{
-  if(!enabled){until=0;attack=null;started=null;noise=null;return false}
-  let mean=0;for(const value of samples)mean+=value;mean/=samples.length;
-  let energy=0;for(const value of samples)energy+=(value-mean)**2;
-  const rms=Math.sqrt(energy/samples.length);
-  if(started===null)started=now;
-  if(noise===null)noise=rms;
-  if(now-started<450){noise=noise*0.95+rms*0.05;return false}
+  if(!enabled){floor=0.00015;activeUntil=0;started=0;return false}
+  let sum=0,peak=0;
+  for(let i=0;i<samples.length;i++){const v=samples[i];sum+=v*v;peak=Math.max(peak,Math.abs(v))}
+  const rms=Math.sqrt(sum/samples.length);
+  if(!started)started=now;
   const sensitivity=Math.max(0,Math.min(100,Number(localStorage.getItem('concord-voice-sensitivity')||65)));
-  // Small USB microphone signals should not be rejected by a fixed 1%-level gate.
-  // Compare against measured background instead of multiplying a noisy baseline.
-  const delta=0.00012+(100-sensitivity)*0.000010;
-  const threshold=Math.max(0.00025,noise+delta);
-  if(rms>threshold){
-   if(attack===null)attack=now;
-   if(now-attack>=30)until=now+180;
-  }else{
-   attack=null;
-   if(now>=until)noise=noise*0.993+rms*0.007;
-  }
-  return now<until;
+  // Speak immediately on a meaningful rise; update floor slowly to avoid following speech.
+  const margin=0.00018+(100-sensitivity)*0.000006;
+  const threshold=Math.max(0.00035,floor+margin);
+  const detected=rms>threshold || peak>Math.max(0.003,threshold*3.5);
+  if(now-started<250){floor=floor*.96+rms*.04;return false}
+  if(detected){activeUntil=now+165}
+  else if(now>=activeUntil){floor=floor*.998+rms*.002}
+  return now<activeUntil;
  };
 }
 let micStream=null,micContext=null,micAnalyser=null,micFrame=null,micEnabled=true,callJoined=false;
@@ -1712,7 +1706,7 @@ let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);functio
     }
   }
   throw lastError||new Error('Nenhuma entrada de áudio ativa.');
-})();callJoined=true;micEnabled=true;concordUpdateUserMic();$('#callState').textContent='Áudio local ativo';$('#callState').style.color='#42dca4';$('#callSubtitle').textContent='Você entrou na sala';$('#voiceStatus').textContent='Você entrou na sala e o microfone está funcionando neste dispositivo. A lista à esquerda mostra participantes conectados nesta sessão. Para ouvir outras pessoas em outros dispositivos, é necessário conectar um servidor de chamadas.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Microfone ligado';if($('#youRosterState'))$('#youRosterState').textContent='🎙';$('#audioStatus').textContent='Microfone ligado';$('#joinCall').textContent='Conectado';$('#joinCall').disabled=true;$('#micToggle').disabled=false;$('#headphoneToggle').disabled=false;$('#callShare').disabled=false;$('#micToggle').classList.add('on');try{micContext=new(window.AudioContext||window.webkitAudioContext)();if(micContext.state==='suspended')await micContext.resume().catch(console.warn);const src=micContext.createMediaStreamSource(micStream);micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=1024;micAnalyser.smoothingTimeConstant=0;src.connect(micAnalyser);
+})();callJoined=true;micEnabled=true;concordUpdateUserMic();$('#callState').textContent='Áudio local ativo';$('#callState').style.color='#42dca4';$('#callSubtitle').textContent='Você entrou na sala';$('#voiceStatus').textContent='Você entrou na sala e o microfone está funcionando neste dispositivo. A lista à esquerda mostra participantes conectados nesta sessão. Para ouvir outras pessoas em outros dispositivos, é necessário conectar um servidor de chamadas.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Microfone ligado';if($('#youRosterState'))$('#youRosterState').textContent='🎙';$('#audioStatus').textContent='Microfone ligado';$('#joinCall').textContent='Conectado';$('#joinCall').disabled=true;$('#micToggle').disabled=false;$('#headphoneToggle').disabled=false;$('#callShare').disabled=false;$('#micToggle').classList.add('on');try{micContext=new(window.AudioContext||window.webkitAudioContext)();if(micContext.state==='suspended')await micContext.resume().catch(console.warn);const src=micContext.createMediaStreamSource(micStream);micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=2048;micAnalyser.smoothingTimeConstant=0;src.connect(micAnalyser);
 // Actual outgoing WebRTC processing, separate from the speaking animation.
 // High-pass reduces rumble/wind. Expander reduces quiet background sounds.
 try{
@@ -1724,7 +1718,7 @@ try{
 }catch(error){console.warn('Filtro de voz indisponível:',error);concordProcessedMic=null;concordMicNoiseGate=null}
 const data=new Float32Array(micAnalyser.fftSize),speechGate=concordCreateSpeechGate();
 const meter=()=>{if(!micAnalyser)return;micAnalyser.getFloatTimeDomainData(data);
-const enabled=callJoined&&micEnabled&&micContext?.state==='running'&&micStream?.getAudioTracks().some(t=>t.enabled&&!t.muted&&t.readyState==='live');
+const enabled=callJoined&&micEnabled&&micStream?.getAudioTracks().some(t=>t.enabled&&!t.muted&&t.readyState==='live');
 const speaking=speechGate(data,performance.now(),enabled);
 const level=Math.sqrt(data.reduce((sum,value)=>sum+value*value,0)/data.length);
 // Show actual input activity separately from the speaking/noise-suppression threshold.
@@ -1739,7 +1733,8 @@ if(concordMicNoiseGate&&micContext?.state==='running'){
 }
 const rms=Math.sqrt(data.reduce((sum,value)=>sum+value*value,0)/data.length);
 if(enabled){const displayed=Math.min(100,rms*9000);document.getElementById('micMeter')?.setAttribute('aria-valuenow',String(Math.round(displayed)))}
-$('#micMeter').style.width=(enabled?Math.min(100,rms*500):0)+'%';
+$('#micMeter').style.width=(enabled?Math.min(100,rms*9000):0)+'%';
+if(micContext?.state==='suspended'&&callJoined)micContext.resume().catch(()=>{});
 micFrame=requestAnimationFrame(meter)};meter()}catch(e){console.warn('Analisador de microfone indisponível:',e);concordMicNoiseGate?.gain.setValueAtTime(1,micContext?.currentTime||0)} }catch(err){
  console.warn('Falha ao abrir microfone:',err);
  const selected=localStorage.getItem('concord-input-device');
