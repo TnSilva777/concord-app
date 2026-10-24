@@ -3286,8 +3286,9 @@ async function concordNegotiatePeer(id){
        check();
      });
    }
-   if(peer.signalingState!=='stable'||peer.connectionState==='closed')return;
+   if(peer.signalingState!=='stable'||peer.connectionState==='closed'||voicePeers.get(id)!==peer)return;
    const offer=await peer.createOffer();
+   if(!callJoined||voicePeers.get(id)!==peer||peer.signalingState!=='stable')return;
    await peer.setLocalDescription(offer);
    await voiceSend(id,'offer',peer.localDescription.toJSON());
  }catch(error){console.warn('Renegociação de tela:',error)}
@@ -3376,6 +3377,7 @@ async function voiceConnect(id,initiator){
       try{
         peer.restartIce();
         const offer=await peer.createOffer({iceRestart:true});
+        if(!callJoined||voicePeers.get(id)!==peer||peer.signalingState!=='stable')return;
         await peer.setLocalDescription(offer);
         await voiceSend(id,'offer',peer.localDescription.toJSON());
         if(peer.connectionState!=='connected')queueRecovery();
@@ -3432,8 +3434,10 @@ async function voiceSignalReceived(packet){
       const peer=voicePeers.get(msg.from);
       if(peer&&stream?.getVideoTracks().some(track=>track.readyState==='live')&&peer.signalingState==='stable'&&peer.connectionState!=='closed'){
         const videoTrack=stream.getVideoTracks().find(track=>track.readyState==='live');
+        // Sender changes initiate their own renegotiation.
+        const alreadySendingVideo=peer.getSenders().some(sender=>sender.track?.kind==='video'&&sender.track.readyState==='live');
         concordUpdatePeerShare(msg.from,peer);
-        await concordNegotiatePeer(msg.from);
+        if(alreadySendingVideo)await concordNegotiatePeer(msg.from);
       }
     }else if(msg.kind==='ice'){
       const peer=voicePeers.get(msg.from);
