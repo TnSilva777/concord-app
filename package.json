@@ -1,6 +1,6 @@
 {
   "name": "concord-desktop",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "CONCORD Desktop para Windows",
   "main": "desktop/main.cjs",
   "private": true,
@@ -28,6 +28,7 @@
   "build": {
     "appId": "app.concord.desktop",
     "productName": "CONCORD",
+    "protocols": [{"name":"CONCORD Login","schemes":["concord"]}],
     "directories": {
       "output": "dist"
     },
