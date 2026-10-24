@@ -4740,6 +4740,7 @@ body:not(.concord-custom-server-view) #concordServerLocalWarning{display:none}
        const fillDevices=async()=>{
          try{
            const devices=await navigator.mediaDevices.enumerateDevices();
+           micSelect.length=1;speakerSelect.length=1;
            for(const item of devices){if(!item.deviceId||item.deviceId==='default'||item.deviceId==='communications')continue;
              const dest=item.kind==='audioinput'?micSelect:item.kind==='audiooutput'?speakerSelect:null;
              if(dest)dest.add(new Option(item.label||((item.kind==='audioinput'?'Microfone ':'Saída ')+dest.options.length),item.deviceId));
@@ -4798,11 +4799,12 @@ body:not(.concord-custom-server-view) #concordServerLocalWarning{display:none}
            const inputs=devices.filter(d=>d.kind==='audioinput');
            lines.push('Microfones encontrados: '+inputs.length);
            const deviceId=resetDevice?'':micSelect.value;
-           const stream=await navigator.mediaDevices.getUserMedia({audio:deviceId?{deviceId:{ideal:deviceId}}:true});
+           const stream=await navigator.mediaDevices.getUserMedia({audio:deviceId?{deviceId:{exact:deviceId},echoCancellation:false,noiseSuppression:false,autoGainControl:false}:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
            const track=stream.getAudioTracks()[0];
            if(!track)throw new Error('A captura não retornou trilha de áudio.');
            lines.push('Captura: '+track.readyState+' / '+(track.muted?'silenciada pelo dispositivo':'não silenciada'));
            lines.push('Dispositivo: '+(track.label||'padrão'));
+           lines.push('Entrada escolhida: '+(deviceId?'dispositivo específico':'padrão do Windows'));
            const context=new(window.AudioContext||window.webkitAudioContext)();
            await context.resume();
            const source=context.createMediaStreamSource(stream),analyser=context.createAnalyser();
@@ -4819,7 +4821,7 @@ body:not(.concord-custom-server-view) #concordServerLocalWarning{display:none}
            lines.push(peak<0.001?'Nenhuma atividade significativa detectada. Confira a entrada padrão e o nível no Windows.':'Áudio captado. Se a call continuar sem voz, o problema está na transmissão ou processamento.');
            stream.getTracks().forEach(t=>t.stop());await context.close().catch(()=>{});
          }catch(error){lines.push('Falha: '+(error.name||'Erro')+' — '+(error.message||'Sem detalhes'));console.warn('Diagnóstico CONCORD:',error)}
-         diagnostic.textContent=lines.join('\\n');
+         diagnostic.textContent=lines.join('\n');
        };
        inspect.onclick=()=>inspectMic(false);
        reset.onclick=()=>inspectMic(true);
