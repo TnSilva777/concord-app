@@ -5006,4 +5006,31 @@ body:not(.concord-custom-server-view) #concordServerLocalWarning{display:none}
  });
 })();
 </script>
+<style id="concord-private-call-hard-hide">
+/* Private view is a conversation, never a voice-stage container. */
+body.concord-home-view #concordVoiceGrid,
+body.concord-home-view #concordInlineStage,
+body.concord-home-view .concord-voice-stage,
+body.concord-home-view #callStage,
+body.concord-home-view #callStageMessage {display:none!important}
+body.concord-home-view #messages:not([hidden]){display:none!important}
+</style>
+<script>
+/* Keep the full call UI confined to server voice views. */
+(()=>{
+ const hidePrivateCallStage=()=>{
+  if(!document.body.classList.contains('concord-home-view'))return;
+  const stage=document.getElementById('concordVoiceGrid');
+  if(stage){stage.classList.remove('open');stage.hidden=true;stage.style.setProperty('display','none','important')}
+  const inline=document.getElementById('concordInlineStage');
+  if(inline)inline.hidden=true;
+  document.body.classList.remove('concord-voice-expanded');
+  const messages=document.getElementById('messages');
+  if(messages)messages.style.display='none';
+ };
+ new MutationObserver(hidePrivateCallStage).observe(document.body,{attributes:true,attributeFilter:['class']});
+ document.getElementById('concordDmNav')?.addEventListener('click',()=>queueMicrotask(hidePrivateCallStage));
+ hidePrivateCallStage();
+})();
+</script>
 </body></html>                              
