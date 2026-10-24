@@ -1,4 +1,4 @@
-const CACHE = 'concord-shell-v3';
+const CACHE = 'concord-shell-v4';
 const ASSETS = ['./index.html', './manifest.json'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
