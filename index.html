@@ -2364,6 +2364,50 @@ function concordOpenServerRoles(community){
  const add=document.createElement('button');add.textContent='＋ Criar cargo';add.style.cssText='margin-top:12px;padding:11px;border-radius:9px;background:#24754c;color:white';add.onclick=()=>{if(community.roles.length>=25){simple('Limite','Máximo de 25 cargos locais.');return}community.roles.push({id:'role-'+crypto.randomUUID(),name:'Novo cargo',color:'#48bb84',permissions:['view']});persist();render()};panel.append(add);
  overlay.append(panel);document.body.append(overlay);overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};render();
 }
+
+function concordOpenServerSettingsHub(id){
+ const community=concordData.communities.find(item=>item.id===id);
+ if(!community||!concordCanManageServer(community)){simple('Sem permissão','Você não pode configurar este servidor.');return}
+ document.getElementById('concordServerSettingsHub')?.remove();
+ const overlay=document.createElement('div');overlay.id='concordServerSettingsHub';
+ overlay.style.cssText='position:fixed;inset:0;z-index:100000;background:#020c08df;display:grid;place-items:center;padding:15px';
+ const panel=document.createElement('section');panel.style.cssText='width:min(850px,96vw);max-height:90vh;overflow:auto;border:1px solid #467959;border-radius:17px;background:#10271c;color:#e9fff0;padding:22px;box-shadow:0 20px 70px #0009';
+ const header=document.createElement('div');header.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:12px';
+ const heading=document.createElement('h2');heading.style.margin='0';heading.textContent='⚙ Configurações · '+community.name;
+ const close=document.createElement('button');close.textContent='✕ Fechar';close.onclick=()=>overlay.remove();header.append(heading,close);panel.append(header);
+ const info=document.createElement('p');info.style.cssText='color:#b7d4c0;font-size:13px;line-height:1.5';info.textContent='Personalize seu servidor. Alguns recursos ainda são configurações locais deste navegador e não aplicam permissões no Supabase.';panel.append(info);
+ const cards=document.createElement('div');cards.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:16px 0';
+ const action=(name,description,callback)=>{
+   const button=document.createElement('button');button.type='button';button.style.cssText='text-align:left;background:#1b3b2a;border:1px solid #426a52;border-radius:12px;padding:15px;color:#e9fff0;min-height:100px';
+   const title=document.createElement('strong');title.textContent=name;title.style.display='block';
+   const sub=document.createElement('small');sub.textContent=description;sub.style.cssText='display:block;margin-top:9px;color:#bad0bf;line-height:1.4';
+   button.append(title,sub);button.onclick=()=>{overlay.remove();callback()};cards.append(button);
+ };
+ action('🖊 Informações gerais','Nome, ícone e descrição do servidor',()=>editLocalCommunity(id));
+ action('♛ Cargos e permissões','Criar cargos, editar cores e permissões locais',()=>concordOpenServerRoles(community));
+ action('👥 Convidar membros','Abrir o convite para amigos',()=>concordInviteFriendsToCommunity(community));
+ action('🔗 Link de convite','Compartilhar o modelo e os canais do servidor',()=>concordInviteCommunity(community));
+ action('↓ Backup','Exportar os dados locais dos servidores',()=>concordExportServers());
+ panel.append(cards);
+ const section=document.createElement('div');section.style.cssText='border-top:1px solid #355d45;padding-top:14px';
+ const subtitle=document.createElement('h3');subtitle.textContent='Preferências do servidor';section.append(subtitle);
+ if(!community.preferences||typeof community.preferences!=='object')community.preferences={};
+ const field=(label,key,options)=>{
+  const wrap=document.createElement('label');wrap.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 0;flex-wrap:wrap;font-size:13px';
+  const name=document.createElement('span');name.textContent=label;
+  const select=document.createElement('select');select.style.cssText='background:#0c2116;color:#e9fff0;border:1px solid #4b785a;padding:9px;border-radius:8px;min-width:190px';
+  for(const [value,title] of options){const item=document.createElement('option');item.value=value;item.textContent=title;select.append(item)}
+  select.value=community.preferences[key]||options[0][0];select.onchange=()=>{const previous=community.preferences[key];community.preferences[key]=select.value;if(!saveConcordData()){community.preferences[key]=previous;simple('Erro','Não foi possível salvar.')}else showConcordToast('Preferência salva','Configuração salva neste navegador.')};
+  wrap.append(name,select);section.append(wrap);
+ };
+ field('Notificações do servidor','notificationLevel',[['all','Todas as mensagens'],['mentions','Apenas menções'],['none','Silenciadas']]);
+ field('Exibição de membros','memberDisplay',[['online','Conectados primeiro'],['alphabetical','Ordem alfabética']]);
+ field('Padrão de entrada nas calls','voiceLayout',[['grade','Grade de participantes'],['stage','Palco (manual)']]);
+ field('Permissão padrão para convites (modelo local)','invitePolicy',[['everyone','Todos'],['staff','Somente equipe']]);
+ const warning=document.createElement('p');warning.style.cssText='font-size:12px;color:#efc88c;margin-top:10px';warning.textContent='Atenção: as preferências são salvas localmente. Cargos, convites e moderação reais exigem regras e tabelas no backend.';section.append(warning);
+ panel.append(section);overlay.append(panel);document.body.append(overlay);overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};
+}
+
 function editLocalCommunity(id){
 const community=concordData.communities.find(x=>x.id===id);if(!community)return;
 if(!concordCanManageServer(community)){simple('Sem permissão','Apenas o dono ou pessoas com permissão de gerenciar o servidor podem editar.');return}
@@ -2592,7 +2636,7 @@ function renderCommunityChannels(){
   const heading=document.createElement('div');heading.className='concord-server-heading';
   const title=document.createElement('strong');title.textContent=community.name;
   const canManage=concordCanManageServer(community);
-  const settings=document.createElement('button');settings.type='button';settings.className='concord-server-settings';settings.textContent='⚙';settings.title='Configurações do servidor';settings.setAttribute('aria-label','Configurações do servidor');settings.onclick=()=>editLocalCommunity(community.id);
+  const settings=document.createElement('button');settings.type='button';settings.className='concord-server-settings';settings.textContent='⚙';settings.title='Configurações do servidor';settings.setAttribute('aria-label','Configurações do servidor');settings.onclick=()=>concordOpenServerSettingsHub(community.id);
   const rolesButton=document.createElement('button');rolesButton.type='button';rolesButton.textContent='♛ Cargos';rolesButton.title='Gerenciar cargos e permissões';rolesButton.onclick=()=>concordOpenServerRoles(community);
   const invite=document.createElement('button');invite.type='button';invite.textContent='🔗 Convite';invite.title='Compartilhar modelo do servidor com canais';
   invite.onclick=()=>concordInviteCommunity(community);
@@ -4498,13 +4542,13 @@ const join=document.getElementById('joinCall');
  stageVolume.append(stageInput,stageValue);stageVolume.hidden=true;
  grid.append(header,stageVolume,tiles);main.insertBefore(grid,messages);
  const open=()=>{if(document.getElementById('concordDmNav')?.classList.contains('active')&&!document.body.classList.contains('concord-voice-expanded'))return;if(!document.body.classList.contains('concord-custom-server-view')&&!document.body.classList.contains('concord-voice-expanded'))return;if(!document.getElementById('joinCall')?.disabled)return;if(!document.body.classList.contains('concord-custom-server-view')&&!document.body.classList.contains('concord-voice-expanded')&&document.getElementById('concordDmPane')?.hidden===false)return;const stage=document.getElementById('concordInlineStage');if(stage)stage.hidden=true;messages.style.display='none';if(window.innerWidth<=760){document.body.classList.remove('concord-mobile-nav-open');document.getElementById('concordMobileNavToggle')?.setAttribute('aria-expanded','false')}grid.classList.add('open');selectMode('grade')};
- const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=()=>{if(grid.classList.contains('open'))close.click();else {document.body.classList.add('concord-voice-expanded');open()}};view.title='Mostrar ou ocultar a grade da chamada';view.setAttribute('aria-label','Mostrar ou ocultar a grade da chamada')}
+ const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=()=>{if(grid.classList.contains('open'))close.click();else {document.body.classList.add('concord-voice-expanded');open()}};view.title='Abrir ou fechar a grade da chamada';view.setAttribute('aria-label','Abrir ou fechar a grade da chamada')}
  const join=document.getElementById('joinCall');
- // A grade só abre por ação explícita no botão de visualização, em qualquer dispositivo.
- if(join)new MutationObserver(()=>{if(!join.disabled&&grid.classList.contains('open'))close.click();else if(join.disabled&&document.body.classList.contains('concord-custom-server-view')){open();selectMode('grade')}}).observe(join,{attributes:true,attributeFilter:['disabled']});
+ // A grade é a tela principal automaticamente após conectar na sala.
+ if(join)new MutationObserver(()=>{if(!join.disabled&&grid.classList.contains('open'))close.click();else if(join.disabled&&document.body.classList.contains('concord-custom-server-view')){document.body.classList.add('concord-voice-expanded');open();selectMode('grade')}}).observe(join,{attributes:true,attributeFilter:['disabled']});
  const selectMode=modeName=>{stageVolume.hidden=modeName!=='palco';grid.classList.toggle('cvg-stage-mode',modeName==='palco');gradeBtn.classList.toggle('selected',modeName==='grade');palcoBtn.classList.toggle('selected',modeName==='palco');lastGridSignature='';render()};
  gradeBtn.onclick=()=>selectMode('grade');palcoBtn.onclick=()=>selectMode('palco');
- if(join?.disabled&&document.body.classList.contains('concord-custom-server-view')){open();selectMode('grade')}
+ if(join?.disabled&&document.body.classList.contains('concord-custom-server-view')){document.body.classList.add('concord-voice-expanded');open();selectMode('grade')}
  let lastGridSignature='';
  const repairAttempts=new Map();
  function render(){
