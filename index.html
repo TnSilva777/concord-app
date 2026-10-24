@@ -943,6 +943,55 @@ body:has(#concordVoiceGrid.open) #concordVoiceGrid{display:flex!important;flex:1
  body:has(#concordVoiceGrid.open) #concordVoiceGrid .cvg-tiles{align-content:center}
  body:has(#concordVoiceGrid.open) #concordVoiceGrid .cvg-tile{background:#263b32;border:1px solid #365949}
 }
+
+/* CONCORD mobile voice: responsive cards, safe areas and distinct stage mode. */
+@media(max-width:760px){
+ body.concord-custom-server-view #concordVoiceGrid.open{
+  padding:calc(9px + env(safe-area-inset-top)) 9px calc(9px + env(safe-area-inset-bottom))!important;
+  gap:9px!important;overflow:hidden!important
+ }
+ #concordVoiceGrid .cvg-header{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:7px!important;flex:0 0 auto!important;padding:0 0 9px!important}
+ #concordVoiceGrid .cvg-header strong{grid-column:1/-1;flex:auto!important;font-size:12px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ #concordVoiceGrid .cvg-modes{grid-column:1;justify-self:start}
+ #concordVoiceGrid .cvg-modes button{min-height:40px!important;min-width:64px;touch-action:manipulation}
+ #concordVoiceGrid .cvg-header>button{grid-column:2;grid-row:2;min-height:40px!important;max-width:100%;white-space:nowrap;font-size:12px!important}
+ body.concord-custom-server-view #concordVoiceGrid .cvg-tiles{
+  display:grid!important;flex:1 1 auto!important;width:100%!important;max-width:none!important;min-height:0!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  grid-auto-rows:minmax(150px,1fr)!important;
+  grid-template-rows:none!important;gap:8px!important;padding:1px 1px calc(10px + env(safe-area-inset-bottom))!important;
+  align-content:stretch!important;justify-content:stretch!important;overflow-y:auto!important;overscroll-behavior:contain
+ }
+ #concordVoiceGrid .cvg-tile{aspect-ratio:auto!important;min-width:0!important;min-height:150px!important;max-width:none!important;width:auto!important;grid-column:auto!important}
+ #concordVoiceGrid .cvg-tiles[data-count="1"]{grid-template-columns:minmax(0,1fr)!important}
+ #concordVoiceGrid .cvg-tiles[data-count="1"] .cvg-tile{min-height:min(58dvh,460px)!important;max-height:calc(100dvh - 175px);align-self:center}
+ #concordVoiceGrid .cvg-tiles[data-count="3"] .cvg-tile:last-child{grid-column:1/-1!important;max-width:none!important;width:100%!important}
+ #concordVoiceGrid .cvg-tiles[data-count="5"] .cvg-tile:last-child{grid-column:1/-1!important}
+ #concordVoiceGrid .cvg-tiles[data-count="2"] .cvg-tile{min-height:min(48dvh,360px)!important}
+ #concordVoiceGrid .cvg-avatar{width:clamp(48px,13vw,72px)!important;height:clamp(48px,13vw,72px)!important;flex-basis:auto!important;font-size:23px!important}
+ #concordVoiceGrid .cvg-name{left:8px!important;right:auto!important;bottom:8px!important;max-width:calc(100% - 16px)!important;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;font-size:11px!important}
+ #concordVoiceGrid .cvg-voice-status{top:7px!important;right:7px!important}
+ #concordVoiceGrid.cvg-stage-mode .cvg-tiles{grid-template-columns:minmax(0,1fr)!important;grid-auto-rows:minmax(185px,auto)!important;align-content:start!important}
+ #concordVoiceGrid.cvg-stage-mode .cvg-tile{min-height:200px!important;aspect-ratio:16/10!important}
+ #concordVoiceGrid.cvg-stage-mode .cvg-tile.cvg-sharing{grid-column:auto!important;min-height:240px!important;aspect-ratio:16/9!important}
+ #concordVoiceGrid.cvg-stage-mode .cvg-tile video{object-fit:contain!important}
+ #concordVoiceGrid.cvg-stage-mode .cvg-zoom,#concordVoiceGrid.cvg-stage-mode .cvg-fullscreen{display:block!important;min-height:36px;touch-action:manipulation}
+ #concordVoiceGrid.cvg-stage-mode .cvg-fullscreen{top:9px!important;right:104px!important;padding:7px!important;font-size:11px!important}
+ #concordVoiceGrid.cvg-stage-mode .cvg-zoom{top:9px!important;right:9px!important;padding:7px!important}
+ #concordEmbeddedVoice .cev-grid{grid-auto-rows:minmax(145px,1fr)}
+ #concordEmbeddedVoice .cev-person{min-height:145px}
+}
+@media(max-width:760px) and (orientation:landscape){
+ body.concord-custom-server-view #concordVoiceGrid.open{padding:5px 8px!important}
+ #concordVoiceGrid .cvg-header{grid-template-columns:minmax(0,1fr) auto auto!important;padding-bottom:3px!important}
+ #concordVoiceGrid .cvg-header strong{grid-column:1;align-self:center}
+ #concordVoiceGrid .cvg-modes{grid-column:2;grid-row:1}
+ #concordVoiceGrid .cvg-header>button{grid-column:3;grid-row:1}
+ body.concord-custom-server-view #concordVoiceGrid .cvg-tiles{grid-auto-rows:minmax(120px,1fr)!important}
+ #concordVoiceGrid .cvg-tiles[data-count="3"] .cvg-tile:last-child{grid-column:auto!important}
+ #concordVoiceGrid .cvg-tiles[data-count="3"]{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+ #concordVoiceGrid.cvg-stage-mode .cvg-tiles{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js'"></script>
 <script>
