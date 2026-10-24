@@ -1929,9 +1929,11 @@ function concordSyncInlineStage(){
   if(concordInlineStage.hidden)return;
   const live=concordWatching?concordLiveStreams.get(concordWatching):stream;
   const video=$('#concordInlineVideo');
-  const available=!!live?.getVideoTracks().some(track=>track.readyState==='live');
+  const available=!!live?.getVideoTracks().some(track=>track.readyState==='live'&&!track.muted);
   if(available){if(video.srcObject!==live){video.srcObject=live;video.play().catch(()=>{})}else if(video.paused)video.play().catch(()=>{});video.hidden=false;$('#concordInlineWaiting').hidden=true}
-  else {video.srcObject=null;video.hidden=true;$('#concordInlineWaiting').hidden=false;$('#concordInlineWaiting').textContent=concordWatching?'Conectando à transmissão… Verificando vídeo e reconexão.':'Aguardando a transmissão começar…'}
+  // A muted WebRTC video track is not a playable stream, even if it is 'live'.
+  // Display a reconnecting state rather than an endless black video panel.
+  else {video.srcObject=null;video.hidden=true;$('#concordInlineWaiting').hidden=false;$('#concordInlineWaiting').textContent=concordWatching?'Reconectando ao vídeo de '+String((roomRoster[joinedRoom]||[]).find(m=>m.id===concordWatching)?.name||'participante')+'…':'Aguardando a transmissão começar…';if(concordWatching&&callJoined)concordRequestShareRepair(concordWatching).catch(console.warn)}
 }
 function concordOpenInlineStage(id){
   concordWatching=id;
@@ -3329,12 +3331,12 @@ async function voiceConnect(id,initiator){
   peer.ontrack=e=>{
     if(e.track.kind==='video'){
       const live=new MediaStream([e.track]);concordLiveStreams.set(id,live);
-      e.track.addEventListener('unmute',()=>{concordShareRepairRequested.delete(id);renderRooms();renderCallRoster()});concordShareRepairRequested.delete(id);
+      e.track.addEventListener('unmute',()=>{concordShareRepairRequested.delete(id);renderRooms();renderCallRoster();concordSyncInlineStage()});concordShareRepairRequested.delete(id);
       if(concordWatching===id){const player=$('#callScreenPreview');player.srcObject=live;player.muted=true;player.style.display='block';$('#callStageMessage').style.display='none';$('#stageBadge').style.display='block';$('#callSubtitle').textContent='Assistindo transmissão ao vivo';player.play().catch(()=>voiceStatus('Clique no vídeo para iniciar a reprodução.'))}
       concordSyncInlineStage();
       if(concordWatching===id){concordInlineSound.textContent='🔊 Ativar som';}
       e.track.onmute=()=>{if(concordVoiceMemberSharing(id))setTimeout(()=>{if(e.track.muted&&e.track.readyState==='live')concordRequestShareRepair(id)},2800);if(concordWatching===id){$('#callSubtitle').textContent='Transmissão pausada ou reconectando';voiceStatus('O vídeo do amigo foi interrompido. Aguardando retorno…')}};
-      e.track.onunmute=()=>{concordShareRepairRequested.delete(id);if(concordWatching===id){const player=$('#callScreenPreview');player.srcObject=live;player.style.display='block';$('#callStageMessage').style.display='none';$('#callSubtitle').textContent='Assistindo transmissão ao vivo';player.play().catch(()=>{})}renderRooms()};
+      e.track.onunmute=()=>{concordShareRepairRequested.delete(id);concordSyncInlineStage();if(concordWatching===id){const player=$('#callScreenPreview');player.srcObject=live;player.style.display='block';$('#callStageMessage').style.display='none';$('#callSubtitle').textContent='Assistindo transmissão ao vivo';player.play().catch(()=>{})}renderRooms()};
       e.track.onended=()=>{if(concordLiveStreams.get(id)===live)concordLiveStreams.delete(id);concordSyncInlineStage();if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block'}renderRooms()};
       renderRooms();if(typeof renderCallRoster==='function')renderCallRoster();return;
     }
