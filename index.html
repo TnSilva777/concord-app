@@ -2407,9 +2407,9 @@ function concordOpenServerSettingsHub(id){
  };
  field('Notificações do servidor','notificationLevel',[['all','Todas as mensagens'],['mentions','Apenas menções'],['none','Silenciadas']]);
  field('Exibição de membros','memberDisplay',[['online','Conectados primeiro'],['alphabetical','Ordem alfabética']]);
- field('Padrão de entrada nas calls','voiceLayout',[['grade','Grade de participantes'],['stage','Palco (manual)']]);
+ // A grade é sempre o modo inicial da call; Palco continua disponível na própria chamada.
  field('Permissão padrão para convites (modelo local)','invitePolicy',[['everyone','Todos'],['staff','Somente equipe']]);
- const warning=document.createElement('p');warning.style.cssText='font-size:12px;color:#efc88c;margin-top:10px';warning.textContent='Atenção: as preferências são salvas localmente. Cargos, convites e moderação reais exigem regras e tabelas no backend.';section.append(warning);
+ const warning=document.createElement('p');warning.style.cssText='font-size:12px;color:#efc88c;margin-top:10px';warning.textContent='Estas preferências são armazenadas como rascunho local e algumas ainda não afetam o comportamento da interface. Cargos, convites e moderação reais exigem integração e permissões no Supabase.';section.append(warning);
  panel.append(section);overlay.append(panel);document.body.append(overlay);overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};
 }
 
