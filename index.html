@@ -2726,7 +2726,7 @@ function voiceParticipants(){
 }
 async function voiceSend(to,kind,payload){
   if(!voiceSignal)return;
-  await voiceSignal.send({type:'broadcast',event:'rtc',payload:{from:voicePeerId,to,kind,data:payload}});
+  await voiceSignal.send({type:'broadcast',event:'rtc',payload:{from:voicePeerId,to,kind,room:joinedRoom,data:payload}});
 }
 async function concordTuneScreenSender(sender){
  if(!sender?.getParameters||!sender?.setParameters)return;
@@ -2876,8 +2876,9 @@ async function voiceConnect(id,initiator){
 }
 async function voiceSignalReceived(packet){
   const msg=packet?.payload;
-  if(!callJoined||!msg||msg.to!==voicePeerId||msg.from===voicePeerId)return;
-  if(!Object.values(voiceSignal?.presenceState()||{}).flat().some(p=>p.id===msg.from))return;
+  if(!callJoined||!voiceSignal||!msg||msg.to!==voicePeerId||msg.from===voicePeerId||msg.room!==joinedRoom)return;
+  // Messages may arrive before Supabase presence sync. Do not discard valid
+  // offers/ICE for the current voice room just because presence is still catching up.
   try{
     if(msg.kind==='offer'){
       let peer=voicePeers.get(msg.from);
@@ -3006,7 +3007,14 @@ async function startVoiceNetwork(){
       .on('presence',{event:'leave'},voiceParticipants)
       .subscribe(async status=>{
         if(status==='SUBSCRIBED'&&callJoined&&voiceSignal===channel&&joinedRoom===requestedRoom){
-          try{await channel.track({id:voicePeerId,userId:session.user.id,name:voicePeerName(),sharing:!!stream,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted});voiceParticipants();voiceStatus('Sala conectada. Aguardando seu amigo entrar na mesma sala.')}
+          try{await channel.track({id:voicePeerId,userId:session.user.id,name:voicePeerName(),sharing:!!stream,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted});voiceParticipants();voiceStatus('Sala conectada. Aguardando seu amigo entrar na mesma sala.');
+            // Re-check membership while the call is active: phones can miss a
+            // Realtime join event when reconnecting or resuming from sleep.
+            const loop=setInterval(()=>{
+              if(!callJoined||voiceSignal!==channel||joinedRoom!==requestedRoom||generation!==concordVoiceNetworkGeneration){clearInterval(loop);return}
+              voiceParticipants();
+            },4000);
+          }
           catch(error){voiceStatus('Erro ao entrar na sala de voz: '+error.message)}
         }else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
           voiceStatus('Falha no Supabase Realtime. Tente sair e entrar novamente.');
