@@ -2880,6 +2880,29 @@ function setLocalSpeaking(on){
 // Salas publicas de teste: nao use para conversas confidenciais ate adicionar autorizacao privada.
 const voicePeerId=crypto.randomUUID();
 let voiceSignal=null,voicePeers=new Map(),voiceAudio=new Map(),voiceStarting=false;
+window.concordVoiceDiagnostics=async()=>{
+ const mic=micStream?.getAudioTracks()[0];
+ const lines=['Call: '+(callJoined?'ativa':'não conectada'),
+  'Microfone da call: '+(mic?.label||'não iniciado'),
+  'Estado: '+(mic?.readyState||'indisponível')+' / '+(mic?.enabled?'habilitado':'desabilitado')+' / '+(mic?.muted?'silenciado pelo dispositivo':'não silenciado'),
+  'Participantes WebRTC: '+voicePeers.size,
+  'Sinalização: '+(voiceSignal?.state||'desconectada')];
+ for(const [id,peer] of voicePeers){
+  const sender=peer.getSenders().find(s=>s.track?.kind==='audio'&&!s.__concordScreenSender);
+  lines.push('Peer '+String(id).slice(0,8)+': '+peer.connectionState+' / ICE '+peer.iceConnectionState+' / áudio '+(sender?.track?.readyState||'sem faixa'));
+  try{
+   const stats=await sender?.getStats();
+   for(const report of stats?.values()||[]){
+    if(report.type==='outbound-rtp'&&report.kind==='audio'){
+     lines.push('Pacotes enviados: '+(report.packetsSent??'—')+' / bytes: '+(report.bytesSent??'—'));
+    }
+   }
+  }catch(error){lines.push('Estatísticas: '+error.message)}
+ }
+ if(!voicePeers.size)lines.push('Sem conexão com outra pessoa. Entre na mesma sala com um amigo para testar o envio.');
+ return lines.join('\n');
+};
+
 let concordVoiceNetworkGeneration=0;
 const voicePendingIce=new Map();
 const concordRemoteSpeechMeters=new Map();
@@ -4829,6 +4852,17 @@ body:not(.concord-custom-server-view) #concordServerLocalWarning{display:none}
        };
        inspect.onclick=()=>inspectMic(false);
        reset.onclick=()=>inspectMic(true);
+       const networkButton=document.createElement('button');
+       networkButton.textContent='📡 Diagnosticar envio de voz na call';
+       recovery.append(networkButton);
+       networkButton.onclick=async()=>{
+         diagnostic.textContent='Verificando a transmissão...';
+         try{
+           diagnostic.textContent=typeof window.concordVoiceDiagnostics==='function'
+             ?await window.concordVoiceDiagnostics()
+             :'Diagnóstico de chamada indisponível. Recarregue o aplicativo.';
+         }catch(error){diagnostic.textContent='Erro no diagnóstico de voz: '+error.message}
+       };
        const treatment=group('Tratamento da voz');
        const toggle=(label,key,defaultValue,apply)=>{
          const row=document.createElement('label');row.style.cssText='display:flex;align-items:center;gap:10px;font-size:13px';
