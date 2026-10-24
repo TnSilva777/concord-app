@@ -3228,7 +3228,8 @@ function voiceParticipants(){
     peer.close();voicePeers.delete(id);concordNegotiationBusy.delete(id);concordNegotiationPending.delete(id);concordVoiceLastSeen.delete(id);concordStopRemoteSpeech(id);
     for(const [key,audio] of voiceAudio)if(key.startsWith(id+':')){audio.remove();voiceAudio.delete(key)}
     voicePendingIce.delete(id);concordLiveStreams.delete(id);concordShareRepairRequested.delete(id);
-    if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none'}
+    if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block';$('#callStageMessage').textContent='Participante desconectado da chamada.'}
+    concordSyncInlineStage();
   }
   // Presença global complementa a sala mesmo durante reconexão do canal WebRTC.
   if(concordVoiceLobby){for(const entry of Object.values(concordVoiceLobby.presenceState()||{}).flat()){
@@ -3372,7 +3373,10 @@ async function voiceConnect(id,initiator){
     if(recoveryAttempts>=3){voiceStatus('Conexão difícil nesta rede. Pode ser necessário servidor TURN.');return}
     recoveryTimer=setTimeout(async()=>{
       recoveryTimer=null;
-      if(!callJoined||!voiceSignal||voicePeers.get(id)!==peer||peer.signalingState!=='stable'||peer.connectionState==='connected')return;
+      if(!callJoined||!voiceSignal||voicePeers.get(id)!==peer||peer.connectionState==='connected')return;
+      // A pending offer may be resolved shortly by the remote answer.
+      // Recheck afterwards instead of abandoning all ICE recovery attempts.
+      if(peer.signalingState!=='stable'){queueRecovery();return}
       recoveryAttempts++;
       try{
         peer.restartIce();
