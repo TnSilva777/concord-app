@@ -1823,6 +1823,7 @@ function concordLiveBadge(member){
 function concordVoiceAvatar(element,member){
  if(!element||!member?.userId||!window.concordVoiceAvatarsReady)return;
  element.dataset.concordFriendAvatar=member.userId;
+ element.dataset.fallbackName=member.name||'Participante';
  concordApplyFriendAvatar(element,member.userId);
 }
 function concordQueueVoiceAvatars(members){
@@ -1831,7 +1832,24 @@ function concordQueueVoiceAvatars(members){
  if(ids.length)concordRefreshFriendAvatars(ids).catch(error=>console.warn('Fotos da chamada indisponíveis:',error));
 }
 function concordCallState(member){const deaf=!!(member?.deafened||(member?.isMe&&remoteAudioMuted));const muted=deaf||!!(member?.muted||(member?.isMe&&!micEnabled));if(!muted)return null;const node=document.createElement('span');node.className='concord-call-state'+(deaf?' is-deafened':'');node.title=deaf?'Escuta e microfone desligados':'Microfone desligado';node.setAttribute('aria-label',node.title);const icons=['<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3M8 21h8M3 3l18 18"/></svg>'];if(deaf)icons.push('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 14v-2a8 8 0 0116 0v6a2 2 0 01-2 2h-2v-7h4M4 13h4v7H6a2 2 0 01-2-2v-5M3 3l18 18"/></svg>');node.innerHTML=icons.join('');return node}
-function concordRefreshVoiceState(){if(!callJoined)return;const fields={id:voicePeerId,userId:socialUser,name:voicePeerName(),sharing:!!stream,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted};if(voiceSignal)voiceSignal.track(fields).catch(console.warn);if(concordVoiceLobby)concordVoiceLobby.track({...fields,room:joinedRoom}).catch(console.warn);renderRooms();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers()}
+function concordRefreshVoiceState(){
+ if(!callJoined)return;
+ // Update the local roster before broadcasting: sidebar and grid must reflect
+ // the click immediately instead of waiting for a Realtime presence roundtrip.
+ if(joinedRoom){
+  const members=roomRoster[joinedRoom]||[];
+  const me=members.find(member=>member.isMe||member.id===voicePeerId);
+  if(me){me.muted=!micEnabled||remoteAudioMuted;me.deafened=!!remoteAudioMuted;me.speaking=!!concordIsLocallySpeaking&&micEnabled&&!remoteAudioMuted}
+ }
+ renderRooms();renderCallRoster();
+ if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();
+ if(typeof concordRenderEmbeddedVoice==='function')concordRenderEmbeddedVoice();
+ document.querySelectorAll('#concordVoiceGrid .cvg-tile[data-concord-self="true"]').forEach(tile=>{
+   tile.querySelector('.cvg-voice-status')?.remove();
+   const me=(roomRoster[joinedRoom]||[]).find(member=>member.isMe);
+   if(me){const state=concordCallState(me);if(state){state.classList.add('cvg-voice-status');tile.append(state)}}
+ });
+ const fields={id:voicePeerId,userId:socialUser,name:voicePeerName(),sharing:!!stream,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted};if(voiceSignal)voiceSignal.track(fields).catch(console.warn);if(concordVoiceLobby)concordVoiceLobby.track({...fields,room:joinedRoom}).catch(console.warn);}
 function renderCallRoster(){const list=$('#callRosterList');if(!list)return;list.innerHTML='';const members=roomRoster[joinedRoom||activeRoom]||[];$('#participantCount').textContent=members.length;if(!members.length){list.innerHTML='<div class="room-empty" style="padding:12px 7px">Ninguém entrou nesta sala ainda.</div>';return}members.forEach(m=>{const row=document.createElement('div');row.className='roster-person'+(m.isMe?' me':'');const av=document.createElement('div');av.className='avatar '+(m.cls||'');av.textContent=m.initial||'?';if(m.speaking||m.isMe&&concordIsLocallySpeaking)av.classList.add('speaking');if(m.isMe&&typeof concordData!=='undefined')setConcordAvatar(av,concordData.profile);else concordVoiceAvatar(av,m);const meta=document.createElement('div');meta.className='person-meta';const name=document.createElement('b');name.textContent=m.name+(m.isMe?' (você)':'');const badge=concordCallState(m);if(badge)name.append(badge);const sub=document.createElement('small');sub.textContent=m.isMe?(micEnabled?'Microfone ligado':'Microfone mutado'):'Na sala';meta.append(name,sub);const live=concordLiveBadge(m);if(live)meta.append(live);const state=document.createElement('span');state.className='person-state';state.textContent='';row.append(av,meta,state);list.append(row)})}
 function renderRooms(){
   document.querySelectorAll('.voice-room').forEach(btn=>{
@@ -3625,7 +3643,7 @@ function concordFriendAvatarUrl(id){
 function concordApplyFriendAvatar(element,id){
  if(!element||!id)return;
  const url=concordFriendAvatars.get(id);
- if(!url){element.style.backgroundImage='';const label=concordFriendNames.get(id);element.textContent=label?label.slice(0,1).toUpperCase():'?';return}
+ if(!url){element.style.backgroundImage='';const label=concordFriendNames.get(id)||element.dataset.fallbackName||element.textContent||'?';element.textContent=label.slice(0,1).toUpperCase();return}
  element.textContent='';
  element.style.backgroundImage='url("'+url+'")';
  element.style.backgroundPosition='center';
@@ -4254,6 +4272,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   const expanded=tiles.querySelector('.cvg-expanded')?.dataset.memberId||null;
   tiles.replaceChildren();
   if(!members.length){const p=document.createElement('p');p.textContent='Aguardando participantes nesta sala.';tiles.append(p);return}
+  concordQueueVoiceAvatars(members);
   members.forEach(member=>{
    const tile=document.createElement('div');tile.className='cvg-tile';tile.dataset.memberId=String(member.id||'');tile.dataset.concordSelf=String(!!member.isMe);tile.classList.toggle('cvg-sharing',stageMode&&!!member.sharing);
    if(expanded===tile.dataset.memberId)tile.classList.add('cvg-expanded');
