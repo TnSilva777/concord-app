@@ -1660,7 +1660,7 @@ async function concordChooseDesktopSource(){
    const button=document.createElement('button');button.type='button';button.style.cssText='background:#173b2a;border:1px solid #42785b;border-radius:12px;overflow:hidden;padding:8px;color:white;text-align:left;cursor:pointer';
    const preview=document.createElement('img');preview.src=source.thumbnail;preview.alt='Prévia de '+source.name;preview.style.cssText='width:100%;aspect-ratio:16/9;object-fit:contain;background:#07150f;border-radius:8px';
    const caption=document.createElement('div');caption.style.cssText='margin-top:8px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';caption.textContent=(source.type==='screen'?'🖥 ':'▣ ')+source.name;
-   button.append(preview,caption);button.onclick=async()=>{button.disabled=true;try{if(await window.concordDesktop.selectShareSource(source.id))close(true);else close(false)}catch(err){console.warn(err);close(false)}};
+   button.append(preview,caption);button.onclick=async()=>{button.disabled=true;try{if(await window.concordDesktop.selectShareSource(source.id,concordShareAudioEnabled))close(true);else close(false)}catch(err){console.warn(err);close(false)}};
    options.append(button);
   }
   panel.append(options);
@@ -4443,7 +4443,7 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  const palcoBtn=document.createElement('button');palcoBtn.type='button';palcoBtn.textContent='Palco';
  mode.append(gradeBtn,palcoBtn);header.append(title,mode,close);
  const tiles=document.createElement('div');tiles.className='cvg-tiles';grid.append(header,tiles);main.insertBefore(grid,messages);
- const open=()=>{if(!document.body.classList.contains('concord-custom-server-view')&&!document.body.classList.contains('concord-voice-expanded'))return;if(!document.getElementById('joinCall')?.disabled)return;if(!document.body.classList.contains('concord-custom-server-view')&&document.getElementById('concordDmPane')?.hidden===false)return;const stage=document.getElementById('concordInlineStage');if(stage)stage.hidden=true;messages.style.display='none';if(window.innerWidth<=760){document.body.classList.remove('concord-mobile-nav-open');document.getElementById('concordMobileNavToggle')?.setAttribute('aria-expanded','false')}grid.classList.add('open');selectMode('grade')};
+ const open=()=>{if(!document.body.classList.contains('concord-custom-server-view')&&!document.body.classList.contains('concord-voice-expanded'))return;if(!document.getElementById('joinCall')?.disabled)return;if(!document.body.classList.contains('concord-custom-server-view')&&!document.body.classList.contains('concord-voice-expanded')&&document.getElementById('concordDmPane')?.hidden===false)return;const stage=document.getElementById('concordInlineStage');if(stage)stage.hidden=true;messages.style.display='none';if(window.innerWidth<=760){document.body.classList.remove('concord-mobile-nav-open');document.getElementById('concordMobileNavToggle')?.setAttribute('aria-expanded','false')}grid.classList.add('open');selectMode('grade')};
  const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=()=>{if(grid.classList.contains('open'))close.click();else {document.body.classList.add('concord-voice-expanded');open()}};view.title='Mostrar ou ocultar a grade da chamada';view.setAttribute('aria-label','Mostrar ou ocultar a grade da chamada')}
  const join=document.getElementById('joinCall');
  // A grade só abre por ação explícita no botão de visualização, em qualquer dispositivo.
