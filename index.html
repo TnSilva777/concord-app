@@ -2747,11 +2747,10 @@ close();renderCommunityChannels();[...concordServerPanel.querySelectorAll('.conc
           concordShowEmbeddedVoice(voiceKey,room.name);
           chooseRoom(voiceKey).then(()=>{
             if(window.innerWidth<=760){
-              window.concordCloseVoiceGrid?.();
               $('#voiceModal').classList.remove('show');
-              document.body.classList.add('concord-mobile-nav-open');
+              document.body.classList.remove('concord-mobile-nav-open');
               const toggle=document.getElementById('concordMobileNavToggle');
-              if(toggle){toggle.setAttribute('aria-expanded','true');toggle.setAttribute('aria-label','Fechar canais e amigos')}
+              if(toggle){toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-label','Abrir canais e amigos')}
               refreshConcordLocalVoiceMembers();
             }
           }).catch(error=>console.warn('Falha ao entrar na call:',error));
