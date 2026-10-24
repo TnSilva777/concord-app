@@ -92,6 +92,18 @@ function openExternal(raw) {
   } catch {}
 }
 
+let selectedDesktopSource = null;
+ipcMain.handle('concord-list-share-sources',async(event)=>{
+ if(!mainWindow||event.sender.id!==mainWindow.webContents.id||!isAppUrl(event.sender.getURL()))return [];
+ const sources=await desktopCapturer.getSources({types:['screen','window'],thumbnailSize:{width:360,height:200}});
+ return sources.map(source=>({id:source.id,name:source.name,type:source.id.startsWith('screen:')?'screen':'window',thumbnail:source.thumbnail.toDataURL()}));
+});
+ipcMain.handle('concord-select-share-source',(event,id)=>{
+ if(!mainWindow||event.sender.id!==mainWindow.webContents.id||!isAppUrl(event.sender.getURL()))return false;
+ if(typeof id!=='string'||!(/^(screen|window):/.test(id)))return false;
+ selectedDesktopSource=id;
+ return true;
+});
 function installPermissions() {
   const ses = session.defaultSession;
   const allowed = new Set(['media', 'display-capture', 'fullscreen', 'notifications']);
@@ -106,6 +118,15 @@ function installPermissions() {
       try {
         const sources = await desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 240, height: 150 } });
         if (!sources.length) { callback({}); return; }
+        // The user selects a preview in the CONCORD UI before getDisplayMedia.
+        const chosenId=selectedDesktopSource;
+        selectedDesktopSource=null;
+        if(chosenId){
+          const chosen=sources.find(source=>source.id===chosenId);
+          if(!chosen){callback({});return;}
+          callback({video:chosen,audio:request.audioRequested?'loopback':undefined});
+          return;
+        }
         const selected = await dialog.showMessageBox(mainWindow, {
           type: 'question',
           title: 'CONCORD — Compartilhar tela',
