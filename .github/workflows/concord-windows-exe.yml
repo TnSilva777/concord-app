@@ -36,10 +36,32 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run desktop:build
 
+      - name: Verificar instalador com Microsoft Defender
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem dist/CONCORD-Setup-*.exe | Select-Object -First 1
+          if (-not $installer) { throw "Instalador nao encontrado" }
+          $defender = Get-Command Start-MpScan -ErrorAction SilentlyContinue
+          if (-not $defender) { throw "Microsoft Defender indisponivel para verificacao" }
+          Update-MpSignature -ErrorAction Stop
+          Start-MpScan -ScanType CustomScan -ScanPath $installer.FullName -ErrorAction Stop
+          $threats = @(Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.Resources -match [regex]::Escape($installer.Name) })
+          if ($threats.Count -gt 0) { throw "Microsoft Defender detectou ameaca no instalador" }
+
+      - name: Gerar checksum SHA256 do instalador
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem dist/CONCORD-Setup-*.exe | Select-Object -First 1
+          $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($installer.Name)" | Out-File -FilePath dist/SHA256SUMS.txt -Encoding ascii
+          Write-Host "SHA256: $hash"
+
       - name: Guardar instalador para download
         uses: actions/upload-artifact@v4
         with:
           name: CONCORD-Windows-Setup
-          path: dist/CONCORD-Setup-*.exe
+          path: |
+            dist/CONCORD-Setup-*.exe
+            dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
