@@ -1710,7 +1710,7 @@ function concordCreateSpeechGate(){
   // Speak immediately on a meaningful rise; update floor slowly to avoid following speech.
   const margin=0.00018+(100-sensitivity)*0.000006;
   const threshold=Math.max(0.00035,floor+margin);
-  const detected=rms>threshold || peak>Math.max(0.003,threshold*3.5);
+  const detected=rms>threshold && (peak>Math.max(0.004,threshold*2.8)); // Evita acender o indicador só por um pico isolado de vento/ruído.
   if(now-started<250){floor=floor*.96+rms*.04;return false}
   if(detected){activeUntil=now+165}
   else if(now>=activeUntil){floor=floor*.998+rms*.002}
@@ -2132,7 +2132,8 @@ async function concordSaveServersToCloud(id){
   if(!id||id!==concordCloudBackupUser||!concordCloudBackupReady)return;
   const communities=concordData.communities.map(item=>({
     id:item.id,name:item.name,icon:item.icon,description:item.description,createdAt:item.createdAt,
-    channels:item.channels||[],lastTextRoom:item.lastTextRoom,ownerId:item.ownerId||null,inviteToken:item.inviteToken||null,readOnlyMember:!!item.readOnlyMember
+    channels:item.channels||[],lastTextRoom:item.lastTextRoom,ownerId:item.ownerId||null,inviteToken:item.inviteToken||null,readOnlyMember:!!item.readOnlyMember,
+    roles:Array.isArray(item.roles)?item.roles:[],preferences:item.preferences&&typeof item.preferences==='object'?item.preferences:{}
   }));
   try{
     const {error}=await concordSupabase.from('concord_server_backups').upsert({user_id:id,communities,updated_at:new Date().toISOString()},{onConflict:'user_id'});
@@ -2175,7 +2176,7 @@ async function concordLoadServersFromCloud(id){
       if(!previous){merged.set(item.id,item);continue}
       const channels=new Map((previous.channels||[]).map(room=>[room.id,room]));
       for(const room of item.channels||[]){if(!channels.has(room.id))channels.set(room.id,room)}
-      merged.set(item.id,{...previous,...item,inviteToken:item.inviteToken||previous.inviteToken||null,ownerId:item.ownerId||previous.ownerId||null,readOnlyMember:item.readOnlyMember??previous.readOnlyMember,channels:[...channels.values()]});
+      merged.set(item.id,{...previous,...item,inviteToken:item.inviteToken||previous.inviteToken||null,ownerId:item.ownerId||previous.ownerId||null,readOnlyMember:item.readOnlyMember??previous.readOnlyMember,channels:[...channels.values()],roles:Array.isArray(item.roles)&&item.roles.length?item.roles:(previous.roles||[]),preferences:{...(previous.preferences||{}),...(item.preferences||{})}});
     }
     concordData.communities=[...merged.values()];
     localStorage.setItem(CONCORD_STORE,JSON.stringify(concordData));
