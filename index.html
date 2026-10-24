@@ -1710,8 +1710,8 @@ let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);functio
 // Actual outgoing WebRTC processing, separate from the speaking animation.
 // High-pass reduces rumble/wind. Expander reduces quiet background sounds.
 try{
- const highpass=micContext.createBiquadFilter();highpass.type='highpass';highpass.frequency.value=110;highpass.Q.value=0.7;
- const lowpass=micContext.createBiquadFilter();lowpass.type='lowpass';lowpass.frequency.value=7200;lowpass.Q.value=0.7;
+ const highpass=micContext.createBiquadFilter();highpass.type='highpass';highpass.frequency.value=170;highpass.Q.value=0.7;
+ const lowpass=micContext.createBiquadFilter();lowpass.type='lowpass';lowpass.frequency.value=6100;lowpass.Q.value=0.7;
  const gate=micContext.createGain();gate.gain.value=1; // fail-open: never hard-mute a live microphone solely on voice activity detection
  const destination=micContext.createMediaStreamDestination();src.connect(highpass);highpass.connect(lowpass);lowpass.connect(gate);gate.connect(destination);
  concordProcessedMic=destination.stream;concordMicNoiseGate=gate;
@@ -1732,8 +1732,8 @@ setLocalSpeaking(speaking);
 if(concordMicNoiseGate&&micContext?.state==='running'){
  const now=micContext.currentTime;
  const strong=localStorage.getItem('concord-noise-mode')!=='normal';
- const target=!enabled?0:!concordNoiseSuppression?1:speaking?1:strong?0.55:0.78;
- concordMicNoiseGate.gain.setTargetAtTime(target,now,speaking?0.008:0.22);
+ const target=!enabled?0:!concordNoiseSuppression?1:speaking?1:strong?0.10:0.38;
+ concordMicNoiseGate.gain.setTargetAtTime(target,now,speaking?0.008:0.18);
 }
 const rms=Math.sqrt(data.reduce((sum,value)=>sum+value*value,0)/data.length);
 if(enabled){const displayed=Math.min(100,rms*9000);document.getElementById('micMeter')?.setAttribute('aria-valuenow',String(Math.round(displayed)))}
