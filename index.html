@@ -1686,7 +1686,7 @@ function concordMicConstraints(){return {echoCancellation:localStorage.getItem('
 let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);function openVoice(){$('#voiceModal').classList.add('show')}$('#voiceBtn').onclick=openVoice;if($('#mobileVoice'))$('#mobileVoice').onclick=openVoice;$('#closeVoice').onclick=()=>$('#voiceModal').classList.remove('show');async function joinCall(){if(callJoined)return;$('#voiceStatus').textContent='Solicitando permissão do microfone…';if(!navigator.mediaDevices?.getUserMedia){$('#voiceStatus').textContent='Este navegador não permite acessar o microfone aqui. Abra o Concord em Chrome/Edge atualizado usando localhost ou HTTPS.';return}try{micStream=await (async()=>{
   const saved=localStorage.getItem('concord-input-device');
   const attempts=[
-    {audio:{...concordMicConstraints(),...(saved?{deviceId:{ideal:saved}}:{})},video:false},
+    {audio:{...concordMicConstraints(),...(saved?{deviceId:{exact:saved}}:{})},video:false},
     {audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:false},video:false},
     {audio:true,video:false}
   ];
@@ -1695,7 +1695,7 @@ let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);functio
     try{
       const captured=await navigator.mediaDevices.getUserMedia(constraints);
       if(captured.getAudioTracks().some(track=>track.readyState==='live')){
-        if(saved&&constraints===attempts[1])localStorage.removeItem('concord-input-device');
+        if(saved&&constraints!==attempts[0])localStorage.removeItem('concord-input-device');
         return captured;
       }
       captured.getTracks().forEach(track=>track.stop());
@@ -1706,7 +1706,7 @@ let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);functio
     }
   }
   throw lastError||new Error('Nenhuma entrada de áudio ativa.');
-})();callJoined=true;micEnabled=true;concordUpdateUserMic();$('#callState').textContent='Áudio local ativo';$('#callState').style.color='#42dca4';$('#callSubtitle').textContent='Você entrou na sala';$('#voiceStatus').textContent='Você entrou na sala e o microfone está funcionando neste dispositivo. A lista à esquerda mostra participantes conectados nesta sessão. Para ouvir outras pessoas em outros dispositivos, é necessário conectar um servidor de chamadas.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Microfone ligado';if($('#youRosterState'))$('#youRosterState').textContent='🎙';$('#audioStatus').textContent='Microfone ligado';$('#joinCall').textContent='Conectado';$('#joinCall').disabled=true;$('#micToggle').disabled=false;$('#headphoneToggle').disabled=false;$('#callShare').disabled=false;$('#micToggle').classList.add('on');try{micContext=new(window.AudioContext||window.webkitAudioContext)();if(micContext.state==='suspended')await micContext.resume().catch(console.warn);const src=micContext.createMediaStreamSource(micStream);micSource=src;micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=2048;micAnalyser.smoothingTimeConstant=0;src.connect(micAnalyser);
+})();callJoined=true;micEnabled=true;concordUpdateUserMic();console.info('CONCORD call microphone:',micStream.getAudioTracks()[0]?.label);$('#callState').textContent='Áudio local ativo';$('#callState').style.color='#42dca4';$('#callSubtitle').textContent='Você entrou na sala';$('#voiceStatus').textContent='Você entrou na sala e o microfone está funcionando neste dispositivo. A lista à esquerda mostra participantes conectados nesta sessão. Para ouvir outras pessoas em outros dispositivos, é necessário conectar um servidor de chamadas.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Microfone ligado';if($('#youRosterState'))$('#youRosterState').textContent='🎙';$('#audioStatus').textContent='Microfone ligado';$('#joinCall').textContent='Conectado';$('#joinCall').disabled=true;$('#micToggle').disabled=false;$('#headphoneToggle').disabled=false;$('#callShare').disabled=false;$('#micToggle').classList.add('on');try{micContext=new(window.AudioContext||window.webkitAudioContext)();if(micContext.state==='suspended')await micContext.resume().catch(console.warn);const src=micContext.createMediaStreamSource(micStream);micSource=src;micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=2048;micAnalyser.smoothingTimeConstant=0;src.connect(micAnalyser);
 // Actual outgoing WebRTC processing, separate from the speaking animation.
 // High-pass reduces rumble/wind. Expander reduces quiet background sounds.
 try{
@@ -1723,6 +1723,10 @@ const speaking=speechGate(data,performance.now(),enabled);
 const level=Math.sqrt(data.reduce((sum,value)=>sum+value*value,0)/data.length);
 // Show actual input activity separately from the speaking/noise-suppression threshold.
 const statusMeter=document.getElementById('micMeter');
+const liveInputLabel=document.getElementById('concordLiveMicLabel');
+if(liveInputLabel&&enabled){
+ liveInputLabel.textContent='Entrada da chamada: '+(micStream?.getAudioTracks()[0]?.label||'indefinida')+' · nível '+(level*100).toFixed(2)+'% RMS';
+}
 if(statusMeter)statusMeter.title=enabled?'Microfone capturado · nível '+Math.round(Math.min(100,level*500))+'%':'Nenhum áudio ativo';
 setLocalSpeaking(speaking);
 if(concordMicNoiseGate&&micContext?.state==='running'){
@@ -4846,6 +4850,7 @@ body:not(.concord-custom-server-view) #concordServerLocalWarning{display:none}
            test.textContent='■ Parar teste';feedback.textContent='Fale no microfone: a barra verde deve reagir somente quando houver som.';
          }catch(err){stopTest();feedback.textContent='Microfone não disponível. Confira as permissões e o dispositivo selecionado.'}
        };
+       const liveMic=document.createElement('small');liveMic.id='concordLiveMicLabel';liveMic.style.cssText='color:#8cf0bc;font-size:12px;white-space:pre-wrap';liveMic.textContent='Entre na chamada para conferir qual entrada está realmente ativa.';sliders.append(liveMic);
        const recovery=group('Diagnóstico e recuperação do microfone');
        const diagnostic=document.createElement('small');diagnostic.style.cssText='color:#c5e8d3;white-space:pre-wrap;line-height:1.65';diagnostic.textContent='Use o diagnóstico para descobrir se o CONCORD recebe áudio do Windows.';
        recovery.append(diagnostic);
