@@ -2602,7 +2602,7 @@ const name=v.name.trim().slice(0,32);if(!name||community.channels.some(x=>x.name
 const room={id:'ch'+Date.now(),name,type:v.type};community.channels.push(room);if(!saveConcordData()){community.channels.pop();simple('Erro','Não foi possível salvar.');return}
 close();renderCommunityChannels();[...concordServerPanel.querySelectorAll('.concord-server-room')].find(x=>x.dataset.channelId===room.id)?.querySelector('.concord-server-room-name')?.click();showConcordToast('Sala criada','Sala adicionada.');
 })};
-  const controls=document.createElement('div');controls.className='concord-server-actions';controls.append(invite);if(canManage)controls.append(settings,add);
+  const controls=document.createElement('div');controls.className='concord-server-actions';controls.append(invite);if(canManage)controls.append(settings,rolesButton,add);
   const backup=document.createElement('button');backup.type='button';backup.textContent='↓ Backup';backup.title='Salvar seus servidores em arquivo para restaurar em outra versão do site';backup.onclick=concordExportServers;
   const restore=document.createElement('button');restore.type='button';restore.textContent='↑ Restaurar';restore.title='Importar servidores de um backup';
   restore.onclick=()=>{const input=document.createElement('input');input.type='file';input.accept='.json,application/json';input.onchange=()=>concordImportServers(input.files?.[0]);input.click()};
