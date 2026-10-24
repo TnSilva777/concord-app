@@ -136,18 +136,27 @@ function installPermissions() {
   // Chromium checks device permissions separately from the media request.
   // Trust only the real app window and its exact origin, not arbitrary frames.
   function trustedMediaRequester(contents, origin) {
-    return !!mainWindow && !mainWindow.isDestroyed()
-      && contents?.id === mainWindow.webContents.id
+    if (!mainWindow || mainWindow.isDestroyed()) return false;
+    // Chromium can pass null webContents for preflight media permission checks.
+    // In that case authorize only if the requested origin belongs to CONCORD.
+    if (!contents) return !!origin && isAppUrl(origin) && isAppUrl(mainWindow.webContents.getURL());
+    return contents.id === mainWindow.webContents.id
       && isAppUrl(contents.getURL())
       && (!origin || isAppUrl(origin));
   }
   ses.setPermissionCheckHandler((contents, permission, origin, details) => {
     const accepted = allowed.has(permission) || permission === 'microphone' || permission === 'audioCapture';
-    return accepted && trustedMediaRequester(contents, origin || details?.requestingUrl);
+    const requester = details?.securityOrigin || details?.requestingUrl || origin;
+    const granted = accepted && trustedMediaRequester(contents, requester);
+    if (permission === 'media' && !granted) console.warn('CONCORD media check denied', {requester, origin, mediaType:details?.mediaType});
+    return granted;
   });
   ses.setPermissionRequestHandler((contents, permission, callback, details) => {
     const accepted = allowed.has(permission) || permission === 'microphone' || permission === 'audioCapture';
-    callback(accepted && trustedMediaRequester(contents, details?.requestingUrl || details?.securityOrigin));
+    const requester = details?.securityOrigin || details?.requestingUrl || contents?.getURL();
+    const granted = accepted && trustedMediaRequester(contents, requester);
+    if (permission === 'media' && !granted) console.warn('CONCORD microphone request denied', {requester, mediaTypes:details?.mediaTypes});
+    callback(granted);
   });
 }
 
