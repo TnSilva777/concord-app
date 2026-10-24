@@ -1245,6 +1245,61 @@ button:focus-visible,[role="button"]:focus-visible{outline:2px solid #8befbb!imp
 }
 @media(prefers-reduced-motion:reduce){.app>.servers button,.app>.servers .server,.concord-server-room,.concord-local-voice-person,.concord-voice-dock button,.concord-user-controls .gear{transition:none!important;transform:none!important}}
 </style>
+<style>
+/* CONCORD / ORBIT — original interface language: connected islands and signal paths.
+   Presentation only: the chat, server, realtime, voice and authentication DOM stays intact. */
+:root{--orbit-ink:#081713;--orbit-surface:#10261f;--orbit-surface-2:#19382d;--orbit-stroke:#376452;--orbit-mint:#71edb7;--orbit-cyan:#85d7c6;--orbit-gold:#e1bc73}
+body{background:radial-gradient(ellipse 70% 55% at 95% 8%,#144839 0%,transparent 70%),#06130f!important}
+@media(min-width:761px){
+ .app{gap:8px!important;padding:8px!important;background:transparent!important;grid-template-columns:76px minmax(220px,255px) minmax(0,1fr)!important}
+ .app>.servers{border-radius:22px!important;border:1px solid #355d4a!important;padding:14px 8px!important;box-shadow:0 12px 30px #0004,inset 0 1px #ffffff0a!important;background:linear-gradient(180deg,#18392b,#0b221a)!important}
+ .app>.sidebar{border:1px solid #345b48!important;border-radius:22px!important;box-shadow:0 12px 30px #0003!important;overflow:hidden}
+ .app>.main{border:1px solid #315e49!important;border-radius:22px!important;overflow:hidden;box-shadow:0 12px 36px #0004!important}
+}
+.app>.servers{position:relative}
+.app>.servers:before{content:'◌';font-size:13px;color:#9fdfc1;letter-spacing:2px;opacity:.75}
+.app>.servers .logo{border-radius:50%!important;background:radial-gradient(circle at 35% 25%,#8dffd1,#258663 65%,#124532)!important;border:2px solid #9aefc5!important;box-shadow:0 0 0 5px #368f6530,0 9px 20px #0004!important}
+.app>.servers .server,.app>.servers .concord-community-item .server{border-radius:15px 22px 15px 22px!important;border:1px solid #46745d!important;background:#183f30!important;box-shadow:inset 0 1px #ffffff0b!important;transform:rotate(-3deg);transition:transform .18s ease,border-radius .18s ease,background .18s ease!important}
+.app>.servers .server:hover,.app>.servers .server.active,.app>.servers .concord-community-item.active .server{transform:rotate(0) scale(1.06)!important;border-radius:22px 15px 22px 15px!important;background:linear-gradient(135deg,#43a97e,#205c48)!important;box-shadow:0 0 0 3px #66cda025!important}
+.app>.sidebar{background:linear-gradient(160deg,#173b2d 0%,#10271f 46%,#0d201a 100%)!important}
+.concord-server-heading .concord-server-menu-trigger{border-radius:15px!important;margin:7px auto 6px;width:calc(100% - 14px)!important;min-height:65px!important;background:linear-gradient(110deg,#24533d,#193c2e)!important;box-shadow:0 7px 14px #0003!important}
+.concord-server-identity-icon{border-radius:50%!important;background:#367657!important}
+.concord-server-section{font-size:10px!important;letter-spacing:1.7px!important;color:#97e9bf!important;padding-top:12px!important}
+.concord-server-room{margin:4px 8px!important;border:1px solid transparent!important;border-radius:12px 18px 12px 18px!important;background:transparent!important;transition:background .15s,border-color .15s!important}
+.concord-server-room:hover{background:#28523d!important;border-color:#3b7453!important}
+.concord-server-room.concord-room-selected{background:linear-gradient(100deg,#316d4c,#204935)!important;border-color:#69bd89!important;box-shadow:inset 4px 0 #acffd2,0 4px 12px #0002!important}
+.concord-local-voice-person{border-radius:11px!important}
+.concord-voice-dock{margin:9px!important;background:linear-gradient(135deg,#204f38,#123427)!important;border:1px solid #5b9472!important;border-radius:18px!important;box-shadow:0 8px 18px #0004!important}
+.app>.sidebar .user{background:linear-gradient(100deg,#163c2b,#143025)!important;border-top:1px solid #4d8665!important}
+.app>.main{background:radial-gradient(ellipse at 85% 3%,#15372a 0%,transparent 43%),#0c1f18!important}
+.app>.main .topbar{background:linear-gradient(90deg,#173b2b,#122b22)!important;border-bottom:1px solid #427356!important;box-shadow:none!important}
+.app>.main .topbar strong{letter-spacing:.3px}
+.app>.main .topbar .hash{color:#71e9b0!important}
+#concordDmPane{background:radial-gradient(ellipse at top right,#194b36,transparent 55%),#0c2118!important}
+#concordDmPane .concord-dm-message,.message{border-radius:14px}
+#concordVoiceGrid.open{background:radial-gradient(ellipse at 65% 0,#163e2e 0%,transparent 48%),#091812!important}
+#concordVoiceGrid .cvg-header{border-bottom:1px solid #396850!important}
+#concordVoiceGrid .cvg-modes{border-radius:24px!important;padding:4px!important;border:1px solid #52856a!important;background:#102b20!important}
+#concordVoiceGrid .cvg-modes button{border-radius:20px!important;min-height:37px}
+#concordVoiceGrid .cvg-modes button.selected{background:linear-gradient(110deg,#4abb8a,#1f7956)!important;color:#062517!important}
+#concordVoiceGrid .cvg-tile{background:radial-gradient(circle at 50% 35%,#2a5341,#142c22 70%)!important;border:1px solid #4c7d62!important;border-radius:22px 12px 22px 12px!important}
+#concordVoiceGrid .cvg-tile.cvg-speaking{border-color:#9cf1bf!important;box-shadow:inset 0 0 0 2px #4ed995,0 0 24px #4ac98930!important}
+#concordVoiceGrid .cvg-avatar{border:3px solid #7fcba0!important;background:#286346!important}
+#concordVoiceGrid .cvg-name{border-radius:12px!important;background:#0a2219e9!important}
+#concordEmbeddedVoice .cev-person{border-radius:22px 12px 22px 12px!important;background:radial-gradient(circle at 50% 30%,#315c46,#162f25)!important}
+#concordEmbeddedVoice .cev-head{border-bottom:1px solid #315e47;padding-bottom:10px}
+#concordEmbeddedVoice .cev-avatar{border:2px solid #8ccfa7}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #86eeba!important;outline-offset:2px}
+@media(max-width:760px){
+ .app>.servers{background:linear-gradient(180deg,#173c2d,#0b241a)!important;border-right:1px solid #4a775c!important}
+ .app>.sidebar{background:linear-gradient(165deg,#17382b,#10261d)!important}
+ .concord-server-heading .concord-server-menu-trigger{margin:6px auto!important;width:calc(100% - 12px)!important}
+ .concord-server-room{margin:3px 7px!important}
+ #concordVoiceGrid .cvg-modes{border-radius:17px!important}
+ #concordVoiceGrid .cvg-tile{border-radius:16px!important}
+}
+@media(prefers-reduced-motion:reduce){.app>.servers .server,.app>.servers .concord-community-item .server{transition:none!important;transform:none!important}}
+</style>
 </head><body>
 <div class="app"><aside class="servers"><div class="logo concord-brand-mark" aria-label="Logo CONCORD" title="CONCORD">C</div><button type="button" class="server" id="concordFriendsNav" title="Amigos e conversas privadas" aria-label="Abrir amigos e conversas privadas">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
 <aside class="sidebar"><div class="brand"><strong>CONCORD</strong><small>SUA COMUNIDADE. SEU ESPAÇO.</small></div><button class="search" id="searchBtn">⌕ &nbsp; Buscar canais</button><div class="section">CONCORD OFICIAL</div><button class="channel active" data-channel="geral"><span>#</span> geral</button><button class="channel" data-channel="regras"><span>#</span> regras</button><button class="channel" data-channel="anuncios"><span>#</span> anúncios</button><div class="section">COMUNIDADES</div><button class="channel" data-channel="jogos"><span>#</span> jogos</button><button class="channel" data-channel="tecnologia"><span>#</span> tecnologia</button><button class="channel" data-channel="memes"><span>#</span> memes</button><div class="section">CANAIS DE VOZ</div><button class="channel" id="voiceBtn"><span>◖</span> Sala de voz <span class="online"></span></button><div class="section voice-section-title">SALAS DE VOZ <button id="addVoiceRoom" title="Criar sala de voz">＋</button></div>
