@@ -2367,7 +2367,6 @@ function concordOpenServerRoles(community){
 function editLocalCommunity(id){
 const community=concordData.communities.find(x=>x.id===id);if(!community)return;
 if(!concordCanManageServer(community)){simple('Sem permissão','Apenas o dono ou pessoas com permissão de gerenciar o servidor podem editar.');return}
-concordOpenServerRoles(community);
 concordHud('Configurações · '+community.name,[{key:'name',label:'Nome',value:community.name,max:40},{key:'icon',label:'Emoji',value:community.icon||'🎮',max:4},{key:'description',label:'Descrição',value:community.description||'',multiline:true}],(v,close)=>{
 const name=v.name.trim().slice(0,40);if(!name||concordData.communities.some(x=>x.id!==id&&x.name.toLowerCase()===name.toLowerCase())){simple('Nome inválido','Escolha um nome único.');return}
 const old={...community};community.name=name;community.icon=v.icon.trim().slice(0,4)||'🎮';community.description=v.description.trim().slice(0,180);
@@ -2594,6 +2593,7 @@ function renderCommunityChannels(){
   const title=document.createElement('strong');title.textContent=community.name;
   const canManage=concordCanManageServer(community);
   const settings=document.createElement('button');settings.type='button';settings.className='concord-server-settings';settings.textContent='⚙';settings.title='Configurações do servidor';settings.setAttribute('aria-label','Configurações do servidor');settings.onclick=()=>editLocalCommunity(community.id);
+  const rolesButton=document.createElement('button');rolesButton.type='button';rolesButton.textContent='♛ Cargos';rolesButton.title='Gerenciar cargos e permissões';rolesButton.onclick=()=>concordOpenServerRoles(community);
   const invite=document.createElement('button');invite.type='button';invite.textContent='🔗 Convite';invite.title='Compartilhar modelo do servidor com canais';
   invite.onclick=()=>concordInviteCommunity(community);
   const add=document.createElement('button');add.type='button';add.textContent='＋ Criar sala';add.title='Criar canal de texto ou sala de voz';
