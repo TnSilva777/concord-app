@@ -1680,7 +1680,30 @@ function concordReleaseProcessedMic(){if(concordProcessedMic)concordProcessedMic
 let concordNoiseSuppression=localStorage.getItem('concord-noise-suppression')!=='false';
 let concordNoiseMode=localStorage.getItem('concord-noise-mode')||'strong';
 function concordMicConstraints(){return {echoCancellation:localStorage.getItem('concord-echo-cancellation')!=='false',noiseSuppression:concordNoiseSuppression,autoGainControl:localStorage.getItem('concord-auto-gain')!=='false',channelCount:1,sampleRate:{ideal:48000}}}
-let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);function openVoice(){$('#voiceModal').classList.add('show')}$('#voiceBtn').onclick=openVoice;if($('#mobileVoice'))$('#mobileVoice').onclick=openVoice;$('#closeVoice').onclick=()=>$('#voiceModal').classList.remove('show');async function joinCall(){if(callJoined)return;$('#voiceStatus').textContent='Solicitando permissão do microfone…';if(!navigator.mediaDevices?.getUserMedia){$('#voiceStatus').textContent='Este navegador não permite acessar o microfone aqui. Abra o Concord em Chrome/Edge atualizado usando localhost ou HTTPS.';return}try{micStream=await navigator.mediaDevices.getUserMedia({audio:{...concordMicConstraints(),...(localStorage.getItem('concord-input-device')?{deviceId:{ideal:localStorage.getItem('concord-input-device')}}:{})},video:false});callJoined=true;micEnabled=true;concordUpdateUserMic();$('#callState').textContent='Áudio local ativo';$('#callState').style.color='#42dca4';$('#callSubtitle').textContent='Você entrou na sala';$('#voiceStatus').textContent='Você entrou na sala e o microfone está funcionando neste dispositivo. A lista à esquerda mostra participantes conectados nesta sessão. Para ouvir outras pessoas em outros dispositivos, é necessário conectar um servidor de chamadas.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Microfone ligado';if($('#youRosterState'))$('#youRosterState').textContent='🎙';$('#audioStatus').textContent='Microfone ligado';$('#joinCall').textContent='Conectado';$('#joinCall').disabled=true;$('#micToggle').disabled=false;$('#headphoneToggle').disabled=false;$('#callShare').disabled=false;$('#micToggle').classList.add('on');try{micContext=new(window.AudioContext||window.webkitAudioContext)();if(micContext.state==='suspended')await micContext.resume().catch(console.warn);const src=micContext.createMediaStreamSource(micStream);micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=1024;micAnalyser.smoothingTimeConstant=0;src.connect(micAnalyser);
+let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);function openVoice(){$('#voiceModal').classList.add('show')}$('#voiceBtn').onclick=openVoice;if($('#mobileVoice'))$('#mobileVoice').onclick=openVoice;$('#closeVoice').onclick=()=>$('#voiceModal').classList.remove('show');async function joinCall(){if(callJoined)return;$('#voiceStatus').textContent='Solicitando permissão do microfone…';if(!navigator.mediaDevices?.getUserMedia){$('#voiceStatus').textContent='Este navegador não permite acessar o microfone aqui. Abra o Concord em Chrome/Edge atualizado usando localhost ou HTTPS.';return}try{micStream=await (async()=>{
+  const saved=localStorage.getItem('concord-input-device');
+  const attempts=[
+    {audio:{...concordMicConstraints(),...(saved?{deviceId:{ideal:saved}}:{})},video:false},
+    {audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:false},video:false},
+    {audio:true,video:false}
+  ];
+  let lastError;
+  for(const constraints of attempts){
+    try{
+      const captured=await navigator.mediaDevices.getUserMedia(constraints);
+      if(captured.getAudioTracks().some(track=>track.readyState==='live')){
+        if(saved&&constraints===attempts[1])localStorage.removeItem('concord-input-device');
+        return captured;
+      }
+      captured.getTracks().forEach(track=>track.stop());
+    }catch(error){
+      lastError=error;
+      if(error.name==='NotAllowedError'||error.name==='PermissionDeniedError'||error.name==='SecurityError')throw error;
+      console.warn('Tentativa de microfone indisponível:',error.name,error.message);
+    }
+  }
+  throw lastError||new Error('Nenhuma entrada de áudio ativa.');
+})();callJoined=true;micEnabled=true;concordUpdateUserMic();$('#callState').textContent='Áudio local ativo';$('#callState').style.color='#42dca4';$('#callSubtitle').textContent='Você entrou na sala';$('#voiceStatus').textContent='Você entrou na sala e o microfone está funcionando neste dispositivo. A lista à esquerda mostra participantes conectados nesta sessão. Para ouvir outras pessoas em outros dispositivos, é necessário conectar um servidor de chamadas.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Microfone ligado';if($('#youRosterState'))$('#youRosterState').textContent='🎙';$('#audioStatus').textContent='Microfone ligado';$('#joinCall').textContent='Conectado';$('#joinCall').disabled=true;$('#micToggle').disabled=false;$('#headphoneToggle').disabled=false;$('#callShare').disabled=false;$('#micToggle').classList.add('on');try{micContext=new(window.AudioContext||window.webkitAudioContext)();if(micContext.state==='suspended')await micContext.resume().catch(console.warn);const src=micContext.createMediaStreamSource(micStream);micAnalyser=micContext.createAnalyser();micAnalyser.fftSize=1024;micAnalyser.smoothingTimeConstant=0;src.connect(micAnalyser);
 // Actual outgoing WebRTC processing, separate from the speaking animation.
 // High-pass reduces rumble/wind. Expander reduces quiet background sounds.
 try{
@@ -1694,6 +1717,10 @@ const data=new Float32Array(micAnalyser.fftSize),speechGate=concordCreateSpeechG
 const meter=()=>{if(!micAnalyser)return;micAnalyser.getFloatTimeDomainData(data);
 const enabled=callJoined&&micEnabled&&micContext?.state==='running'&&micStream?.getAudioTracks().some(t=>t.enabled&&!t.muted&&t.readyState==='live');
 const speaking=speechGate(data,performance.now(),enabled);
+const level=Math.sqrt(data.reduce((sum,value)=>sum+value*value,0)/data.length);
+// Show actual input activity separately from the speaking/noise-suppression threshold.
+const statusMeter=document.getElementById('micMeter');
+if(statusMeter)statusMeter.title=enabled?'Microfone capturado · nível '+Math.round(Math.min(100,level*500))+'%':'Nenhum áudio ativo';
 setLocalSpeaking(speaking);
 if(concordMicNoiseGate&&micContext?.state==='running'){
  const now=micContext.currentTime;
