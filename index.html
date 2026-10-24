@@ -3899,6 +3899,7 @@ async function concordRefreshFriendAvatars(ids){
  const account=socialUser;
  const now=Date.now();
  const pending=[...new Set(ids)].filter(id=>typeof id==='string'&&id&&!(!concordAvatarCheckedAt.has(id)?false:now-concordAvatarCheckedAt.get(id)<=60000));
+ if(!pending.length)return; // Sem fotos novas, não forçar reconstrução de todas as tiles da chamada.
  for(let offset=0;offset<pending.length;offset+=6){
  await Promise.all(pending.slice(offset,offset+6).map(async id=>{
    concordAvatarCheckedAt.set(id,now);
