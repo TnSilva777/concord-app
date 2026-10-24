@@ -1764,6 +1764,31 @@ document.addEventListener('keydown',event=>{
   event.preventDefault();
   if(callJoined&&micStream)toggleMic();else concordMicIdleNotice();
 });
+window.concordSwitchCallMicrophone=async(deviceId)=>{
+ if(!callJoined)return {ok:true,restart:false};
+ const constraints={audio:{...concordMicConstraints(),...(deviceId?{deviceId:{exact:deviceId}}:{})},video:false};
+ const replacement=await navigator.mediaDevices.getUserMedia(constraints);
+ const newTrack=replacement.getAudioTracks()[0];
+ if(!newTrack){replacement.getTracks().forEach(t=>t.stop());throw new Error('Nenhuma faixa de microfone capturada')}
+ newTrack.enabled=micEnabled&&!remoteAudioMuted;
+ const old=micStream;
+ // Replace outgoing audio on every peer before retiring old media.
+ try{
+  for(const peer of voicePeers.values()){
+   const sender=peer.getSenders().find(sender=>sender.track?.kind==='audio'&&!sender.__concordScreenSender);
+   if(sender)await sender.replaceTrack(newTrack);
+  }
+ }catch(error){replacement.getTracks().forEach(t=>t.stop());throw error}
+ micStream=replacement;
+ // Reconnect the analyser to the new microphone on the next animation frame.
+ if(micContext&&micAnalyser){
+  try{micContext.createMediaStreamSource(replacement).connect(micAnalyser)}catch(err){console.warn('Reconexão do medidor:',err)}
+ }
+ old?.getTracks().forEach(t=>t.stop());
+ // Old filtered track belongs to the old capture; prevent reusing it.
+ concordReleaseProcessedMic();
+ return {ok:true,restart:false,label:newTrack.label};
+};
 function toggleMic(){if(!micStream)return;micEnabled=!micEnabled;micStream.getAudioTracks().forEach(t=>t.enabled=micEnabled&&!remoteAudioMuted);$('#micToggle').classList.toggle('on',micEnabled);$('#micToggle').textContent=micEnabled?'🎙':'🔇';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent=micEnabled?'Microfone ligado':'Microfone mutado';if($('#youRosterState'))$('#youRosterState').textContent=micEnabled?'🎙':'🔇';$('#audioStatus').textContent=micEnabled?'Microfone ligado':'Microfone mutado';concordUpdateUserMic();if(!micEnabled)setLocalSpeaking(false);$('#voiceStatus').textContent=micEnabled?'Microfone ligado. Fale para testar o indicador de nível.':'Microfone mutado.';concordRefreshVoiceState()}function leaveCall(){if(stream)stopShare();if(micFrame)cancelAnimationFrame(micFrame);micFrame=null;if(micStream)micStream.getTracks().forEach(t=>t.stop());micStream=null;concordReleaseProcessedMic();if(micContext){micContext.close().catch(()=>{});micContext=null}micAnalyser=null;callJoined=false;micEnabled=true;concordUpdateUserMic();if(typeof setLocalSpeaking==='function')setLocalSpeaking(false);$('#micMeter').style.width='0';$('#callState').textContent='Não conectado';$('#callState').style.color='#9fbaaa';$('#callSubtitle').textContent='Pronto para conectar';$('#voiceStatus').textContent='Você saiu da sala. Entre novamente para testar o microfone.';if($('#youVoiceStatus'))$('#youVoiceStatus').textContent='Ainda não entrou';if($('#youRosterState'))$('#youRosterState').textContent='○';$('#audioStatus').textContent='Microfone desligado';$('#joinCall').textContent='Entrar na sala';$('#joinCall').disabled=false;$('#micToggle').disabled=true;$('#headphoneToggle').disabled=true;$('#callShare').disabled=true;$('#micToggle').classList.remove('on');$('#micToggle').textContent='🎙'}$('#joinCall').onclick=joinCall;$('#micToggle').onclick=toggleMic;$('#leaveCall').onclick=leaveCall;$('#headphoneToggle').onclick=()=>{if(!callJoined)return;remoteAudioMuted=!remoteAudioMuted;for(const audio of voiceAudio.values()){audio.muted=remoteAudioMuted;if(!remoteAudioMuted)audio.play().catch(()=>{concordAudioUnlock.hidden=false;voiceStatus('Clique em Ativar som para liberar áudio no navegador.')})}$('#headphoneToggle').textContent=remoteAudioMuted?'🔇':'🎧';$('#voiceStatus').textContent=remoteAudioMuted?'Áudio dos participantes silenciado.':'Áudio dos participantes ativado.';const inline=document.getElementById('concordInlineSound');if(inline)inline.textContent=remoteAudioMuted?'🔇 Som silenciado':'🔊 Som ativado';micStream?.getAudioTracks().forEach(t=>t.enabled=micEnabled&&!remoteAudioMuted);if(remoteAudioMuted)setLocalSpeaking(false);concordRefreshVoiceState();};$('#callShare').onclick=()=>{ $('#voiceModal').classList.remove('show');openShare()};$('#inviteBtn').onclick=$('#mobileInvite').onclick=async()=>{
   const room=typeof activeRoom==='string'?activeRoom:'Geral';
   const url=new URL(location.href);url.hash='voz='+encodeURIComponent(room);
@@ -4759,7 +4784,14 @@ body:not(.concord-custom-server-view) #concordServerLocalWarning{display:none}
          select.value='';wrap.append(select);parent.append(wrap);
          select.onchange=async()=>{
            localStorage.setItem(storageKey,select.value);
-           if(kind==='audioinput'){notice.textContent='Microfone salvo. Para aplicar durante uma call, saia e entre novamente.';return}
+           if(kind==='audioinput'){
+             notice.textContent='Aplicando microfone na chamada...';
+             try{
+               const result=await window.concordSwitchCallMicrophone?.(select.value);
+               notice.textContent=result?.label?'Microfone ativo: '+result.label:'Microfone selecionado. Entre na call para ativá-lo.';
+             }catch(error){notice.textContent='Falha ao trocar microfone: '+error.message+'. Saia e entre na sala novamente.'}
+             return
+           }
            const players=[...document.querySelectorAll('audio')].filter(el=>el.srcObject&&typeof el.setSinkId==='function');
            const result=await Promise.allSettled(players.map(el=>el.setSinkId(select.value)));
            notice.textContent=result.some(r=>r.status==='rejected')?'O sistema não permitiu trocar a saída em alguns áudios.':'Saída de som aplicada aos áudios ativos.';
