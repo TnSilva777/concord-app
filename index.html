@@ -1686,7 +1686,7 @@ let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);functio
 try{
  const highpass=micContext.createBiquadFilter();highpass.type='highpass';highpass.frequency.value=195;highpass.Q.value=0.7;
  const lowpass=micContext.createBiquadFilter();lowpass.type='lowpass';lowpass.frequency.value=7600;lowpass.Q.value=0.7;
- const gate=micContext.createGain();gate.gain.value=1;
+ const gate=micContext.createGain();gate.gain.value=1; // fail-open: never hard-mute a live microphone solely on voice activity detection
  const destination=micContext.createMediaStreamDestination();src.connect(highpass);highpass.connect(lowpass);lowpass.connect(gate);gate.connect(destination);
  concordProcessedMic=destination.stream;concordMicNoiseGate=gate;
 }catch(error){console.warn('Filtro de voz indisponível:',error);concordProcessedMic=null;concordMicNoiseGate=null}
@@ -1698,12 +1698,23 @@ setLocalSpeaking(speaking);
 if(concordMicNoiseGate&&micContext?.state==='running'){
  const now=micContext.currentTime;
  const strong=localStorage.getItem('concord-noise-mode')!=='normal';
- const target=!enabled?0:!concordNoiseSuppression?1:speaking?1:strong?0.012:0.12;
- concordMicNoiseGate.gain.setTargetAtTime(target,now,speaking?0.012:0.11);
+ const target=!enabled?0:!concordNoiseSuppression?1:speaking?1:strong?0.32:0.50;
+ concordMicNoiseGate.gain.setTargetAtTime(target,now,speaking?0.008:0.22);
 }
 const rms=Math.sqrt(data.reduce((sum,value)=>sum+value*value,0)/data.length);
 $('#micMeter').style.width=(enabled?Math.min(100,rms*500):0)+'%';
-micFrame=requestAnimationFrame(meter)};meter()}catch(e){} }catch(err){$('#voiceStatus').textContent=err.name==='NotAllowedError'?'Permissão do microfone negada. Clique no cadeado ao lado do endereço do site, permita o microfone e tente novamente.':'Não foi possível acessar o microfone. Verifique se ele está conectado e se outro aplicativo não o está bloqueando.'}}function concordUpdateUserMic(){
+micFrame=requestAnimationFrame(meter)};meter()}catch(e){console.warn('Analisador de microfone indisponível:',e);concordMicNoiseGate?.gain.setValueAtTime(1,micContext?.currentTime||0)} }catch(err){
+ console.warn('Falha ao abrir microfone:',err);
+ const selected=localStorage.getItem('concord-input-device');
+ if((err.name==='NotFoundError'||err.name==='OverconstrainedError')&&selected){localStorage.removeItem('concord-input-device')}
+ $('#voiceStatus').textContent=err.name==='NotAllowedError'||err.name==='PermissionDeniedError'
+ ?'Microfone bloqueado. No Windows, abra Configurações > Privacidade e segurança > Microfone e permita aplicativos de desktop. Depois reinicie o CONCORD.'
+ :err.name==='NotFoundError'||err.name==='OverconstrainedError'
+ ?'Microfone não encontrado. A seleção antiga foi redefinida; verifique o dispositivo e tente entrar novamente.'
+ :err.name==='NotReadableError'
+ ?'Microfone ocupado ou indisponível. Feche outros programas que estejam usando o dispositivo e tente novamente.'
+ :'Não foi possível acessar o microfone. Abra Configurações > Voz e vídeo e teste outra entrada.';
+ }}function concordUpdateUserMic(){
   const b=$('#concordUserMic');if(!b)return;
   const active=!!(callJoined&&micStream);
   b.textContent=!active?'🎙':micEnabled?'🎙':'🔇';
