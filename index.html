@@ -463,7 +463,7 @@ body.concord-custom-server-view #concordInlineStage[hidden]{display:none!importa
 
 /* Hide duplicate headset in upper voice dock; keep profile audio control */
 #concordVoiceDockSound{display:none!important}
-#concordVoiceDock .voice-dock-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+#concordVoiceDock .voice-dock-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
 
 /* Compact profile actions aligned toward the right */
 .sidebar .user>.concord-user-controls{justify-content:flex-end!important;gap:3px!important;padding-left:0;margin-left:auto!important}
@@ -1688,7 +1688,7 @@ async function beginShare(){if(concordShareStarting){$('#shareStatus').textConte
 const capturedStream=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:preset.width},height:{ideal:preset.height},frameRate:{ideal:preset.frameRate,max:preset.frameRate}},audio:concordShareAudioEnabled?{echoCancellation:false,noiseSuppression:false,autoGainControl:false}:false,systemAudio:concordShareAudioEnabled?'include':'exclude',windowAudio:concordShareAudioEnabled?'system':'exclude',surfaceSwitching:'include'});if(!callJoined||stream){capturedStream.getTracks().forEach(track=>track.stop());$('#shareStatus').textContent='Compartilhamento cancelado: a chamada foi encerrada ou já existe uma transmissão.';return}stream=capturedStream;
 stream.getVideoTracks()[0]?.applyConstraints({frameRate:{ideal:preset.frameRate,max:preset.frameRate}}).catch(()=>{});if(stream.getVideoTracks()[0])stream.getVideoTracks()[0].contentHint=concordShareQuality==='quality'?'detail':'motion';const video=$('#screenPreview');video.srcObject=stream;video.style.display='block';$('#stopShare').style.display='inline-block';if(document.body.classList.contains('concord-custom-server-view')){
   $('#shareModal').classList.remove('show');
-  $('#concordVoiceDockView')?.click();
+  // A grade já é a tela principal; não alternar nem fechar ao compartilhar.
 }
 if(concordShareAudioEnabled&&!stream.getAudioTracks().length){
   $('#shareStatus').textContent='Vídeo compartilhado sem áudio do sistema. Encerre e compartilhe novamente marcando Compartilhar áudio no navegador.';
@@ -1950,7 +1950,7 @@ function concordLiveBadge(member){
   if(member.isMe&&!stream)return null;
   const button=document.createElement('button');button.type='button';button.className='concord-live-button';button.dataset.livePeer=member.id;
   button.textContent=!member.isMe&&!concordLiveStreams.has(member.id)?'◌ CONECTANDO':'● AO VIVO';button.title='Assistir à transmissão de '+member.name;button.setAttribute('aria-label','Assistir à transmissão ao vivo de '+member.name);
-  button.onclick=e=>{e.stopPropagation();if(document.body.classList.contains('concord-custom-server-view')){$('#concordVoiceDockView')?.click()}else if(member.isMe){$('#voiceModal').classList.add('show');$('#callScreenPreview').srcObject=stream;$('#callScreenPreview').style.display='block'}else concordShowLive(member.id)};
+  button.onclick=e=>{e.stopPropagation();if(document.body.classList.contains('concord-custom-server-view')){window.concordOpenVoiceGrid?.()}else if(member.isMe){$('#voiceModal').classList.add('show');$('#callScreenPreview').srcObject=stream;$('#callScreenPreview').style.display='block'}else concordShowLive(member.id)};
   return button;
 }
 function concordVoiceAvatar(element,member){
@@ -4436,12 +4436,12 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  if(!sidebar||!user||document.getElementById('concordVoiceDock'))return;
  const dock=document.createElement('section');dock.id='concordVoiceDock';dock.className='concord-voice-dock';
  dock.setAttribute('aria-label','Conexão de voz');
- dock.innerHTML='<div class="voice-dock-top"><div><div class="voice-dock-label">◉ Voz conectada</div><span class="voice-dock-room" id="concordVoiceDockRoom">Sala de voz</span></div><button type="button" class="voice-dock-disconnect" id="concordVoiceDockLeave" title="Desconectar da sala" aria-label="Desconectar da sala">☎</button></div><div class="voice-dock-actions"><button type="button" id="concordVoiceDockScreen" title="Compartilhar tela" aria-label="Compartilhar tela">🖥️</button><button type="button" id="concordVoiceDockView" title="Abrir sala de voz" aria-label="Abrir sala de voz">▤</button><button type="button" id="concordVoiceDockInvite" title="Copiar convite da sala" aria-label="Copiar convite da sala">✧</button><button type="button" id="concordVoiceDockSound" title="Ativar ou silenciar áudio recebido" aria-label="Ativar ou silenciar áudio recebido">🎧</button></div>';
+ dock.innerHTML='<div class="voice-dock-top"><div><div class="voice-dock-label">◉ Voz conectada</div><span class="voice-dock-room" id="concordVoiceDockRoom">Sala de voz</span></div><button type="button" class="voice-dock-disconnect" id="concordVoiceDockLeave" title="Desconectar da sala" aria-label="Desconectar da sala">☎</button></div><div class="voice-dock-actions"><button type="button" id="concordVoiceDockScreen" title="Compartilhar tela" aria-label="Compartilhar tela">🖥️</button><button type="button" id="concordVoiceDockInvite" title="Copiar convite da sala" aria-label="Copiar convite da sala">✧</button><button type="button" id="concordVoiceDockSound" title="Ativar ou silenciar áudio recebido" aria-label="Ativar ou silenciar áudio recebido">🎧</button></div>';
  sidebar.insertBefore(dock,user);
  const $id=id=>document.getElementById(id);
  $id('concordVoiceDockLeave').onclick=()=>{if($id('leaveCall')&&!$id('joinCall')?.disabled)return;$id('leaveCall')?.click()};
  $id('concordVoiceDockScreen').onclick=()=>$id('shareBtn')?.click();
- $id('concordVoiceDockView').onclick=()=>$id('voiceBtn')?.click();
+ 
  $id('concordVoiceDockInvite').onclick=()=>{
    const b=$id('copyRoomInvite')||$id('inviteBtn');
    if(b)b.click();else navigator.clipboard?.writeText(location.href).catch(()=>{});
@@ -4541,6 +4541,7 @@ const join=document.getElementById('joinCall');
  stageVolume.append(stageInput,stageValue);stageVolume.hidden=true;
  grid.append(header,stageVolume,tiles);main.insertBefore(grid,messages);
  const open=()=>{if(document.getElementById('concordDmNav')?.classList.contains('active')&&!document.body.classList.contains('concord-voice-expanded'))return;if(!document.body.classList.contains('concord-custom-server-view')&&!document.body.classList.contains('concord-voice-expanded'))return;if(!document.getElementById('joinCall')?.disabled)return;if(!document.body.classList.contains('concord-custom-server-view')&&!document.body.classList.contains('concord-voice-expanded')&&document.getElementById('concordDmPane')?.hidden===false)return;const stage=document.getElementById('concordInlineStage');if(stage)stage.hidden=true;messages.style.display='none';if(window.innerWidth<=760){document.body.classList.remove('concord-mobile-nav-open');document.getElementById('concordMobileNavToggle')?.setAttribute('aria-expanded','false')}grid.classList.add('open');selectMode('grade')};
+ window.concordOpenVoiceGrid=()=>{document.body.classList.add('concord-voice-expanded');open()};
  const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=()=>{if(grid.classList.contains('open'))close.click();else {document.body.classList.add('concord-voice-expanded');open()}};view.title='Abrir ou fechar a grade da chamada';view.setAttribute('aria-label','Abrir ou fechar a grade da chamada')}
  const join=document.getElementById('joinCall');
  // A grade é a tela principal automaticamente após conectar na sala.
