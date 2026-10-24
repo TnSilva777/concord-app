@@ -4501,9 +4501,10 @@ const join=document.getElementById('joinCall');
  const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=()=>{if(grid.classList.contains('open'))close.click();else {document.body.classList.add('concord-voice-expanded');open()}};view.title='Mostrar ou ocultar a grade da chamada';view.setAttribute('aria-label','Mostrar ou ocultar a grade da chamada')}
  const join=document.getElementById('joinCall');
  // A grade só abre por ação explícita no botão de visualização, em qualquer dispositivo.
- if(join){new MutationObserver(()=>{if(!join.disabled&&grid.classList.contains('open'))close.click();else if(join.disabled&&document.body.classList.contains('concord-custom-server-view')){open();selectMode('grade')}}).observe(join,{attributes:true,attributeFilter:['disabled']});if(join.disabled&&document.body.classList.contains('concord-custom-server-view')){open();selectMode('grade')}}
+ if(join){new MutationObserver(()=>{if(!join.disabled&&grid.classList.contains('open'))close.click();else }).observe(join,{attributes:true,attributeFilter:['disabled']});if(join.disabled&&document.body.classList.contains('concord-custom-server-view')){open();selectMode('grade')}}
  const selectMode=modeName=>{stageVolume.hidden=modeName!=='palco';grid.classList.toggle('cvg-stage-mode',modeName==='palco');gradeBtn.classList.toggle('selected',modeName==='grade');palcoBtn.classList.toggle('selected',modeName==='palco');lastGridSignature='';render()};
  gradeBtn.onclick=()=>selectMode('grade');palcoBtn.onclick=()=>selectMode('palco');
+ if(join?.disabled&&document.body.classList.contains('concord-custom-server-view')){open();selectMode('grade')}
  let lastGridSignature='';
  const repairAttempts=new Map();
  function render(){
