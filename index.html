@@ -1054,6 +1054,22 @@ body:has(#concordVoiceGrid.open) #concordVoiceGrid{display:flex!important;flex:1
 .concord-mic-control.concord-mic-active{color:#70f0ae;background:#153f2c}
 @media(max-width:420px){.concord-user-controls{gap:2px}.concord-user-controls .gear{min-width:28px;padding:5px}}
 </style><style>
+#concordEmbeddedVoice[hidden]{display:none!important}
+#concordEmbeddedVoice{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:18px;background:#0d1914;overflow:hidden}
+#concordEmbeddedVoice .cev-head{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#dff7e8;font-size:14px}
+#concordEmbeddedVoice .cev-head span{font-size:12px;color:#a3c9b1}
+#concordEmbeddedVoice .cev-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(var(--cev-columns,1),minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:10px;overflow:auto}
+#concordEmbeddedVoice .cev-person{min-width:0;min-height:130px;position:relative;display:flex;justify-content:center;align-items:center;background:linear-gradient(145deg,#274638,#192c23);border:1px solid #375d49;border-radius:15px}
+#concordEmbeddedVoice .cev-person:nth-child(4n+2){background:linear-gradient(145deg,#3a4740,#25332b)}
+#concordEmbeddedVoice .cev-person:nth-child(4n+3){background:linear-gradient(145deg,#244b3c,#142b23)}
+#concordEmbeddedVoice .cev-avatar{height:80px;width:80px;border-radius:50%;display:grid;place-items:center;font-size:29px;font-weight:750;background:#285840;overflow:hidden}
+#concordEmbeddedVoice .cev-talking{border-color:#49d993;box-shadow:inset 0 0 0 2px #42bd7d}
+#concordEmbeddedVoice .cev-talking .cev-avatar{box-shadow:0 0 0 3px #40d58c}
+#concordEmbeddedVoice .cev-name{position:absolute;bottom:12px;left:12px;padding:6px 10px;border-radius:8px;background:#07150fc9;color:#fff;font-size:12px;font-weight:700}
+#concordEmbeddedVoice .cev-state{position:absolute;right:12px;top:12px;color:#b8e4cc;font-size:11px}
+#concordEmbeddedVoice .cev-empty{display:grid;place-items:center;color:#a8cbb8}
+@media(max-width:760px){#concordEmbeddedVoice{padding:9px}#concordEmbeddedVoice .cev-grid{grid-template-columns:repeat(min(var(--cev-columns,1),2),minmax(0,1fr));grid-auto-rows:minmax(170px,1fr)}#concordEmbeddedVoice .cev-avatar{height:58px;width:58px;font-size:22px}}
+</style><style>
 .concord-server-heading{position:relative;display:block;padding:0 0 8px;margin:0}
 .concord-server-menu-wrap{position:relative;width:100%}
 .concord-server-heading .concord-server-menu-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 13px;background:#13241d;border:0;border-bottom:1px solid #365344;border-radius:0;color:#f2fff7;font-size:14px;font-weight:800;text-align:left}
@@ -1153,6 +1169,7 @@ body.concord-custom-server-view .concord-server-room .concord-server-room-name{t
 </div>
 <div class="user"><div class="avatar">T</div><div class="concord-user-identity"><b>Thauwan</b><small>● Online</small></div><div class="concord-user-controls"><button class="gear" id="concordSettings" type="button" title="Configurações do CONCORD" aria-label="Abrir configurações">⚙</button><button class="gear concord-mic-control" id="concordUserMic" type="button" title="Entrar na chamada para usar o microfone" aria-label="Microfone: fora da chamada" aria-pressed="false">🎙</button><button class="gear" type="button" id="concordUserHeadphones" title="Ativar ou silenciar áudio recebido" aria-label="Ativar ou silenciar áudio recebido">🎧</button><button class="gear concord-screen-control" id="shareBtn" title="Compartilhar tela" aria-label="Compartilhar tela"><svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></button><button class="gear" id="logoutBtn" title="Sair da conta" aria-label="Sair da conta">↪</button><button class="gear" id="profileBtn" title="Configurações do perfil" aria-label="Configurações do perfil">⚙</button></div></div></aside>
 <main class="main"><header class="topbar"><span class="hash">#</span><div><strong id="channelTitle">geral</strong><span class="sub"> — Converse com sua comunidade</span></div><div class="top-actions"><button class="pill hide-mobile" id="inviteBtn">＋ Convidar</button></div></header>
+<section id="concordEmbeddedVoice" hidden aria-label="Participantes da sala de voz"><div class="cev-head"><strong id="cevTitle">Sala de voz</strong><span id="cevCount">0 participantes</span></div><div id="cevGrid" class="cev-grid"></div></section>
 <div class="messages" id="messages"><section class="welcome"><h1>Bem-vindo ao <span style="color:#54d79b">CONCORD</span> ✨</h1><p>Seu espaço para jogar, conversar e encontrar sua comunidade. Comece mandando uma mensagem ou entre em uma sala de voz.</p></section><div class="date">HOJE</div><div id="messageList"><article class="message"><div class="avatar">C</div><div><div class="msghead"><b>Concord Bot</b><time>agora</time></div><div class="msgbody">Fala, pessoal! 👋 Bem-vindos ao servidor oficial do Concord. Este é o começo de uma nova comunidade!</div></div></article><article class="message"><div class="avatar" style="background:linear-gradient(135deg,#e68a56,#7d365e)">L</div><div><div class="msghead"><b>Membro da comunidade</b><time>agora</time></div><div class="msgbody">Quem vai jogar hoje? 🎮</div></div></article></div></div>
 <div class="mobilebar"><button class="pill" id="mobileInvite">＋ Convidar</button></div><footer class="composer"><form class="composebox" id="chatForm"><button type="button" class="iconbtn" id="attachBtn" title="Anexar">＋</button><textarea id="chatInput" placeholder="Mensagem em #geral" autocomplete="off" maxlength="2000" rows="1" aria-label="Escrever mensagem"></textarea><button class="iconbtn" type="button" id="emojiBtn" title="Emoji">☺</button><button class="primary" type="submit">➤</button></form><div class="hint">CONCORD • Respeite a comunidade e divirta-se.</div></footer></main></div>
 <div class="modal" id="shareModal"><section class="dialog"><h2>Compartilhar tela</h2><p>Escolha o que deseja transmitir para a sala. O navegador vai pedir sua autorização antes de capturar a tela.</p><div class="choices"><button class="choice" data-share="screen"><span class="symbol">▣</span><span><b>Tela inteira</b><small>Compartilhe tudo que aparece no monitor.</small></span></button><button class="choice" data-share="window"><span class="symbol">▢</span><span><b>Janela ou jogo</b><small>Escolha uma janela na janela do navegador.</small></span></button><button class="choice" data-share="tab"><span class="symbol">▤</span><span><b>Aba do navegador</b><small>Compartilhe uma aba específica.</small></span></button></div><video class="preview" id="screenPreview" autoplay muted playsinline style="display:none"></video><div id="shareStatus" style="color:#b9b2cf;font-size:12px"></div><div class="footbuttons"><button class="pill" id="closeShare">Fechar</button><button class="primary" id="stopShare" style="display:none">Parar transmissão</button></div></section></div>
@@ -2033,6 +2050,59 @@ close();renderCommunities();if(concordSelectedCommunity===id){renderCommunityCha
 },close=>{if(!confirm('Excluir este servidor deste navegador?'))return;concordData.communities=concordData.communities.filter(x=>x.id!==id);if(!saveConcordData()){concordData.communities.push(community);return}close();renderCommunities();if(concordSelectedCommunity===id){concordSelectedCommunity=null;concordSelectedTextRoom=null;dmShow(true)}});
 }
 let concordSelectedCommunity=null,concordSelectedTextRoom=null;
+let concordEmbeddedVoiceRoom=null;
+function concordShowEmbeddedVoice(roomKey,roomName){
+ concordEmbeddedVoiceRoom=roomKey;
+ const pane=document.getElementById('concordEmbeddedVoice');
+ if(!pane)return;
+ pane.hidden=false;document.getElementById('messages').hidden=true;
+ document.getElementById('cevTitle').textContent='◉ '+roomName;
+ concordRenderEmbeddedVoice();
+}
+function concordHideEmbeddedVoice(){
+ concordEmbeddedVoiceRoom=null;
+ const pane=document.getElementById('concordEmbeddedVoice');
+ if(pane)pane.hidden=true;
+}
+function concordRenderEmbeddedVoice(){
+ const key=concordEmbeddedVoiceRoom,pane=document.getElementById('concordEmbeddedVoice');
+ if(!key||!pane||pane.hidden)return;
+ const members=[...(roomRoster[key]||[])];
+ const unique=new Map();
+ for(const member of members){
+   const id=member.userId?'user:'+member.userId:member.id?'peer:'+member.id:member.isMe?'self':member.name;
+   if(!unique.has(id))unique.set(id,member);
+ }
+ const people=[...unique.values()];
+ const grid=document.getElementById('cevGrid');
+ document.getElementById('cevCount').textContent=people.length+' participante(s)';
+ const columns=people.length<=1?1:people.length<=4?2:people.length<=9?3:4;
+ grid.style.setProperty('--cev-columns',columns);
+ const keys=people.map(p=>p.userId||p.id||(p.isMe?'self':p.name));
+ if(grid.dataset.memberKeys!==JSON.stringify(keys)){
+   grid.replaceChildren();
+   grid.dataset.memberKeys=JSON.stringify(keys);
+   for(const member of people){
+     const tile=document.createElement('article');tile.className='cev-person';
+     const avatar=document.createElement('div');avatar.className='cev-avatar mini-avatar';
+     const label=document.createElement('span');label.className='cev-name';
+     const state=document.createElement('span');state.className='cev-state';
+     tile.append(avatar,label,state);grid.append(tile);
+   }
+ }
+ people.forEach((member,i)=>{
+   const tile=grid.children[i];if(!tile)return;
+   tile.classList.toggle('cev-talking',!!member.speaking&&!member.sharing);
+   const name=member.isMe?String(concordData.profile?.name||member.name||'Você'):String((member.userId&&concordFriendNames.get(member.userId))||member.name||'Participante');
+   tile.querySelector('.cev-name').textContent=name+(member.isMe?' (você)':'');
+   const avatar=tile.querySelector('.cev-avatar');
+   avatar.textContent=(member.initial||name[0]||'?').toUpperCase();
+   if(member.isMe)setConcordAvatar(avatar,concordData.profile);else concordVoiceAvatar(avatar,member);
+   tile.querySelector('.cev-state').textContent=member.sharing?'● AO VIVO':member.muted?'⌁ Microfone desligado':'';
+ });
+ if(!people.length){const empty=document.createElement('div');empty.className='cev-empty';empty.textContent='Nenhum participante conectado';grid.append(empty)}
+}
+
 const concordServerPanel=document.createElement('div');
 concordServerPanel.id='concordServerPanel';
 const concordSidebar=$('.sidebar');
@@ -2282,7 +2352,8 @@ close();renderCommunityChannels();[...concordServerPanel.querySelectorAll('.conc
         if(welcome){welcome.querySelector('h1').textContent=room.name;welcome.querySelector('p').textContent=kind==='text'?'Este canal pertence ao servidor. Suas mensagens ficam salvas neste navegador.':'Participantes e controles desta sala ficam na interface de chamada.'}
         $('#messageList').replaceChildren();
         concordInlineStage.hidden=true;$('#concordInlineVideo').srcObject=null;
-        $('#messages').hidden=false;
+        $('#messages').hidden=kind==='voice';
+        if(kind==='text')concordHideEmbeddedVoice();
         if(concordSelectedTextRoom)saveConcordDraft(concordCurrentDraftKey(),$('#chatInput').value);
         concordSelectedTextRoom=kind==='text'?room.id:null;
         if(kind==='text'){community.lastTextRoom=room.id;saveConcordData()}
@@ -2302,6 +2373,7 @@ close();renderCommunityChannels();[...concordServerPanel.querySelectorAll('.conc
         if(kind==='voice'){
           const voiceKey='srv-'+concordSelectedCommunity+'-'+room.id;
           if(!Object.prototype.hasOwnProperty.call(roomRoster,voiceKey))roomRoster[voiceKey]=[];
+          concordShowEmbeddedVoice(voiceKey,room.name);
           chooseRoom(voiceKey).then(()=>{
             if(window.innerWidth<=760){
               window.concordCloseVoiceGrid?.();
@@ -2730,7 +2802,7 @@ function voiceParticipants(){
     members.push({id:entry.id,userId:entry.userId||null,name,initial:name[0]?.toUpperCase()||'?',isMe:false,sharing:!!entry.sharing,speaking:(concordRemoteSpeechMeters.get(entry.id)?.speaking??!!entry.speaking),muted:!!entry.muted,deafened:!!entry.deafened});
   }}
   roomRoster[joinedRoom]=[{id:voicePeerId,userId:socialUser,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream,speaking:concordIsLocallySpeaking,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted},...members];
-  renderRooms();renderCallRoster();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();concordQueueVoiceAvatars(members);
+  renderRooms();renderCallRoster();concordRenderEmbeddedVoice();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();concordQueueVoiceAvatars(members);
   // A participant's chosen public name can arrive after presence sync.
   const unknownIds=[...new Set(members.filter(m=>m.userId&&!concordFriendNames.has(m.userId)&&!concordVoiceNameLookupAttempted.has(m.userId)).map(m=>m.userId))];
   if(unknownIds.length){unknownIds.forEach(id=>concordVoiceNameLookupAttempted.add(id));concordSupabase.from('concord_public_profiles').select('user_id,display_name').in('user_id',unknownIds).then(({data,error})=>{
@@ -2988,6 +3060,7 @@ function concordSyncVoiceLobby(){
  concordVoiceLobbyRooms.clear();
  for(const room of groups.keys())concordVoiceLobbyRooms.add(room);
  renderRooms();
+ concordRenderEmbeddedVoice();
  if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();
  concordQueueVoiceAvatars([...groups.values()].flat());
 }
