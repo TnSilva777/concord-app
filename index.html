@@ -1317,7 +1317,13 @@ body.concord-home-view #concordVoiceGrid,body.concord-home-view #concordInlineSt
 #concordAuth .concord-google-divider:before,#concordAuth .concord-google-divider:after{content:"";height:1px;background:#42624f;flex:1}
 #concordGoogleLogin{width:100%;display:flex;justify-content:center;align-items:center;gap:11px;min-height:46px;padding:12px;border:1px solid #66846f;border-radius:11px;background:#f8fcf9;color:#23382b;font-weight:700;margin-top:13px;transition:background .15s}
 #concordGoogleLogin:hover{background:#e6f7eb}#concordGoogleLogin:disabled{opacity:.65;cursor:wait}
-</style><style>body:not(.concord-custom-server-view):not(.concord-voice-expanded) #concordVoiceGrid{display:none!important}</style></head><body>
+</style><style>body:not(.concord-custom-server-view):not(.concord-voice-expanded) #concordVoiceGrid{display:none!important}</style><style>
+/* Private conversations show only the compact voice dock unless expanded explicitly. */
+body:has(#concordDmNav.active):not(.concord-voice-expanded) #concordVoiceGrid,
+body:has(#concordDmPane:not([hidden])):not(.concord-voice-expanded) #concordVoiceGrid{display:none!important}
+#concordStageVolumeControl{display:flex;gap:10px;align-items:center;padding:9px 13px;border:1px solid #37654b;border-radius:10px;background:#10291e;color:#c9eed9;font-size:12px}
+#concordStageVolumeControl input{flex:1;min-width:50px;accent-color:#4ddd95}
+</style></head><body>
 <div class="app"><aside class="servers"><div class="logo concord-brand-mark" aria-label="Logo CONCORD" title="CONCORD">C</div><button type="button" class="server" id="concordFriendsNav" title="Amigos e conversas privadas" aria-label="Abrir amigos e conversas privadas">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
 <aside class="sidebar"><div class="brand"><strong>CONCORD</strong><small>SUA COMUNIDADE. SEU ESPAÇO.</small></div><button class="search" id="searchBtn">⌕ &nbsp; Buscar canais</button><div class="section">CONCORD OFICIAL</div><button class="channel active" data-channel="geral"><span>#</span> geral</button><button class="channel" data-channel="regras"><span>#</span> regras</button><button class="channel" data-channel="anuncios"><span>#</span> anúncios</button><div class="section">COMUNIDADES</div><button class="channel" data-channel="jogos"><span>#</span> jogos</button><button class="channel" data-channel="tecnologia"><span>#</span> tecnologia</button><button class="channel" data-channel="memes"><span>#</span> memes</button><div class="section">CANAIS DE VOZ</div><button class="channel" id="voiceBtn"><span>◖</span> Sala de voz <span class="online"></span></button><div class="section voice-section-title">SALAS DE VOZ <button id="addVoiceRoom" title="Criar sala de voz">＋</button></div>
 <div class="voice-room-list" id="voiceRoomList">
@@ -4383,7 +4389,18 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
    const roomName=typeof joinedRoom!=='undefined'&&joinedRoom?joinedRoom:'Sala de voz';
    if(room){room.textContent=roomName;room.title=roomName;}
  };
- const join=document.getElementById('joinCall');
+ const privateTab=document.getElementById('concordDmNav');
+ if(privateTab)privateTab.addEventListener('click',()=>{
+   document.body.classList.remove('concord-voice-expanded');
+   if(grid.classList.contains('open'))close.click();
+ },{capture:true});
+ // Ensure the private/home view never retains the full call stage after navigation.
+ const reconcilePrivateView=()=>{
+   if(privateTab?.classList.contains('active')&&!document.body.classList.contains('concord-voice-expanded')&&grid.classList.contains('open'))close.click();
+ };
+ const privateObserver=new MutationObserver(reconcilePrivateView);
+ if(privateTab)privateObserver.observe(privateTab,{attributes:true,attributeFilter:['class']});
+const join=document.getElementById('joinCall');
  if(join)new MutationObserver(update).observe(join,{attributes:true,attributeFilter:['disabled']});
  update();
 })();
@@ -4442,8 +4459,14 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
  const gradeBtn=document.createElement('button');gradeBtn.type='button';gradeBtn.textContent='Grade';gradeBtn.className='selected';
  const palcoBtn=document.createElement('button');palcoBtn.type='button';palcoBtn.textContent='Palco';
  mode.append(gradeBtn,palcoBtn);header.append(title,mode,close);
- const tiles=document.createElement('div');tiles.className='cvg-tiles';grid.append(header,tiles);main.insertBefore(grid,messages);
- const open=()=>{if(!document.body.classList.contains('concord-custom-server-view')&&!document.body.classList.contains('concord-voice-expanded'))return;if(!document.getElementById('joinCall')?.disabled)return;if(!document.body.classList.contains('concord-custom-server-view')&&!document.body.classList.contains('concord-voice-expanded')&&document.getElementById('concordDmPane')?.hidden===false)return;const stage=document.getElementById('concordInlineStage');if(stage)stage.hidden=true;messages.style.display='none';if(window.innerWidth<=760){document.body.classList.remove('concord-mobile-nav-open');document.getElementById('concordMobileNavToggle')?.setAttribute('aria-expanded','false')}grid.classList.add('open');selectMode('grade')};
+ const tiles=document.createElement('div');tiles.className='cvg-tiles';
+ const stageVolume=document.createElement('label');stageVolume.id='concordStageVolumeControl';stageVolume.textContent='🔊 Volume da transmissão';
+ const stageInput=document.createElement('input');stageInput.type='range';stageInput.min='0';stageInput.max='100';stageInput.value=String(concordScreenAudioVolume);
+ const stageValue=document.createElement('span');stageValue.textContent=stageInput.value+'%';
+ stageInput.oninput=()=>{concordScreenVolumeInput.value=stageInput.value;concordScreenVolumeInput.dispatchEvent(new Event('input'));stageValue.textContent=stageInput.value+'%'};
+ stageVolume.append(stageInput,stageValue);
+ grid.append(header,stageVolume,tiles);main.insertBefore(grid,messages);
+ const open=()=>{if(document.getElementById('concordDmNav')?.classList.contains('active')&&!document.body.classList.contains('concord-voice-expanded'))return;if(!document.body.classList.contains('concord-custom-server-view')&&!document.body.classList.contains('concord-voice-expanded'))return;if(!document.getElementById('joinCall')?.disabled)return;if(!document.body.classList.contains('concord-custom-server-view')&&!document.body.classList.contains('concord-voice-expanded')&&document.getElementById('concordDmPane')?.hidden===false)return;const stage=document.getElementById('concordInlineStage');if(stage)stage.hidden=true;messages.style.display='none';if(window.innerWidth<=760){document.body.classList.remove('concord-mobile-nav-open');document.getElementById('concordMobileNavToggle')?.setAttribute('aria-expanded','false')}grid.classList.add('open');selectMode('grade')};
  const view=document.getElementById('concordVoiceDockView');if(view){view.onclick=()=>{if(grid.classList.contains('open'))close.click();else {document.body.classList.add('concord-voice-expanded');open()}};view.title='Mostrar ou ocultar a grade da chamada';view.setAttribute('aria-label','Mostrar ou ocultar a grade da chamada')}
  const join=document.getElementById('joinCall');
  // A grade só abre por ação explícita no botão de visualização, em qualquer dispositivo.
