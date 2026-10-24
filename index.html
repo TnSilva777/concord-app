@@ -3106,9 +3106,13 @@ async function voiceConnect(id,initiator){
   if(voicePeers.has(id))return voicePeers.get(id);
   const peer=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}],bundlePolicy:'max-bundle'});
   voicePeers.set(id,peer);
-  const outgoingMic=(concordProcessedMic?.getAudioTracks().find(track=>track.readyState==='live')||micStream.getAudioTracks().find(track=>track.readyState==='live'));
+  // On Electron use the original, diagnosed microphone track. The WebAudio
+  // speech gate can suppress quiet headset microphones despite successful capture.
+  const rawMic=micStream.getAudioTracks().find(track=>track.readyState==='live');
+  const processedMic=concordProcessedMic?.getAudioTracks().find(track=>track.readyState==='live');
+  const outgoingMic=window.concordDesktop?rawMic:(processedMic||rawMic);
   if(!outgoingMic){voiceStatus('Microfone indisponível. Saia e entre novamente na chamada para autorizar o dispositivo.');peer.close();voicePeers.delete(id);return;}
-  peer.addTrack(outgoingMic,micStream);
+  peer.addTrack(outgoingMic,window.concordDesktop||outgoingMic===rawMic?micStream:concordProcessedMic);
   if(stream?.getVideoTracks()[0]){for(const track of stream.getTracks()){const sender=peer.addTrack(track,stream);sender.__concordScreenSender=true;if(track.kind==='video')concordTuneScreenSender(sender)}}
   peer.onicecandidate=e=>{if(e.candidate)voiceSend(id,'ice',e.candidate.toJSON()).catch(console.warn)};
   peer.ontrack=e=>{
