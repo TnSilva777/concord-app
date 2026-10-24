@@ -93,15 +93,17 @@ function openExternal(raw) {
 }
 
 let selectedDesktopSource = null;
+let selectedDesktopAudio = false;
 ipcMain.handle('concord-list-share-sources',async(event)=>{
  if(!mainWindow||event.sender.id!==mainWindow.webContents.id||!isAppUrl(event.sender.getURL()))return [];
  const sources=await desktopCapturer.getSources({types:['screen','window'],thumbnailSize:{width:360,height:200}});
  return sources.map(source=>({id:source.id,name:source.name,type:source.id.startsWith('screen:')?'screen':'window',thumbnail:source.thumbnail.toDataURL()}));
 });
-ipcMain.handle('concord-select-share-source',(event,id)=>{
+ipcMain.handle('concord-select-share-source',(event,id,withAudio=false)=>{
  if(!mainWindow||event.sender.id!==mainWindow.webContents.id||!isAppUrl(event.sender.getURL()))return false;
  if(typeof id!=='string'||!(/^(screen|window):/.test(id)))return false;
  selectedDesktopSource=id;
+ selectedDesktopAudio=withAudio===true;
  return true;
 });
 function installPermissions() {
@@ -120,11 +122,13 @@ function installPermissions() {
         if (!sources.length) { callback({}); return; }
         // The user selects a preview in the CONCORD UI before getDisplayMedia.
         const chosenId=selectedDesktopSource;
+        const chosenAudio=selectedDesktopAudio;
         selectedDesktopSource=null;
+        selectedDesktopAudio=false;
         if(chosenId){
           const chosen=sources.find(source=>source.id===chosenId);
           if(!chosen){callback({});return;}
-          callback({video:chosen,audio:request.audioRequested?'loopback':undefined});
+          callback(chosenAudio?{video:chosen,audio:'loopback'}:{video:chosen});
           return;
         }
         const selected = await dialog.showMessageBox(mainWindow, {
