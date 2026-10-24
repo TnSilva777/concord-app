@@ -1,0 +1,33 @@
+name: Publicar CONCORD Desktop
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    runs-on: windows-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+      - name: Gerar instalador e publicar atualizacao
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run desktop:release
+      - name: Disponibilizar copia do instalador
+        uses: actions/upload-artifact@v4
+        with:
+          name: CONCORD-Setup-Windows
+          path: dist/CONCORD-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 30
