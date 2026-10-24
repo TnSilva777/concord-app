@@ -1575,7 +1575,7 @@ $('#chatForm').onsubmit=async event=>{
   appendChatMessage(entry);input.value='';saveConcordDraft(concordActiveChannel,'');$('#messages').scrollTop=$('#messages').scrollHeight;
 };
 function openShare(){$('#shareModal').classList.add('show')}$('#shareBtn').onclick=openShare;$('#closeShare').onclick=()=>$('#shareModal').classList.remove('show');
-let concordShareAudioEnabled=false;
+let concordShareAudioEnabled=false; // Default: share video only, never the computer audio without explicit opt-in.
 let concordShareQuality=localStorage.getItem('concord-share-quality')||'balanced';
 const concordQualityLabel=document.createElement('label');concordQualityLabel.style.cssText='display:flex;align-items:center;gap:10px;margin:12px 0;color:#d9f9e6;font-size:13px';
 const concordQualitySelect=document.createElement('select');concordQualitySelect.setAttribute('aria-label','Qualidade da transmissão');
@@ -1750,10 +1750,11 @@ let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);functio
 // Actual outgoing WebRTC processing, separate from the speaking animation.
 // High-pass reduces rumble/wind. Expander reduces quiet background sounds.
 try{
- const highpass=micContext.createBiquadFilter();highpass.type='highpass';highpass.frequency.value=145;highpass.Q.value=0.7;
+ const highpass=micContext.createBiquadFilter();highpass.type='highpass';highpass.frequency.value=185;highpass.Q.value=0.7;
+ const windCut=micContext.createBiquadFilter();windCut.type='highpass';windCut.frequency.value=120;windCut.Q.value=0.7;
  const lowpass=micContext.createBiquadFilter();lowpass.type='lowpass';lowpass.frequency.value=6800;lowpass.Q.value=0.7;
  const gate=micContext.createGain();gate.gain.value=1; // fail-open: never hard-mute a live microphone solely on voice activity detection
- const destination=micContext.createMediaStreamDestination();src.connect(highpass);highpass.connect(lowpass);lowpass.connect(gate);gate.connect(destination);
+ const destination=micContext.createMediaStreamDestination();src.connect(highpass);highpass.connect(windCut);windCut.connect(lowpass);lowpass.connect(gate);gate.connect(destination);
  concordProcessedMic=destination.stream;concordMicNoiseGate=gate;
 }catch(error){console.warn('Filtro de voz indisponível:',error);concordProcessedMic=null;concordMicNoiseGate=null}
 const data=new Float32Array(micAnalyser.fftSize),speechGate=concordCreateSpeechGate();
