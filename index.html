@@ -1669,12 +1669,13 @@ function concordCreateSpeechGate(){
   if(noise===null)noise=rms;
   if(now-started<450){noise=noise*0.95+rms*0.05;return false}
   const sensitivity=Math.max(0,Math.min(100,Number(localStorage.getItem('concord-voice-sensitivity')||65)));
-  const multiplier=2.6-(sensitivity/100)*1.3;
-  const floor=0.0005+(100-sensitivity)*0.000012;
-  const threshold=Math.max(floor,noise*multiplier);
+  // Small USB microphone signals should not be rejected by a fixed 1%-level gate.
+  // Compare against measured background instead of multiplying a noisy baseline.
+  const delta=0.00012+(100-sensitivity)*0.000010;
+  const threshold=Math.max(0.00025,noise+delta);
   if(rms>threshold){
    if(attack===null)attack=now;
-   if(now-attack>=55)until=now+220;
+   if(now-attack>=30)until=now+180;
   }else{
    attack=null;
    if(now>=until)noise=noise*0.993+rms*0.007;
@@ -1737,6 +1738,7 @@ if(concordMicNoiseGate&&micContext?.state==='running'){
  concordMicNoiseGate.gain.setTargetAtTime(target,now,speaking?0.008:0.22);
 }
 const rms=Math.sqrt(data.reduce((sum,value)=>sum+value*value,0)/data.length);
+if(enabled){const displayed=Math.min(100,rms*9000);document.getElementById('micMeter')?.setAttribute('aria-valuenow',String(Math.round(displayed)))}
 $('#micMeter').style.width=(enabled?Math.min(100,rms*500):0)+'%';
 micFrame=requestAnimationFrame(meter)};meter()}catch(e){console.warn('Analisador de microfone indisponível:',e);concordMicNoiseGate?.gain.setValueAtTime(1,micContext?.currentTime||0)} }catch(err){
  console.warn('Falha ao abrir microfone:',err);
