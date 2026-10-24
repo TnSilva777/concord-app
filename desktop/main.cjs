@@ -133,12 +133,21 @@ function installPermissions() {
       } catch (error) { console.warn('Captura de tela:', error.message); callback({}); }
     });
   }
-  ses.setPermissionCheckHandler((webContents, permission, requestingOrigin) => {
-    return allowed.has(permission) && isAppUrl(requestingOrigin || webContents?.getURL() || '');
+  // Chromium checks device permissions separately from the media request.
+  // Trust only the real app window and its exact origin, not arbitrary frames.
+  function trustedMediaRequester(contents, origin) {
+    return !!mainWindow && !mainWindow.isDestroyed()
+      && contents?.id === mainWindow.webContents.id
+      && isAppUrl(contents.getURL())
+      && (!origin || isAppUrl(origin));
+  }
+  ses.setPermissionCheckHandler((contents, permission, origin, details) => {
+    const accepted = allowed.has(permission) || permission === 'microphone' || permission === 'audioCapture';
+    return accepted && trustedMediaRequester(contents, origin || details?.requestingUrl);
   });
-  ses.setPermissionRequestHandler((webContents, permission, callback, details) => {
-    const requester = details?.requestingUrl || webContents.getURL();
-    callback(allowed.has(permission) && isAppUrl(requester));
+  ses.setPermissionRequestHandler((contents, permission, callback, details) => {
+    const accepted = allowed.has(permission) || permission === 'microphone' || permission === 'audioCapture';
+    callback(accepted && trustedMediaRequester(contents, details?.requestingUrl || details?.securityOrigin));
   });
 }
 
