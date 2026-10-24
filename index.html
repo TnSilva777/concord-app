@@ -1682,7 +1682,7 @@ let concordProcessedMic=null,concordMicNoiseGate=null;
 function concordReleaseProcessedMic(){if(concordProcessedMic)concordProcessedMic.getTracks().forEach(t=>t.stop());concordProcessedMic=null;concordMicNoiseGate=null}
 let concordNoiseSuppression=localStorage.getItem('concord-noise-suppression')!=='false';
 let concordNoiseMode=localStorage.getItem('concord-noise-mode')||'strong';
-function concordMicConstraints(){return {echoCancellation:localStorage.getItem('concord-echo-cancellation')!=='false',noiseSuppression:concordNoiseSuppression,autoGainControl:localStorage.getItem('concord-auto-gain')!=='false',channelCount:1,sampleRate:{ideal:48000}}}
+function concordMicConstraints(){return {echoCancellation:localStorage.getItem('concord-echo-cancellation')!=='false',noiseSuppression:concordNoiseSuppression,autoGainControl:localStorage.getItem('concord-auto-gain')==='true',channelCount:1,sampleRate:{ideal:48000}}}
 let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);function openVoice(){$('#voiceModal').classList.add('show')}$('#voiceBtn').onclick=openVoice;if($('#mobileVoice'))$('#mobileVoice').onclick=openVoice;$('#closeVoice').onclick=()=>$('#voiceModal').classList.remove('show');async function joinCall(){if(callJoined)return;$('#voiceStatus').textContent='Solicitando permissão do microfone…';if(!navigator.mediaDevices?.getUserMedia){$('#voiceStatus').textContent='Este navegador não permite acessar o microfone aqui. Abra o Concord em Chrome/Edge atualizado usando localhost ou HTTPS.';return}try{micStream=await (async()=>{
   const saved=localStorage.getItem('concord-input-device');
   const attempts=[
@@ -1710,8 +1710,8 @@ let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);functio
 // Actual outgoing WebRTC processing, separate from the speaking animation.
 // High-pass reduces rumble/wind. Expander reduces quiet background sounds.
 try{
- const highpass=micContext.createBiquadFilter();highpass.type='highpass';highpass.frequency.value=195;highpass.Q.value=0.7;
- const lowpass=micContext.createBiquadFilter();lowpass.type='lowpass';lowpass.frequency.value=7600;lowpass.Q.value=0.7;
+ const highpass=micContext.createBiquadFilter();highpass.type='highpass';highpass.frequency.value=110;highpass.Q.value=0.7;
+ const lowpass=micContext.createBiquadFilter();lowpass.type='lowpass';lowpass.frequency.value=7200;lowpass.Q.value=0.7;
  const gate=micContext.createGain();gate.gain.value=1; // fail-open: never hard-mute a live microphone solely on voice activity detection
  const destination=micContext.createMediaStreamDestination();src.connect(highpass);highpass.connect(lowpass);lowpass.connect(gate);gate.connect(destination);
  concordProcessedMic=destination.stream;concordMicNoiseGate=gate;
@@ -1732,7 +1732,7 @@ setLocalSpeaking(speaking);
 if(concordMicNoiseGate&&micContext?.state==='running'){
  const now=micContext.currentTime;
  const strong=localStorage.getItem('concord-noise-mode')!=='normal';
- const target=!enabled?0:!concordNoiseSuppression?1:speaking?1:strong?0.32:0.50;
+ const target=!enabled?0:!concordNoiseSuppression?1:speaking?1:strong?0.55:0.78;
  concordMicNoiseGate.gain.setTargetAtTime(target,now,speaking?0.008:0.22);
 }
 const rms=Math.sqrt(data.reduce((sum,value)=>sum+value*value,0)/data.length);
@@ -3167,9 +3167,9 @@ async function voiceConnect(id,initiator){
   // speech gate can suppress quiet headset microphones despite successful capture.
   const rawMic=micStream.getAudioTracks().find(track=>track.readyState==='live');
   const processedMic=concordProcessedMic?.getAudioTracks().find(track=>track.readyState==='live');
-  const outgoingMic=rawMic; // Send the actual captured device track, never the VAD-filtered copy.
+  const outgoingMic=(concordNoiseSuppression && processedMic) ? processedMic : rawMic; // Mild EQ + native NS, fallback to raw mic.
   if(!outgoingMic){voiceStatus('Microfone indisponível. Saia e entre novamente na chamada para autorizar o dispositivo.');peer.close();voicePeers.delete(id);return;}
-  peer.addTrack(outgoingMic,micStream);
+  peer.addTrack(outgoingMic,outgoingMic===processedMic?concordProcessedMic:micStream);
   if(stream?.getVideoTracks()[0]){for(const track of stream.getTracks()){const sender=peer.addTrack(track,stream);sender.__concordScreenSender=true;if(track.kind==='video')concordTuneScreenSender(sender)}}
   peer.onicecandidate=e=>{if(e.candidate)voiceSend(id,'ice',e.candidate.toJSON()).catch(console.warn)};
   peer.ontrack=e=>{
