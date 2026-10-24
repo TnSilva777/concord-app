@@ -4781,6 +4781,48 @@ body:not(.concord-custom-server-view) #concordServerLocalWarning{display:none}
            test.textContent='■ Parar teste';feedback.textContent='Fale no microfone: a barra verde deve reagir somente quando houver som.';
          }catch(err){stopTest();feedback.textContent='Microfone não disponível. Confira as permissões e o dispositivo selecionado.'}
        };
+       const recovery=group('Diagnóstico e recuperação do microfone');
+       const diagnostic=document.createElement('small');diagnostic.style.cssText='color:#c5e8d3;white-space:pre-wrap;line-height:1.65';diagnostic.textContent='Use o diagnóstico para descobrir se o CONCORD recebe áudio do Windows.';
+       recovery.append(diagnostic);
+       const inspect=document.createElement('button');inspect.textContent='🔎 Diagnosticar microfone';recovery.append(inspect);
+       const reset=document.createElement('button');reset.textContent='↻ Restaurar microfone padrão e testar';recovery.append(reset);
+       const inspectMic=async(resetDevice=false)=>{
+         if(testStream)stopTest();
+         if(resetDevice){localStorage.removeItem('concord-input-device');micSelect.value='';}
+         diagnostic.textContent='Verificando entrada de áudio...';
+         const lines=['Ambiente: '+(window.concordDesktop?'CONCORD Desktop':'Navegador')];
+         try{
+           const permission=await navigator.permissions?.query?.({name:'microphone'}).catch(()=>null);
+           if(permission)lines.push('Permissão: '+permission.state);
+           const devices=await navigator.mediaDevices.enumerateDevices();
+           const inputs=devices.filter(d=>d.kind==='audioinput');
+           lines.push('Microfones encontrados: '+inputs.length);
+           const deviceId=resetDevice?'':micSelect.value;
+           const stream=await navigator.mediaDevices.getUserMedia({audio:deviceId?{deviceId:{ideal:deviceId}}:true});
+           const track=stream.getAudioTracks()[0];
+           if(!track)throw new Error('A captura não retornou trilha de áudio.');
+           lines.push('Captura: '+track.readyState+' / '+(track.muted?'silenciada pelo dispositivo':'não silenciada'));
+           lines.push('Dispositivo: '+(track.label||'padrão'));
+           const context=new(window.AudioContext||window.webkitAudioContext)();
+           await context.resume();
+           const source=context.createMediaStreamSource(stream),analyser=context.createAnalyser();
+           analyser.fftSize=512;source.connect(analyser);
+           const values=new Float32Array(analyser.fftSize);
+           let peak=0;
+           for(let i=0;i<12;i++){
+             await new Promise(resolve=>setTimeout(resolve,100));
+             analyser.getFloatTimeDomainData(values);
+             let sum=0;for(const value of values)sum+=value*value;
+             peak=Math.max(peak,Math.sqrt(sum/values.length));
+           }
+           lines.push('Nível observado: '+Math.round(peak*10000)/100+'% RMS');
+           lines.push(peak<0.001?'Nenhuma atividade significativa detectada. Confira a entrada padrão e o nível no Windows.':'Áudio captado. Se a call continuar sem voz, o problema está na transmissão ou processamento.');
+           stream.getTracks().forEach(t=>t.stop());await context.close().catch(()=>{});
+         }catch(error){lines.push('Falha: '+(error.name||'Erro')+' — '+(error.message||'Sem detalhes'));console.warn('Diagnóstico CONCORD:',error)}
+         diagnostic.textContent=lines.join('\\n');
+       };
+       inspect.onclick=()=>inspectMic(false);
+       reset.onclick=()=>inspectMic(true);
        const treatment=group('Tratamento da voz');
        const toggle=(label,key,defaultValue,apply)=>{
          const row=document.createElement('label');row.style.cssText='display:flex;align-items:center;gap:10px;font-size:13px';
