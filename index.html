@@ -2955,6 +2955,15 @@ function concordSyncVoiceLobby(){
    // A lista da sala ativa também deve refletir a presença, independentemente do WebRTC.
    const activeRoom=room===joinedRoom&&callJoined;
    const actual=groups.get(room)||[];
+   // Merge the room's own signalling presence: the global lobby can briefly lag
+   // behind (or reconnect independently of) the active call's presence.
+   if(activeRoom&&voiceSignal){
+     for(const peer of Object.values(voiceSignal.presenceState()||{}).flat()){
+       if(!peer?.id||peer.id===voicePeerId||(socialUser&&peer.userId===socialUser)||actual.some(member=>member.id===peer.id))continue;
+       const name=String((peer.userId&&concordFriendNames.get(peer.userId))||peer.name||'Participante').trim().slice(0,28)||'Participante';
+       actual.push({id:peer.id,userId:peer.userId||null,name,initial:name[0].toUpperCase(),isMe:false,sharing:!!peer.sharing,speaking:concordRemoteSpeechMeters.get(peer.id)?.speaking??!!peer.speaking,muted:!!peer.muted,deafened:!!peer.deafened});
+     }
+   }
    // Short grace period prevents flicker on Realtime rejoin, never permanent ghosts.
    const now=Date.now();
    for(const member of actual)concordLobbySeenAt.set(member.id,now);
@@ -2973,6 +2982,8 @@ function concordSyncVoiceLobby(){
     tile.querySelector('.cvg-avatar')?.classList.toggle('speaking',speaking.get(tile.dataset.memberId)===true&&!concordVoiceMemberSharing(tile.dataset.memberId));
    });
    renderCallRoster();
+   // Refresh the full roster/grid from both sources after any lobby update.
+   if(voiceSignal)voiceParticipants();
  }
  concordVoiceLobbyRooms.clear();
  for(const room of groups.keys())concordVoiceLobbyRooms.add(room);
@@ -2994,6 +3005,8 @@ async function concordJoinVoiceLobby(userId){
      concordSyncVoiceLobby();
      if(!callJoined||!joinedRoom)return;
      await channel.track({id:voicePeerId,userId,room:joinedRoom,name:voicePeerName(),sharing:!!stream,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted}).catch(console.warn);
+   }else if((status==='CHANNEL_ERROR'||status==='TIMED_OUT')&&concordVoiceLobby===channel){
+     console.warn('Lobby de voz temporariamente desconectado:',status);
    }
  });
 }
@@ -3031,6 +3044,9 @@ async function startVoiceNetwork(){
             const loop=setInterval(()=>{
               if(!callJoined||voiceSignal!==channel||joinedRoom!==requestedRoom||generation!==concordVoiceNetworkGeneration){clearInterval(loop);return}
               voiceParticipants();
+              // Recover the global roster too, so people outside our WebRTC
+              // channel remain visible during transient presence sync gaps.
+              if(concordVoiceLobby)concordSyncVoiceLobby();
             },4000);
           }
           catch(error){voiceStatus('Erro ao entrar na sala de voz: '+error.message)}
