@@ -1311,6 +1311,11 @@ body.concord-home-view #concordVoiceGrid,body.concord-home-view #concordInlineSt
 .concord-friend-add-dialog input{min-width:0;width:100%;padding:14px;border:1px solid #538768;border-radius:11px;background:#081b12;color:#f4fff7;font-size:14px}
 .concord-friend-add-actions{display:flex;flex-wrap:wrap;gap:8px}.concord-friend-add-actions button{flex:1 1 auto;padding:11px;border-radius:10px;background:#25543b;min-height:42px}.concord-friend-add-actions .primary{background:#208b5f;color:#fff}
 @media(max-width:760px){.concord-friend-add-dialog{padding:18px}.concord-friend-add-actions{display:grid;grid-template-columns:1fr 1fr}.concord-friend-add-actions .primary{grid-column:1/-1}}
+</style><style>
+#concordAuth .concord-google-divider{display:flex;align-items:center;gap:10px;margin-top:16px;color:#96bca8;font-size:12px}
+#concordAuth .concord-google-divider:before,#concordAuth .concord-google-divider:after{content:"";height:1px;background:#42624f;flex:1}
+#concordGoogleLogin{width:100%;display:flex;justify-content:center;align-items:center;gap:11px;min-height:46px;padding:12px;border:1px solid #66846f;border-radius:11px;background:#f8fcf9;color:#23382b;font-weight:700;margin-top:13px;transition:background .15s}
+#concordGoogleLogin:hover{background:#e6f7eb}#concordGoogleLogin:disabled{opacity:.65;cursor:wait}
 </style></head><body>
 <div class="app"><aside class="servers"><div class="logo concord-brand-mark" aria-label="Logo CONCORD" title="CONCORD">C</div><button type="button" class="server" id="concordFriendsNav" title="Amigos e conversas privadas" aria-label="Abrir amigos e conversas privadas">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
 <aside class="sidebar"><div class="brand"><strong>CONCORD</strong><small>SUA COMUNIDADE. SEU ESPAÇO.</small></div><button class="search" id="searchBtn">⌕ &nbsp; Buscar canais</button><div class="section">CONCORD OFICIAL</div><button class="channel active" data-channel="geral"><span>#</span> geral</button><button class="channel" data-channel="regras"><span>#</span> regras</button><button class="channel" data-channel="anuncios"><span>#</span> anúncios</button><div class="section">COMUNIDADES</div><button class="channel" data-channel="jogos"><span>#</span> jogos</button><button class="channel" data-channel="tecnologia"><span>#</span> tecnologia</button><button class="channel" data-channel="memes"><span>#</span> memes</button><div class="section">CANAIS DE VOZ</div><button class="channel" id="voiceBtn"><span>◖</span> Sala de voz <span class="online"></span></button><div class="section voice-section-title">SALAS DE VOZ <button id="addVoiceRoom" title="Criar sala de voz">＋</button></div>
@@ -4012,6 +4017,8 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
         <label class="auth-field" for="authPassword">Senha<input id="authPassword" type="password" placeholder="Sua senha" autocomplete="current-password" minlength="6" required></label>
         <button id="authSubmit" type="submit">Entrar no CONCORD →</button>
       </form>
+      <div class="concord-google-divider"><span>ou continue com</span></div>
+      <button id="concordGoogleLogin" type="button" aria-label="Continuar com Google"><svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6C44.4 38.04 46.98 31.88 46.98 24.55z"/><path fill="#FBBC05" d="M10.53 28.59A14.45 14.45 0 0 1 9.75 24c0-1.59.28-3.14.77-4.59l-7.98-6.2A23.86 23.86 0 0 0 0 24c0 3.87.93 7.52 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.92-2.13 15.89-5.8l-7.73-6c-2.14 1.44-4.88 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Continuar com Google</span></button>
       <p id="authMessage" role="status" aria-live="polite"></p>
       <p class="auth-switch"><a id="authToggle" role="button" tabindex="0">Ainda não tem conta? Cadastre-se</a></p>
       <p class="auth-footer">CONCORD · Sua comunidade, seu espaço.</p>
@@ -4026,6 +4033,23 @@ if('serviceWorker'in navigator && location.protocol.startsWith('http'))navigator
   const message = document.getElementById('authMessage');
   const submit = document.getElementById('authSubmit');
   let registering = false;
+  document.getElementById('concordGoogleLogin').onclick=async()=>{
+    const button=document.getElementById('concordGoogleLogin');
+    button.disabled=true;
+    message.textContent='Abrindo o login do Google…';
+    try{
+      // OAuth redirects back to the same trusted site, not an arbitrary URL.
+      // Google does not support sign-in inside embedded Electron webviews.
+      if(navigator.userAgent.includes('Electron')){
+        message.textContent='No aplicativo Windows, o login Google precisa ser concluído no navegador externo. Por enquanto, utilize e-mail e senha.';
+        return;
+      }
+      const redirectTo=location.origin+location.pathname;
+      const {error}=await concordSupabase.auth.signInWithOAuth({provider:'google',options:{redirectTo}});
+      if(error)throw error;
+    }catch(error){message.textContent=error.message||'Não foi possível entrar com Google. Confira se o provedor está configurado no Supabase.'}
+    finally{button.disabled=false}
+  };
 
   document.getElementById('authToggle').onclick = () => {
     registering = !registering;
