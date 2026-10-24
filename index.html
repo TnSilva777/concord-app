@@ -1300,7 +1300,18 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 }
 @media(prefers-reduced-motion:reduce){.app>.servers .server,.app>.servers .concord-community-item .server{transition:none!important;transform:none!important}}
 </style>
-</head><body>
+<style>
+/* Private conversations must never inherit the active voice-preview stage. */
+body.concord-home-view #concordVoiceGrid,body.concord-home-view #concordInlineStage{display:none!important}
+.sidebar .user .avatar[role="button"]{cursor:pointer;outline-offset:3px}
+.sidebar .user .avatar[role="button"]:focus-visible{outline:2px solid #86efb8}
+.concord-friend-add-overlay{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:#010b08cd;padding:16px}
+.concord-friend-add-dialog{display:grid;gap:16px;width:min(450px,100%);padding:25px;border-radius:20px;background:linear-gradient(145deg,#1b4230,#10261d);border:1px solid #5b9470;box-shadow:0 20px 70px #000a}
+.concord-friend-add-dialog h2{margin:0;font-size:21px}.concord-friend-add-dialog p{margin:0;color:#badccc;line-height:1.5;font-size:13px}
+.concord-friend-add-dialog input{min-width:0;width:100%;padding:14px;border:1px solid #538768;border-radius:11px;background:#081b12;color:#f4fff7;font-size:14px}
+.concord-friend-add-actions{display:flex;flex-wrap:wrap;gap:8px}.concord-friend-add-actions button{flex:1 1 auto;padding:11px;border-radius:10px;background:#25543b;min-height:42px}.concord-friend-add-actions .primary{background:#208b5f;color:#fff}
+@media(max-width:760px){.concord-friend-add-dialog{padding:18px}.concord-friend-add-actions{display:grid;grid-template-columns:1fr 1fr}.concord-friend-add-actions .primary{grid-column:1/-1}}
+</style></head><body>
 <div class="app"><aside class="servers"><div class="logo concord-brand-mark" aria-label="Logo CONCORD" title="CONCORD">C</div><button type="button" class="server" id="concordFriendsNav" title="Amigos e conversas privadas" aria-label="Abrir amigos e conversas privadas">✦</button><button class="server add" id="addServer" title="Criar comunidade">+</button></aside>
 <aside class="sidebar"><div class="brand"><strong>CONCORD</strong><small>SUA COMUNIDADE. SEU ESPAÇO.</small></div><button class="search" id="searchBtn">⌕ &nbsp; Buscar canais</button><div class="section">CONCORD OFICIAL</div><button class="channel active" data-channel="geral"><span>#</span> geral</button><button class="channel" data-channel="regras"><span>#</span> regras</button><button class="channel" data-channel="anuncios"><span>#</span> anúncios</button><div class="section">COMUNIDADES</div><button class="channel" data-channel="jogos"><span>#</span> jogos</button><button class="channel" data-channel="tecnologia"><span>#</span> tecnologia</button><button class="channel" data-channel="memes"><span>#</span> memes</button><div class="section">CANAIS DE VOZ</div><button class="channel" id="voiceBtn"><span>◖</span> Sala de voz <span class="online"></span></button><div class="section voice-section-title">SALAS DE VOZ <button id="addVoiceRoom" title="Criar sala de voz">＋</button></div>
 <div class="voice-room-list" id="voiceRoomList">
@@ -1667,9 +1678,10 @@ let concordMicGain=Number(localStorage.getItem('concord-mic-gain')||100);functio
 // Actual outgoing WebRTC processing, separate from the speaking animation.
 // High-pass reduces rumble/wind. Expander reduces quiet background sounds.
 try{
- const highpass=micContext.createBiquadFilter();highpass.type='highpass';highpass.frequency.value=165;highpass.Q.value=0.7;
+ const highpass=micContext.createBiquadFilter();highpass.type='highpass';highpass.frequency.value=195;highpass.Q.value=0.7;
+ const lowpass=micContext.createBiquadFilter();lowpass.type='lowpass';lowpass.frequency.value=7600;lowpass.Q.value=0.7;
  const gate=micContext.createGain();gate.gain.value=1;
- const destination=micContext.createMediaStreamDestination();src.connect(highpass);highpass.connect(gate);gate.connect(destination);
+ const destination=micContext.createMediaStreamDestination();src.connect(highpass);highpass.connect(lowpass);lowpass.connect(gate);gate.connect(destination);
  concordProcessedMic=destination.stream;concordMicNoiseGate=gate;
 }catch(error){console.warn('Filtro de voz indisponível:',error);concordProcessedMic=null;concordMicNoiseGate=null}
 const data=new Float32Array(micAnalyser.fftSize),speechGate=concordCreateSpeechGate();
@@ -1680,8 +1692,8 @@ setLocalSpeaking(speaking);
 if(concordMicNoiseGate&&micContext?.state==='running'){
  const now=micContext.currentTime;
  const strong=localStorage.getItem('concord-noise-mode')!=='normal';
- const target=!enabled?0:!concordNoiseSuppression?1:speaking?1:strong?0.055:0.20;
- concordMicNoiseGate.gain.setTargetAtTime(target,now,speaking?0.018:0.16);
+ const target=!enabled?0:!concordNoiseSuppression?1:speaking?1:strong?0.012:0.12;
+ concordMicNoiseGate.gain.setTargetAtTime(target,now,speaking?0.012:0.11);
 }
 const rms=Math.sqrt(data.reduce((sum,value)=>sum+value*value,0)/data.length);
 $('#micMeter').style.width=(enabled?Math.min(100,rms*500):0)+'%';
@@ -2800,7 +2812,10 @@ $('#addServer').onclick=openCommunityCreator;$('#profileBtn').onclick=()=>{
   overlay.onclick=event=>{if(event.target===overlay)overlay.remove()};
   overlay.onkeydown=event=>{if(event.key==='Escape'){event.preventDefault();overlay.remove()}};
   actions.querySelector('button')?.focus();
-};updateProfileUI();renderCommunities();concordReceiveCommunityInvite();
+};
+const concordOwnAvatar=document.querySelector('.sidebar .user .avatar');
+if(concordOwnAvatar){concordOwnAvatar.tabIndex=0;concordOwnAvatar.setAttribute('role','button');concordOwnAvatar.title='Visualizar ou personalizar meu perfil';concordOwnAvatar.setAttribute('aria-label','Abrir opções do meu perfil');concordOwnAvatar.addEventListener('click',()=>document.getElementById('profileBtn')?.click());concordOwnAvatar.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();document.getElementById('profileBtn')?.click()}})}
+updateProfileUI();renderCommunities();concordReceiveCommunityInvite();
 // Anima o contorno da foto quando o microfone detecta voz (somente no dispositivo local).
 let concordIsLocallySpeaking=false,concordVoiceSpeakingLast=0;
 function setLocalSpeaking(on){
@@ -3488,7 +3503,7 @@ dmPane.querySelector('.concord-dm-header')?.insertBefore(dmHeaderAvatar,dmPane.q
 function dmShow(open){
   ++dmRequest;
   dmOpen=open;dmPane.hidden=!open;
-  if(open)window.concordCloseVoiceGrid?.();
+  if(open){window.concordCloseVoiceGrid?.();document.getElementById('concordVoiceGrid')?.classList.remove('open');document.getElementById('concordInlineStage')?.setAttribute('hidden','');}
   dmProfileAction.hidden=!open||!dmPeer;
   if(open&&!dmPeer){
     const history=$('#dmHistory');
@@ -3860,7 +3875,24 @@ async function refreshSocial(){
 }
 $('#concordAddFriend').onclick=async()=>{
   if(!socialUser){simple('Entre na conta','Faça login antes de adicionar amigos.');return}
-  const id=prompt('Cole o ID de usuário (UUID) do seu amigo:');
+  const id=await new Promise(resolve=>{
+    document.getElementById('concordFriendAddOverlay')?.remove();
+    const overlay=document.createElement('div');overlay.id='concordFriendAddOverlay';overlay.className='concord-friend-add-overlay';
+    const form=document.createElement('form');form.className='concord-friend-add-dialog';
+    const heading=document.createElement('h2');heading.textContent='Conectar com um amigo';
+    const help=document.createElement('p');help.textContent='Cole o ID que seu amigo compartilhou. Você também pode copiar seu próprio ID para enviar a ele.';
+    const field=document.createElement('input');field.type='text';field.autocomplete='off';field.placeholder='ID do amigo';field.required=true;field.setAttribute('aria-label','ID do amigo');
+    const actions=document.createElement('div');actions.className='concord-friend-add-actions';
+    const copy=document.createElement('button');copy.type='button';copy.textContent='Copiar meu ID';
+    copy.onclick=async()=>{try{await navigator.clipboard.writeText(socialUser);copy.textContent='✓ ID copiado'}catch{prompt('Copie seu ID:',socialUser)}};
+    const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Cancelar';
+    const send=document.createElement('button');send.type='submit';send.textContent='Enviar pedido';send.className='primary';
+    let finished=false;const finish=value=>{if(finished)return;finished=true;overlay.remove();resolve(value)};
+    cancel.onclick=()=>finish(null);overlay.onclick=e=>{if(e.target===overlay)finish(null)};
+    form.onsubmit=e=>{e.preventDefault();finish(field.value.trim())};
+    form.onkeydown=e=>{if(e.key==='Escape')finish(null)};
+    actions.append(copy,cancel,send);form.append(heading,help,field,actions);overlay.append(form);document.body.append(overlay);field.focus();
+  });
   if(!id)return;
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id.trim())){simple('ID inválido','Peça ao amigo para copiar o ID dele no painel Amigos.');return}
   if(id.trim()===socialUser){simple('Amigos','Você não pode adicionar sua própria conta.');return}
