@@ -1951,7 +1951,7 @@ const concordLiveStreams=new Map();
 let concordWatching=null;
 function concordShowLive(id){
   const video=$('#callScreenPreview'),remote=concordLiveStreams.get(id);
-  if(!remote||!remote.getVideoTracks().some(t=>t.readyState==='live')){concordWatching=id;$('#voiceModal').classList.add('show');$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block';$('#callStageMessage').textContent='Aguardando vídeo de '+String((roomRoster[joinedRoom]||[]).find(m=>m.id===id)?.name||'seu amigo')+'…';$('#callSubtitle').textContent='Conectando à transmissão';voiceStatus('Aguardando a transmissão chegar. Verifique se a chamada está conectada.');concordRequestShareRepair(id);return}
+  if(!remote||!remote.getVideoTracks().some(t=>t.readyState==='live'&&!t.muted)){concordWatching=id;$('#voiceModal').classList.add('show');$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block';$('#callStageMessage').textContent='Aguardando vídeo de '+String((roomRoster[joinedRoom]||[]).find(m=>m.id===id)?.name||'seu amigo')+'…';$('#callSubtitle').textContent='Conectando à transmissão';voiceStatus('Aguardando a transmissão chegar. Verifique se a chamada está conectada.');concordRequestShareRepair(id);return}
   concordWatching=id;video.srcObject=remote;video.muted=true;video.autoplay=true;video.playsInline=true;video.style.display='block';concordUpdateFullscreen();
   video.play().catch(()=>voiceStatus('Clique no vídeo para iniciar a reprodução da transmissão.'));
   $('#callStageMessage').style.display='none';$('#stageBadge').style.display='block';
@@ -3220,7 +3220,7 @@ function voiceParticipants(){
   }
   for(const [id,peer] of voicePeers)if(!members.some(m=>m.id===id)){
     if(!concordVoiceLastSeen.has(id))concordVoiceLastSeen.set(id,now);
-    if(now-concordVoiceLastSeen.get(id)<9000){
+    if(now-concordVoiceLastSeen.get(id)<(peer.connectionState==='connected'?30000:12000)){
       const previous=(roomRoster[joinedRoom]||[]).find(m=>m.id===id);
       if(previous)members.push(previous);
       continue;
@@ -3335,9 +3335,9 @@ async function voiceConnect(id,initiator){
       if(concordWatching===id){const player=$('#callScreenPreview');player.srcObject=live;player.muted=true;player.style.display='block';$('#callStageMessage').style.display='none';$('#stageBadge').style.display='block';$('#callSubtitle').textContent='Assistindo transmissão ao vivo';player.play().catch(()=>voiceStatus('Clique no vídeo para iniciar a reprodução.'))}
       concordSyncInlineStage();
       if(concordWatching===id){concordInlineSound.textContent='🔊 Ativar som';}
-      e.track.onmute=()=>{if(concordVoiceMemberSharing(id))setTimeout(()=>{if(e.track.muted&&e.track.readyState==='live')concordRequestShareRepair(id)},2800);if(concordWatching===id){$('#callSubtitle').textContent='Transmissão pausada ou reconectando';voiceStatus('O vídeo do amigo foi interrompido. Aguardando retorno…')}};
+      e.track.onmute=()=>{if(concordLiveStreams.get(id)!==live)return;concordSyncInlineStage();if(concordVoiceMemberSharing(id))setTimeout(()=>{if(concordLiveStreams.get(id)===live&&e.track.muted&&e.track.readyState==='live')concordRequestShareRepair(id)},2800);if(concordWatching===id){$('#callSubtitle').textContent='Transmissão pausada ou reconectando';voiceStatus('O vídeo do amigo foi interrompido. Aguardando retorno…')}};
       e.track.onunmute=()=>{concordShareRepairRequested.delete(id);concordSyncInlineStage();if(concordWatching===id){const player=$('#callScreenPreview');player.srcObject=live;player.style.display='block';$('#callStageMessage').style.display='none';$('#callSubtitle').textContent='Assistindo transmissão ao vivo';player.play().catch(()=>{})}renderRooms()};
-      e.track.onended=()=>{if(concordLiveStreams.get(id)===live)concordLiveStreams.delete(id);concordSyncInlineStage();if(concordWatching===id){concordWatching=null;$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block'}renderRooms()};
+      e.track.onended=()=>{if(concordLiveStreams.get(id)!==live)return;concordLiveStreams.delete(id);concordSyncInlineStage();if(concordWatching===id){$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block';$('#callStageMessage').textContent='Transmissão interrompida. Tentando reconectar…';concordRequestShareRepair(id).catch(console.warn)}renderRooms();renderCallRoster()};
       renderRooms();if(typeof renderCallRoster==='function')renderCallRoster();return;
     }
     const audioKey=id+':'+e.track.id;
