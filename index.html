@@ -3237,6 +3237,9 @@ function voiceParticipants(){
     const name=String((entry.userId&&concordFriendNames.get(entry.userId))||entry.name||'Participante').slice(0,28);
     members.push({id:entry.id,userId:entry.userId||null,name,initial:name[0]?.toUpperCase()||'?',isMe:false,sharing:!!entry.sharing,speaking:(concordRemoteSpeechMeters.get(entry.id)?.speaking??!!entry.speaking),muted:!!entry.muted,deafened:!!entry.deafened});
   }}
+  const uniqueMembers=new Map();
+  for(const member of members){const key=member.userId?'user:'+member.userId:'peer:'+member.id;const prev=uniqueMembers.get(key);if(!prev||(voicePeers.get(member.id)?.connectionState==='connected'&&voicePeers.get(prev.id)?.connectionState!=='connected'))uniqueMembers.set(key,member)}
+  members.splice(0,members.length,...uniqueMembers.values());
   roomRoster[joinedRoom]=[{id:voicePeerId,userId:socialUser,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream,speaking:concordIsLocallySpeaking,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted},...members];
   renderRooms();renderCallRoster();concordRenderEmbeddedVoice();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();concordQueueVoiceAvatars(members);
   // A participant's chosen public name can arrive after presence sync.
@@ -3342,6 +3345,7 @@ async function voiceConnect(id,initiator){
       e.track.onended=()=>{if(concordLiveStreams.get(id)!==live)return;concordLiveStreams.delete(id);concordSyncInlineStage();if(concordWatching===id){$('#callScreenPreview').srcObject=null;$('#callScreenPreview').style.display='none';$('#callStageMessage').style.display='block';$('#callStageMessage').textContent='Transmissão interrompida. Tentando reconectar…';concordRequestShareRepair(id).catch(console.warn)}renderRooms();renderCallRoster()};
       renderRooms();if(typeof renderCallRoster==='function')renderCallRoster();return;
     }
+    for(const [key,oldAudio] of voiceAudio){if(key.startsWith(id+':')&&oldAudio.srcObject?.getAudioTracks().every(track=>track.readyState==='ended')){oldAudio.pause();oldAudio.srcObject=null;oldAudio.remove();voiceAudio.delete(key)}}
     const audioKey=id+':'+e.track.id;
     let audio=voiceAudio.get(audioKey);
     if(!audio){audio=document.createElement('audio');audio.autoplay=true;audio.playsInline=true;audio.muted=remoteAudioMuted;audio.style.display='none';audio.volume=Math.min(1,concordPeerVolume(id)/100);document.body.append(audio);voiceAudio.set(audioKey,audio)}
@@ -3467,7 +3471,7 @@ function concordSyncVoiceLobby(){
    if(entry.userId)concordRememberVoiceName(entry.userId,entry.name);
    const name=String((entry.userId&&concordFriendNames.get(entry.userId))||entry.name||'Participante').trim().slice(0,28)||'Participante';
    if(!groups.has(entry.room))groups.set(entry.room,[]);
-   if(!groups.get(entry.room).some(member=>member.id===entry.id))groups.get(entry.room).push({id:entry.id,userId:entry.userId||null,name,initial:name[0].toUpperCase(),isMe:false,sharing:!!entry.sharing,speaking:(concordRemoteSpeechMeters.get(entry.id)?.speaking??!!entry.speaking),muted:!!entry.muted,deafened:!!entry.deafened});
+   if(!groups.get(entry.room).some(member=>member.id===entry.id||(entry.userId&&member.userId===entry.userId)))groups.get(entry.room).push({id:entry.id,userId:entry.userId||null,name,initial:name[0].toUpperCase(),isMe:false,sharing:!!entry.sharing,speaking:(concordRemoteSpeechMeters.get(entry.id)?.speaking??!!entry.speaking),muted:!!entry.muted,deafened:!!entry.deafened});
  }
  for(const room of new Set([...concordVoiceLobbyRooms,...groups.keys()])){
    // A lista da sala ativa também deve refletir a presença, independentemente do WebRTC.
@@ -3477,7 +3481,7 @@ function concordSyncVoiceLobby(){
    // behind (or reconnect independently of) the active call's presence.
    if(activeRoom&&voiceSignal){
      for(const peer of Object.values(voiceSignal.presenceState()||{}).flat()){
-       if(!peer?.id||peer.id===voicePeerId||(socialUser&&peer.userId===socialUser)||actual.some(member=>member.id===peer.id))continue;
+       if(!peer?.id||peer.id===voicePeerId||(socialUser&&peer.userId===socialUser)||actual.some(member=>member.id===peer.id||(peer.userId&&member.userId===peer.userId)))continue;
        const name=String((peer.userId&&concordFriendNames.get(peer.userId))||peer.name||'Participante').trim().slice(0,28)||'Participante';
        actual.push({id:peer.id,userId:peer.userId||null,name,initial:name[0].toUpperCase(),isMe:false,sharing:!!peer.sharing,speaking:concordRemoteSpeechMeters.get(peer.id)?.speaking??!!peer.speaking,muted:!!peer.muted,deafened:!!peer.deafened});
      }
