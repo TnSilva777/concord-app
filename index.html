@@ -3201,10 +3201,10 @@ function voiceParticipants(){
   if(!voiceSignal||!joinedRoom)return;
   const state=voiceSignal.presenceState(),members=[];
    const speakingByPeer=new Map();
-   if(concordVoiceLobby)for(const entry of Object.values(concordVoiceLobby.presenceState()).flat())if(entry?.id)speakingByPeer.set(entry.id,(concordRemoteSpeechMeters.get(entry.id)?.speaking??!!entry.speaking));
+   if(concordVoiceLobby)for(const entry of Object.values(concordVoiceLobby.presenceState()).flat())if(entry?.id)speakingByPeer.set(entry.id,(concordRemoteSpeechMeters.get(entry.id)?.speaking===true));
   Object.values(state).flat().forEach(p=>{
     if(!p||!p.id||p.id===voicePeerId||p.userId&&p.userId===socialUser)return;
-    if(!members.some(m=>m.id===p.id)){if(p.userId)concordRememberVoiceName(p.userId,p.name);const publicName=p.userId&&concordFriendNames.get(p.userId);const name=String(publicName||p.name||'Participante').trim().slice(0,28)||'Participante';members.push({id:p.id,userId:p.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!p.sharing,speaking:concordRemoteSpeechMeters.get(p.id)?.speaking??speakingByPeer.get(p.id)===true,muted:!!p.muted,deafened:!!p.deafened})};
+    if(!members.some(m=>m.id===p.id)){if(p.userId)concordRememberVoiceName(p.userId,p.name);const publicName=p.userId&&concordFriendNames.get(p.userId);const name=String(publicName||p.name||'Participante').trim().slice(0,28)||'Participante';members.push({id:p.id,userId:p.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!p.sharing,speaking:concordRemoteSpeechMeters.get(p.id)?.speaking===true||speakingByPeer.get(p.id)===true,muted:!!p.muted,deafened:!!p.deafened})};
   });
   // Oscilações de presença durante renegociação de vídeo não são saídas confirmadas.
   const now=Date.now();
@@ -3215,7 +3215,7 @@ function voiceParticipants(){
     concordVoiceLastSeen.set(entry.id,now);
     if(!members.some(m=>m.id===entry.id)){
       const name=String((entry.userId&&concordFriendNames.get(entry.userId))||entry.name||'Participante').slice(0,28);
-      members.push({id:entry.id,userId:entry.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!entry.sharing,speaking:(concordRemoteSpeechMeters.get(entry.id)?.speaking??!!entry.speaking),muted:!!entry.muted,deafened:!!entry.deafened});
+      members.push({id:entry.id,userId:entry.userId||null,name,initial:name.slice(0,1).toUpperCase(),isMe:false,sharing:!!entry.sharing,speaking:(concordRemoteSpeechMeters.get(entry.id)?.speaking===true),muted:!!entry.muted,deafened:!!entry.deafened});
     }
   }
   for(const [id,peer] of voicePeers)if(!members.some(m=>m.id===id)){
@@ -3235,10 +3235,17 @@ function voiceParticipants(){
   if(concordVoiceLobby){for(const entry of Object.values(concordVoiceLobby.presenceState()||{}).flat()){
     if(entry?.room!==joinedRoom||!entry.id||entry.id===voicePeerId||members.some(m=>m.id===entry.id))continue;
     const name=String((entry.userId&&concordFriendNames.get(entry.userId))||entry.name||'Participante').slice(0,28);
-    members.push({id:entry.id,userId:entry.userId||null,name,initial:name[0]?.toUpperCase()||'?',isMe:false,sharing:!!entry.sharing,speaking:(concordRemoteSpeechMeters.get(entry.id)?.speaking??!!entry.speaking),muted:!!entry.muted,deafened:!!entry.deafened});
+    members.push({id:entry.id,userId:entry.userId||null,name,initial:name[0]?.toUpperCase()||'?',isMe:false,sharing:!!entry.sharing,speaking:(concordRemoteSpeechMeters.get(entry.id)?.speaking===true),muted:!!entry.muted,deafened:!!entry.deafened});
   }}
   const uniqueMembers=new Map();
-  for(const member of members){const key=member.userId?'user:'+member.userId:'peer:'+member.id;const prev=uniqueMembers.get(key);if(!prev||(voicePeers.get(member.id)?.connectionState==='connected'&&voicePeers.get(prev.id)?.connectionState!=='connected'))uniqueMembers.set(key,member)}
+  // Prefer a connected session when a reconnect leaves duplicate presence keys.
+  for(const member of members){
+    const key=member.userId?'user:'+member.userId:'peer:'+member.id;
+    const prev=uniqueMembers.get(key);
+    if(!prev){uniqueMembers.set(key,member);continue}
+    const score=m=>(voicePeers.get(m.id)?.connectionState==='connected'?4:0)+(m.sharing?2:0)+(voicePeers.get(m.id)?.connectionState==='connecting'?1:0);
+    if(score(member)>score(prev))uniqueMembers.set(key,member);
+  }
   members.splice(0,members.length,...uniqueMembers.values());
   roomRoster[joinedRoom]=[{id:voicePeerId,userId:socialUser,name:voicePeerName(),initial:voicePeerName().slice(0,1).toUpperCase(),isMe:true,sharing:!!stream,speaking:concordIsLocallySpeaking,muted:!micEnabled||remoteAudioMuted,deafened:!!remoteAudioMuted},...members];
   renderRooms();renderCallRoster();concordRenderEmbeddedVoice();if(typeof refreshConcordLocalVoiceMembers==='function')refreshConcordLocalVoiceMembers();concordQueueVoiceAvatars(members);
@@ -3471,7 +3478,7 @@ function concordSyncVoiceLobby(){
    if(entry.userId)concordRememberVoiceName(entry.userId,entry.name);
    const name=String((entry.userId&&concordFriendNames.get(entry.userId))||entry.name||'Participante').trim().slice(0,28)||'Participante';
    if(!groups.has(entry.room))groups.set(entry.room,[]);
-   if(!groups.get(entry.room).some(member=>member.id===entry.id||(entry.userId&&member.userId===entry.userId)))groups.get(entry.room).push({id:entry.id,userId:entry.userId||null,name,initial:name[0].toUpperCase(),isMe:false,sharing:!!entry.sharing,speaking:(concordRemoteSpeechMeters.get(entry.id)?.speaking??!!entry.speaking),muted:!!entry.muted,deafened:!!entry.deafened});
+   if(!groups.get(entry.room).some(member=>member.id===entry.id||(entry.userId&&member.userId===entry.userId)))groups.get(entry.room).push({id:entry.id,userId:entry.userId||null,name,initial:name[0].toUpperCase(),isMe:false,sharing:!!entry.sharing,speaking:(concordRemoteSpeechMeters.get(entry.id)?.speaking===true),muted:!!entry.muted,deafened:!!entry.deafened});
  }
  for(const room of new Set([...concordVoiceLobbyRooms,...groups.keys()])){
    // A lista da sala ativa também deve refletir a presença, independentemente do WebRTC.
