@@ -94,6 +94,13 @@ function openExternal(raw) {
 
 let selectedDesktopSource = null;
 let selectedDesktopAudio = false;
+let selectedDesktopSourceAt = 0;
+const SHARE_SELECTION_TTL_MS = 45_000;
+function clearDesktopShareSelection() {
+  selectedDesktopSource = null;
+  selectedDesktopAudio = false;
+  selectedDesktopSourceAt = 0;
+}
 ipcMain.handle('concord-list-share-sources',async(event)=>{
  if(!mainWindow||event.sender.id!==mainWindow.webContents.id||!isAppUrl(event.sender.getURL()))return [];
  const sources=await desktopCapturer.getSources({types:['screen','window'],thumbnailSize:{width:360,height:200}});
@@ -104,6 +111,7 @@ ipcMain.handle('concord-select-share-source',(event,id,withAudio=false)=>{
  if(typeof id!=='string'||!(/^(screen|window):/.test(id)))return false;
  selectedDesktopSource=id;
  selectedDesktopAudio=withAudio===true;
+ selectedDesktopSourceAt=Date.now();
  return true;
 });
 function installPermissions() {
@@ -121,10 +129,9 @@ function installPermissions() {
         const sources = await desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 240, height: 150 } });
         if (!sources.length) { callback({}); return; }
         // The user selects a preview in the CONCORD UI before getDisplayMedia.
-        const chosenId=selectedDesktopSource;
-        const chosenAudio=selectedDesktopAudio;
-        selectedDesktopSource=null;
-        selectedDesktopAudio=false;
+        const chosenId=selectedDesktopSourceAt && Date.now()-selectedDesktopSourceAt<=SHARE_SELECTION_TTL_MS ? selectedDesktopSource : null;
+        const chosenAudio=!!chosenId && selectedDesktopAudio;
+        clearDesktopShareSelection();
         if(chosenId){
           const chosen=sources.find(source=>source.id===chosenId);
           if(!chosen){callback({});return;}
@@ -244,6 +251,7 @@ function createWindow() {
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (!isAppUrl(url)) { event.preventDefault(); openExternal(url); }
   });
+  mainWindow.webContents.on('did-start-navigation', () => clearDesktopShareSelection());
   mainWindow.webContents.on('did-navigate', (_event, url) => { if (isAppUrl(url)) { lastMainUrl = url; if (new URL(url).origin === APP_ORIGIN) usingBundledFallback = false; } });
   mainWindow.webContents.on('did-navigate-in-page', (_event, url) => { if (isAppUrl(url)) lastMainUrl = url; });
   // Retry when Internet access is restored; do not expose Node integration to the site.
