@@ -1588,7 +1588,7 @@ $('#chatForm').onsubmit=async event=>{
   appendChatMessage(entry);input.value='';saveConcordDraft(concordActiveChannel,'');$('#messages').scrollTop=$('#messages').scrollHeight;
 };
 function openShare(){$('#shareModal').classList.add('show')}$('#shareBtn').onclick=openShare;$('#closeShare').onclick=()=>$('#shareModal').classList.remove('show');
-let concordShareAudioEnabled=false; // Default: share video only, never the computer audio without explicit opt-in.
+let concordShareAudioEnabled=!!window.concordDesktop?.listShareSources; // Desktop: audio enabled by default, visible and adjustable before selecting a source.
 let concordShareQuality=localStorage.getItem('concord-share-quality')||'balanced';
 const concordQualityLabel=document.createElement('label');concordQualityLabel.style.cssText='display:flex;align-items:center;gap:10px;margin:12px 0;color:#d9f9e6;font-size:13px';
 const concordQualitySelect=document.createElement('select');concordQualitySelect.setAttribute('aria-label','Qualidade da transmissão');
@@ -1599,8 +1599,8 @@ concordQualityLabel.append(document.createTextNode('Qualidade'),concordQualitySe
 $('#shareStatus').parentElement.insertBefore(concordQualityLabel,$('#shareStatus'));
 
 const concordShareAudioLabel=document.createElement('label');concordShareAudioLabel.style.cssText='display:flex;gap:8px;align-items:center;margin:12px 0;color:#d9f9e6;font-size:13px';
-const concordShareAudioInput=document.createElement('input');concordShareAudioInput.type='checkbox';concordShareAudioInput.checked=false;concordShareAudioInput.onchange=()=>{concordShareAudioEnabled=concordShareAudioInput.checked};
-concordShareAudioLabel.append(concordShareAudioInput,document.createTextNode('Compartilhar áudio da aba (opcional · use fones para evitar eco)'));
+const concordShareAudioInput=document.createElement('input');concordShareAudioInput.type='checkbox';concordShareAudioInput.checked=concordShareAudioEnabled;concordShareAudioInput.onchange=()=>{concordShareAudioEnabled=concordShareAudioInput.checked};
+concordShareAudioLabel.append(concordShareAudioInput,document.createTextNode(window.concordDesktop?.listShareSources?'Incluir som do computador na transmissão (use fones para evitar eco)':'Compartilhar áudio quando disponível (use fones para evitar eco)'));
 $('#shareStatus').parentElement.insertBefore(concordShareAudioLabel,$('#shareStatus'));
 // Volume individual do participante remoto (microfone + áudio de transmissão).
 const concordPeerVolumes=new Map();
@@ -1668,7 +1668,7 @@ function concordOpenAudioSettings(){
 }
 const concordAudioHelp=document.createElement('small');
 concordAudioHelp.style.cssText='display:block;color:#a7d3b7;line-height:1.5;margin-bottom:10px';
-concordAudioHelp.textContent='Para transmitir o som do jogo ou vídeo, selecione uma aba com áudio ou habilite “Compartilhar áudio do sistema” no Chrome/Edge. Algumas janelas e sistemas não permitem capturar áudio.';
+concordAudioHelp.textContent=window.concordDesktop?.listShareSources?'No aplicativo para Windows, o som do computador já vem selecionado. Desmarque a opção acima para transmitir sem áudio. A captura depende do suporte do Windows/Electron.':'No navegador, ative também a opção de compartilhar áudio no seletor do Chrome/Edge, quando disponível.';
 concordShareAudioLabel.after(concordAudioHelp);
 
 let concordShareStarting=false;
@@ -1678,23 +1678,50 @@ async function concordChooseDesktopSource(){
  if(!sources?.length)throw new Error('Nenhuma tela ou janela disponível.');
  return new Promise(resolve=>{
   const overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;inset:0;z-index:100001;display:grid;place-items:center;background:#030b08e8;padding:20px';
-  const panel=document.createElement('section');panel.style.cssText='width:min(850px,96vw);max-height:85vh;overflow:auto;background:#10271c;border:1px solid #3c8863;border-radius:18px;padding:22px;color:#eafff3;box-shadow:0 24px 70px #000b';
-  const heading=document.createElement('h2');heading.textContent='Compartilhar tela • CONCORD';panel.append(heading);
-  const subtitle=document.createElement('p');subtitle.textContent='Selecione o monitor ou a janela que deseja transmitir.';panel.append(subtitle);
-  const options=document.createElement('div');options.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;max-height:55vh;overflow:auto';
-  const close=(result)=>{overlay.remove();resolve(result)};
-  for(const source of sources){
-   const button=document.createElement('button');button.type='button';button.style.cssText='background:#173b2a;border:1px solid #42785b;border-radius:12px;overflow:hidden;padding:8px;color:white;text-align:left;cursor:pointer';
-   const preview=document.createElement('img');preview.src=source.thumbnail;preview.alt='Prévia de '+source.name;preview.style.cssText='width:100%;aspect-ratio:16/9;object-fit:contain;background:#07150f;border-radius:8px';
-   const caption=document.createElement('div');caption.style.cssText='margin-top:8px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';caption.textContent=(source.type==='screen'?'🖥 ':'▣ ')+source.name;
-   button.append(preview,caption);button.onclick=async()=>{button.disabled=true;try{if(await window.concordDesktop.selectShareSource(source.id,concordShareAudioEnabled))close(true);else close(false)}catch(err){console.warn(err);close(false)}};
-   options.append(button);
+  overlay.style.cssText='position:fixed;inset:0;z-index:100001;display:grid;place-items:center;background:#030b08e8;padding:18px';
+  const panel=document.createElement('section');panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label','Escolher tela para transmissão');
+  panel.style.cssText='width:min(940px,98vw);max-height:92vh;display:flex;flex-direction:column;gap:12px;overflow:hidden;background:#10271c;border:1px solid #3c8863;border-radius:18px;padding:22px;color:#eafff3;box-shadow:0 24px 70px #000b';
+  const heading=document.createElement('h2');heading.textContent='O que você quer transmitir?';heading.style.margin='0';panel.append(heading);
+  const subtitle=document.createElement('p');subtitle.textContent='Escolha uma tela ou janela. O som do computador está '+(concordShareAudioEnabled?'ativado':'desativado')+' e pode ser alterado abaixo.';subtitle.style.margin='0';panel.append(subtitle);
+  const tabs=document.createElement('div');tabs.style.cssText='display:flex;gap:8px;flex-wrap:wrap';panel.append(tabs);
+  const options=document.createElement('div');options.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;overflow:auto;min-height:100px;max-height:52vh;padding:3px';
+  let current='screen',selected=null,selectedButton=null;
+  const tabButtons={};
+  const draw=()=>{
+   options.replaceChildren();selected=null;selectedButton=null;
+   for(const [type,button] of Object.entries(tabButtons)){button.style.background=current===type?'#18764f':'#1b3e2c';button.setAttribute('aria-pressed',String(current===type))}
+   const filtered=sources.filter(source=>source.type===current);
+   for(const source of filtered){
+    const button=document.createElement('button');button.type='button';button.style.cssText='background:#173b2a;border:2px solid #42785b;border-radius:12px;overflow:hidden;padding:9px;color:white;text-align:left;cursor:pointer;min-width:0';
+    const preview=document.createElement('img');preview.src=source.thumbnail;preview.alt='Prévia de '+source.name;preview.style.cssText='width:100%;aspect-ratio:16/9;object-fit:contain;background:#07150f;border-radius:8px';
+    const caption=document.createElement('div');caption.style.cssText='margin-top:8px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';caption.textContent=(source.type==='screen'?'🖥 ':'▣ ')+source.name;
+    button.append(preview,caption);button.onclick=()=>{if(selectedButton)selectedButton.style.borderColor='#42785b';selected=source;selectedButton=button;button.style.borderColor='#48e6a0';confirm.disabled=false;confirm.style.opacity='1'};
+    button.ondblclick=()=>{button.click();confirm.click()};
+    options.append(button);
+   }
+   if(!filtered.length){const empty=document.createElement('p');empty.textContent='Nenhuma opção disponível nesta categoria.';options.append(empty)}
+   confirm.disabled=true;confirm.style.opacity='.5';
+  };
+  for(const [type,label] of [['screen','🖥 Telas'],['window','▣ Janelas']]){
+   const tab=document.createElement('button');tab.type='button';tab.textContent=label;tab.style.cssText='padding:9px 15px;border-radius:9px;color:white;border:1px solid #4f8b69';tab.onclick=()=>{current=type;draw()};tabButtons[type]=tab;tabs.append(tab);
   }
   panel.append(options);
-  const cancel=document.createElement('button');cancel.textContent='Cancelar';cancel.style.cssText='margin-top:16px;background:#244d37;padding:10px 18px;border-radius:10px;color:white';cancel.onclick=()=>close(false);panel.append(cancel);
+  const audioLabel=document.createElement('label');audioLabel.style.cssText='display:flex;gap:10px;align-items:center;padding:12px;background:#173b2a;border:1px solid #42785b;border-radius:10px;font-size:13px';
+  const audioToggle=document.createElement('input');audioToggle.type='checkbox';audioToggle.checked=concordShareAudioEnabled;
+  audioToggle.onchange=()=>{concordShareAudioEnabled=audioToggle.checked;concordShareAudioInput.checked=audioToggle.checked;subtitle.textContent='Escolha uma tela ou janela. O som do computador está '+(audioToggle.checked?'ativado':'desativado')+'.'};
+  audioLabel.append(audioToggle,document.createTextNode('🔊 Transmitir também o som do computador'));panel.append(audioLabel);
+  const note=document.createElement('small');note.textContent='O áudio do sistema será solicitado automaticamente quando disponível. Use fones para evitar eco.';note.style.color='#a8cdb7';panel.append(note);
+  const actions=document.createElement('div');actions.style.cssText='display:flex;justify-content:flex-end;gap:9px';
+  let settled=false;
+  const onKey=e=>{if(e.key==='Escape'){e.preventDefault();close(false)}};
+  const close=result=>{if(settled)return;settled=true;document.removeEventListener('keydown',onKey);overlay.remove();resolve(result)};
+  const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Cancelar';cancel.style.cssText='background:#244d37;padding:11px 18px;border-radius:10px;color:white';cancel.onclick=()=>close(false);
+  const confirm=document.createElement('button');confirm.type='button';confirm.textContent='Iniciar transmissão';confirm.disabled=true;confirm.style.cssText='background:#16865e;padding:11px 18px;border-radius:10px;color:white;font-weight:700';
+  confirm.onclick=async()=>{if(!selected||confirm.disabled)return;confirm.disabled=true;try{const ok=await window.concordDesktop.selectShareSource(selected.id,audioToggle.checked);close(!!ok)}catch(err){console.warn(err);close(false)}};
+  actions.append(cancel,confirm);panel.append(actions);
   overlay.append(panel);document.body.append(overlay);
   overlay.addEventListener('click',event=>{if(event.target===overlay)close(false)});
+  document.addEventListener('keydown',onKey);draw();cancel.focus();
  });
 }
 async function beginShare(){if(concordShareStarting){$('#shareStatus').textContent='Uma solicitação de compartilhamento já está em andamento.';return}if(stream){$('#shareStatus').textContent='Você já está compartilhando a tela. Encerre a transmissão atual antes de iniciar outra.';return}if(!callJoined){$('#shareStatus').textContent='Entre em uma sala de voz antes de compartilhar sua tela.';return}if(!navigator.mediaDevices?.getDisplayMedia){$('#shareStatus').textContent='Seu navegador não oferece compartilhamento de tela. Tente uma versão atualizada do Chrome ou Edge em um computador.';return}concordShareStarting=true;try{if(window.concordDesktop?.listShareSources){const chosen=await concordChooseDesktopSource();if(!chosen){$('#shareStatus').textContent='Compartilhamento cancelado.';return}}const preset=concordShareQuality==='performance'?{width:1280,height:720,frameRate:30}:concordShareQuality==='quality'?{width:1920,height:1080,frameRate:60}:{width:1920,height:1080,frameRate:30};
